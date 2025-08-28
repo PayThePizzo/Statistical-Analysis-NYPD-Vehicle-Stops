@@ -1,0 +1,197 @@
+---
+title: "Predicting Excessive Enforcement Patterns in Police Behavior After Vehicles Stops in New York"
+author: "Gianmaria Pizzo"
+output:
+  html_document:
+    fig_caption: yes
+    theme: flatly
+    highlight: pygments
+    code_folding: show
+    kee_md: yes
+    toc: yes
+    toc_depth: 4
+    number_sections: no
+    toc_float:
+      smooth_scroll: no
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+These `.Rmd` files represent the project submission for the course [Statistical Inference and Learning](https://www.unive.it/data/course/451271) by Professor [Cristiano Varin](https://www.unive.it/data/people/5592728) at [Ca' Foscari University of Venice](https://www.unive.it/) for the year 2024/2025.
+
+# Problem Statement
+
+## Goal of the Project
+
+As the title of the project suggests, the goal of the project is to assess **whether** we can say (with enough confidence) that the **police behavior shows excessive enforcement patterns**, after a vehicle stop has been conducted.
+
+In particular, we focus on studying if there exist relationships between violent outcomes and specific groups of people, or areas. This should help to shed some light on the alleged "systemic nature" of the stops.
+
+However, some of the limiting factors for our study, include the small time frame of the data, the absence of information about the reason behind the halt, the self-report nature of some variables and the partial anonymization of the values.
+
+Thus, this analysis will not be limited to performing basic univariate, bivariate or multivariate exploratory analysis. Instead, we first start from formatting the data in a way we can understand the meaning of each variable, and the issues that come with it.
+
+Furthermore, we may also introduce transformations or other means of engineering, until we feel satisfied with the final data. We might add new insights about the effects of time-of-day, day-of-week, precinct to reveal new observations, such as whether racial disparities peak during specific hours or hot-spots.
+
+All of the manipulations, are to be carefully tested for significance. In fact, we might end up using some automatic variable selection approach to and other means of model selection.
+
+Only then, we can proceed to design the final plot, check for outliers and collinearity, and formulate our main assumptions. We want to prevent complex interactions between terms that might limit the interpretability. This does not mean we are not going to try and evaluate combinations of features (that may also substitute the initial ones) nonetheless. The result of this initial part, aims to increase the reliability of the information, crucial to the next step.
+
+The core of this project is to pragmatically build, analyze and interpret (multiple) predictive models capable of estimating whether a stop escalates into a search, seizure, arrest, or use-of-force based (forecasting outcome) and the significance of the factors used to build such models. This means, we want to differentiate between different target features by context.
+
+Therefore, this requires an extensive training process, including the use of k-fold-cross validation, subset selection and other techniques to promote theoretical and empirical validity.
+
+Finally, as this is mainly a classification problem, we will include all possible classification metrics and perform extensive tests. We hope to quantify both the accuracy and the confidence of our inferences to determine what this data is telling us.
+
+## Previous Research and Novel Approach
+
+Even though there exist some public reports (e.g., [NYCLU - NYPD Vehicle Stops Data](https://www.nyclu.org/data/nypd-vehicle-stops-data)), they only cover descriptive statistics.
+
+As already stated above, our analysis will provide a better insight, through predictive modeling, model comparison (via AIC and cross-validation), and inference on interactions (e.g., race × time or precinct).
+
+We hope this analysis dissipates or pinpoints the police bias clearly, even with limited data, as it might lead to either confirming that some areas and races are more subject to police enforcement than others, or that this has been a product of the prominent propaganda, and the police is "just doing its job".
+
+Last but not least, we do not approach the data with any prior research bias, unlike many journalists.
+
+## Questions we want to ask
+
+Obviously, we could not proceed forward if we did not have some designated questions for our data. 
+
+Is it more likely to be the subject of an episode of excessive enforcement behavior...
+
+- When stopped in a specific area (or borough)?
+- When stopped by a specific command unit?
+- When stopped outside of the 9am-5pm "window"?
+- When stopped during the weekend?
+- If the driver is under 35 years old?
+- If the driver belongs to a specific ethnicity? 
+- If the driver identifies with a specific gender?
+- If the vehicles used belongs to a specific category?
+
+Furthermore, we may also formulate questions of the kind
+
+- Is there a specific sub-category of drivers that is subject of most of these episodes? 
+- Is there a specific ethnicity targeted by excessive enforcement behavior in a particular area?
+- Proportionally speaking, since Donald Trump became president (January 20, 2025), has any of the previous aspect changed?
+
+## Goal of this rmarkdown file - TODO
+
+The EDA is the first step to understanding the data and its nature.
+
+This includes analyzing the single features (Univariate Analysis), their interactions with the target (Bivariate Analysis) and their interactions with other features (Multivariate Analysis and Collinearity Check). However, the latter might be hard to compute as it requires the estimation of a regression model that follows certain assumptions and it is usually easier to check this when using linear models.
+
+During my exploration I will look out for possible outliers, correlation and any other statistically relevant problem that might affect my final prediction.
+
+We will start with the environment.
+
+
+Note that, from now on, I will shift adopt a more **formal or inclusive tone** (e.g., the "editorial we").
+
+------------------------------------------------------------------------
+
+# Environment
+
+The first to do, is to build a reproducible environment for our project.
+
+```{r}
+requirements=c( 
+  "remotes", "summarytools", 
+  "stringr", "plyr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
+  "timeDate", "timechange", "tzdb", "hms", "readr",
+  "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor", "ggbeeswarm", "emmeans",
+  "sf", "plotly", "ggplot2", "ggmap", "ggdensity", "UpSetR", "patchwork"
+)
+```
+
+```{r, include=FALSE}
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      install.packages(req)
+  }
+}
+```
+
+Note that some of the packages may not be used, but to avoid any error related to dependencies, we are going to keep all of these libraries. Now, the loading of all packages should be immediate.
+
+```{r, include=FALSE}
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      library(req)
+  }
+}
+```
+
+------------------------------------------------------------------------
+
+# Univariate EDA
+
+In this part we perform a deeper analysis of the target feature, and some of the most important features (according to the domain knowledge in notebook 0).
+
+Our goal here is to polish the data, by removing outliers and possible confounders that may introduce bias. Furthermore, we need to understand its distribution and normalizing it if necessary.
+
+Possibly, we can introduce new variables that are transformations or combinations of other ones, and evaluate their contributions later with a bivariate analysis and/or model testing.
+
+Hopefully, this process will reduce the variance.
+
+
+## Target feature
+
+## Enforcement and Escalation features
+
+## Command Unit, Geospatial and Area related Features
+
+Combine Latitude and longitude in one variable?
+
+## Time related features
+
+TODO: Year 2023 per month vs amount of stops
+
+TODO: Year 2023 per month vs amount of stops
+
+TODO: Year 2025 per months vs amount of stops
+
+## Motorist related features
+
+## Vehicle related features
+
+---
+
+# Bivariate EDA
+
+## Correlation
+
+## Collinearity
+
+## Enforcement and Escalation features vs Target
+
+## Command Unit, Geospatial and Area related Features vs Target
+
+## Time related features vs Target
+
+## Motorist related features vs Target
+
+## Vehicle related features vs Target
+
+---
+
+# Multivariate EDA
+
+## Multicollinearity
+
+## Enforcement and Escalation features vs Target
+
+## Command Unit, Geospatial and Area related Features vs Target
+
+## Time related features vs Target
+
+## Motorist related features vs Target
+
+## Vehicle related features vs Target
+
+--- 
+
+# Feature Encoding
