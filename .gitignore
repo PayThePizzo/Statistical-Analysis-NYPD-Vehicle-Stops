@@ -50,3 +50,6 @@ rsconnect/
 
 # Do not include large datasets
 data/*
+
+# Ignore the todo
+TODO.*
