@@ -27,21 +27,25 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 ## Goal of the Project
 
-As the title of the project suggests, the goal of the project is to assess **whether** we can say (with enough confidence) that the **police behavior shows excessive enforcement patterns**, after a vehicle stop has been conducted.
+As the title of the project suggests, the goal of the project is to assess **whether** we can affirm that the **police behavior shows excessive enforcement patterns**, after a vehicle stop has been conducted.
 
-In particular, we focus on studying if there exist relationships between violent outcomes and specific groups of people, or areas. This should help to shed some light on the alleged "systemic nature" of the stops.
+In particular, we focus on studying if there exist relationships between violent outcomes and specific groups of people, time frames, or areas. This should help to shed some light on the alleged "systemic nature" of the stops.
 
-However, some of the limiting factors for our study, include the small time frame of the data, the absence of information about the reason behind the halt, the self-report nature of some variables and the partial anonymization of the values.
+However, some of the limiting factors for our study include:
+
+-   The small window of time used to gather the data (2ys and 6 months);
+-   The absence of information about the reason behind the halt;
+-   The self-report nature of some variables and the partial anonymization of the values.
 
 Thus, this analysis will not be limited to performing basic univariate, bivariate or multivariate exploratory analysis. Instead, we first start from formatting the data in a way we can understand the meaning of each variable, and the issues that come with it.
 
 Furthermore, we may also introduce transformations or other means of engineering, until we feel satisfied with the final data. We might add new insights about the effects of time-of-day, day-of-week, precinct to reveal new observations, such as whether racial disparities peak during specific hours or hot-spots.
 
-All of the manipulations, are to be carefully tested for significance. In fact, we might end up using some automatic variable selection approach to and other means of model selection.
+All of the manipulations, are to be carefully tested for their impact. In fact, we might end up using some automatic variable selection approach to and other means of model selection.
 
 Only then, we can proceed to design the final plot, check for outliers and collinearity, and formulate our main assumptions. We want to prevent complex interactions between terms that might limit the interpretability. This does not mean we are not going to try and evaluate combinations of features (that may also substitute the initial ones) nonetheless. The result of this initial part, aims to increase the reliability of the information, crucial to the next step.
 
-The core of this project is to pragmatically build, analyze and interpret (multiple) predictive models capable of estimating whether a stop escalates into a search, seizure, arrest, or use-of-force based (forecasting outcome) and the significance of the factors used to build such models. This means, we want to differentiate between different target features by context.
+The core of this project is to pragmatically build, analyze and interpret (multiple) predictive models capable of estimating whether a stop escalates into a search, seizure, arrest, or use-of-force based (forecasting outcome) and the importance of the factors used to build such models. This means, we want to differentiate between different target features by context.
 
 Therefore, this requires an extensive training process, including the use of k-fold-cross validation, subset selection and other techniques to promote theoretical and empirical validity.
 
@@ -59,24 +63,25 @@ Last but not least, we do not approach the data with any prior research bias, un
 
 ## Questions we want to ask
 
-Obviously, we could not proceed forward if we did not have some designated questions for our data. 
+Obviously, we could not proceed forward if we did not have some designated questions for our data.
 
 Is it more likely to be the subject of an episode of excessive enforcement behavior...
 
-- When stopped in a specific area (or borough)?
-- When stopped by a specific command unit?
-- When stopped outside of the 9am-5pm "window"?
-- When stopped during the weekend?
-- If the driver is under 35 years old?
-- If the driver belongs to a specific ethnicity? 
-- If the driver identifies with a specific gender?
-- If the vehicles used belongs to a specific category?
+-   When stopped in a specific area (or borough)?
+-   When stopped by a specific command unit?
+-   When stopped outside of the 9am-5pm "window"?
+-   When stopped during a specific time bracket (ex: 0am-3am)?
+-   When stopped during the weekend (Saturday/Sunday)?
+-   If the driver is under 35 years old?
+-   If the driver belongs to a specific reported ethnicity?
+-   If the driver identifies with a specific reported sex?
+-   If the vehicles used belongs to a specific category?
 
 Furthermore, we may also formulate questions of the kind
 
-- Is there a specific sub-category of drivers that is subject of most of these episodes? 
-- Is there a specific ethnicity targeted by excessive enforcement behavior in a particular area?
-- Proportionally speaking, since Donald Trump became president (January 20, 2025), has any of the previous aspect changed?
+-   Is there a specific sub-category of drivers (grouped by reported sex and/or reported race and/or reported age) that is subject of most of these episodes?
+-   Is there a specific reported ethnicity targeted by excessive enforcement behavior in a particular area/borough?
+-   Proportionally speaking, since Donald Trump became president (January 20, 2025), has any of the previous aspect changed dramatically?
 
 ## Goal of this rmarkdown file
 
@@ -126,12 +131,12 @@ Here we try to introduce the data, elaborate on its nature and make hypothesis a
 
 ## Data Description
 
-The dataset was published during February 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in July 2025 and downloaded less than 2100 times at the time of download (Mid July 2025).
+The dataset was published during February 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in October 2025 and downloaded less than 4400 times at the time of download (end of January 2026).
 
 Let us load the data now.
 
 ```{r}
-vehiclestops = read.csv("data/NYPD_Vehicle_Stop_Reports_20250717.csv")
+vehiclestops = read.csv("data/NYPD_Vehicle_Stop_Reports_20260123.csv")
 ```
 
 The [data overview landing page](https://data.cityofnewyork.us/Public-Safety/NYPD-Vehicle-Stop-Reports/hn9i-dwpr/about_data) confirms that the number of rows are 2M+ rows and has 19 features
@@ -262,13 +267,13 @@ Another aspect we can include inside the data, comes from looking up **national 
 
 For future analysis, we should also dig into the NY community life and reveal the presence of manifestations, construction works and other aspects that can help us explain the patterns we are going to see.
 
-However, when we initially looked at the dataset through the API, we found around `10687` instances of vehicle stops that have happened at midnight, which might mean the presence of some mistake (possibly due to the system) or some anonymization pattern we might want to explore in detail. This, even though limited to very few instances (compared to the full dataset), can be an interesting point for **data correction**.
+However, as it shows in the DataFrame summary, we found around `14615` instances of vehicle stops that have happened at midnight, which might mean the presence of some mistake (possibly due to the system) or some anonymization pattern we might want to explore in detail. This, even though limited to very few instances (compared to the full dataset), can be an interesting point for **data correction**.
 
 ### Geospatial Features and `VEH_CHECKPOINT_FLG`
 
-Geospatial features like `LATITUDE`, `LONGITUDE`, `X_COORD_CD` and `Y_COORD_CD` suffer from some **lack of information** as the previous ones. In fact, using the website api mentioned above, we can filter them to check the amount of rows where all 4 of them are set to exactly 0. This would result in `234682` records. Also, there are less null values for the x,y coordinates than there are for the latitude and longitude, which means we can convert where one into the other and viceversa. 
+Geospatial features like `LATITUDE`, `LONGITUDE`, suffer from some **lack of information**. In fact, without checking null or 0 values, there is already 19% of missing data. Also, there is evidence of errors in the range of `X_COORD_CD` and `Y_COORD_CD`, which should not have values like `-74` or `40`. This indicates a mix-up with the previously mentioned columns. Fortunately, it is possible to convert one into the other and viceversa.
 
-What we can also say, is that this might be due to two kinds of dynamics, depending on **whether the stop occurred at a fixed location (checkpoint) or not** (like a patrol stop or traffic violation observed in motion). This is represented by the `VEH_CHECKPOINT_FLG`.
+For what concerns the great presence of 0 values in `LATITUDE` and `LONGITUDE`, it might be due to two kinds of dynamics, depending on **whether the stop occurred at a fixed location (checkpoint) or not** (like a patrol stop or traffic violation observed in motion). This is represented by the `VEH_CHECKPOINT_FLG`.
 
 Thus, some of the values could be set to 0 in order to anonymize the location, as we are dealing with sensitive or standardized information. Thus, if conducting a checkpoint, the officers might just fill the data for one stop, while the remaining ones are simply set to 0. On the other hand, if this information does not come from a checkpoint, it is plausible to think there will be a higher frequency of police enforcement statistics for police-initiated stops.
 
@@ -286,7 +291,7 @@ Furthermore, the command code serves more as a mean to represent **behavior** ra
 
 This makes `CMD_CD` a **powerful signal, but also a highly confounded one**. We need to be cautious to avoid the scenario where it encodes systemic enforcement bias. Namely, if our models lean too heavily on this variable, we risk to learn and *amplify patterns that may already be skewed*. Plus, since we already have geospatial data, we need to verify whether `CMD_CD` adds non-redundant information or simply repeats what is already captured in those features, which may introduce multicollinearity.
 
-Last but not least, the phenomenon of *data drift* adds another layer of complexity: if precinct behavior evolves over time, the predictive significance of `CMD_CD` might not hold up in future data, although this another aspect we must explore.
+Last but not least, the phenomenon of *data drift* adds another layer of complexity: if precinct behavior evolves over time, the predictive power of `CMD_CD` might not hold up in future data, although this another aspect we must explore.
 
 To sum up, we still need to consider the role of this feature, when it comes to explain part of the target. For the time being, we have considered that a precinct surely relates well to spatial information, and factors that lead to escalating stops.
 
@@ -298,7 +303,7 @@ When we talk about escalation, we consider being stopped by the police the start
 
 Without any idea about what the police is looking for when conducting an halt, we should find a way to infer when their behavior become "excessive". This means we must treat each flag (e.g., search, seizure, use of force, arrest) as a separate event with its own conditions, rather than parts of a single unfolding sequence, and dig deeper into common patterns behind each one of them. Alternatively, we can group them to become a single feature that signals the presence of an outcome that might be considered "excessive".
 
-In order to communicate why this seems complicated, let us look at the arrests: they occur in only `3.4%` of cases, a very rare event compared to the amount of instances. In contrast, judicial summonses appear in `59.4%` of rows, and are far more common. By our line of conduct, this preview may let us believe there is no such thing as excessive enforcement behavior in NYPD, but trusting frequency alone is not our goal.
+In order to communicate why this seems complicated, let us look at the arrests: they occur in only `3.4%` of cases, a very rare event compared to the amount of instances. In contrast, judicial summonses appear in `59.3%` of rows, and are far more common. By our line of conduct, this preview may let us believe there is no such thing as excessive enforcement behavior in NYPD, but trusting frequency alone is not our goal.
 
 Fortunately, for this category of features, only the `VEH_SEARCH_CONSENT_FLG` presents `(null)` values, but only less than `3%` of the instances present an actual flag. This surely can give some context regarding escalation of searches.
 
@@ -308,23 +313,23 @@ When working with *self-reported demographic* features (age, sex, and race), we 
 
 The `RPTED_AGE` field, for instance, allows us to **segment drivers into age brackets** (like we would do for the time of the day). This idea comes from the fact, the preview highlights a good amount of stops involved people under 30 years of age. Thus (with a new representation) we might be able to confirm whether younger drivers are treated differently, such as being more likely to be searched or arrested. More interesting aspects will emerge later on.
 
-For `SEX_CD`, we usually treat it as a binary or categorical variable, but the presence of `UNKNOWN` as a possibility may suggest that the form used by police officers is not "inclusive". By not being able to represent people that do not identify themselves with traditional labels "Male" or "Female", `13654` records are left with this ambiguous value. Unlike other numerical data, we have no means to impute this information, although my first thought would be assuming these persons are part of the LGBT+ community. On the other hand, the self-reported nature of the variable does not help us understand if the data was exploited by the motorist to take advantage of the line of defense that involve minorities, so we must take a faith leap on that. Anyway, we cannot just assume people belong to the LGBT+ community (even if we could check the statistics regarding the month of July, the international pride month), nor that they are always honest (especially with the police).
+For `SEX_CD`, we usually treat it as a binary or categorical variable, but the presence of `UNKNOWN` as a possibility may suggest that the form used by police officers is not "inclusive". By not being able to represent people that do not identify themselves with traditional labels "Male" or "Female", `14509` records are left with this ambiguous value. Unlike other numerical data, we have no means to impute this information, although our first thought would be assuming these persons are part of the LGBT+ community. On the other hand, the self-reported nature of the variable does not help us understand if the data was exploited by the motorist to take advantage of the line of defense that involve minorities, so we must take a faith leap on that. Anyway, we cannot just assume people belong to the LGBT+ community (even if we could check the statistics regarding the month of July, the international pride month), nor that they are always honest (especially with the police).
 
-The `RACE_DESC` variable is particularly important for identifying possible disparities. However, it is hard to understand how to approach the fact we have `5842` instances of `OTHER` values and `206144` of `UNKNOWN` values. They represent more than `10%` of the total data, and it seems hard even to distinguish between the meaning of other and unknown as labels. Again, this might be an attempt of forgery as a response to fear of police enforcement, but we can only make a weak assumption about this. We could pair the `UNKNOWN` and `OTHER` values for sex, age and race, to infer that this was an attempt to confound the stop agent, but it is hard to assess with certainty. In fact, doing this in the api gives us `2458` records that we might want to delete or analyze separately. We will see more about this later on.
+The `RACE_DESC` variable is particularly important for identifying possible disparities. However, it is hard to understand how to approach the fact we have `6571` instances of `OTHER` values and `215967` of `UNKNOWN` values. They represent almost `10%` of the total data, and it seems hard even to distinguish between the meaning of other and unknown as labels. Again, this might be an attempt of forgery as a response to fear of police enforcement, but we can only make a weak assumption about this. We could pair the `UNKNOWN` and `OTHER` values for sex, age and race, to infer that this was an attempt to confound the stop agent, but it is hard to assess with certainty. We will see more about this later on.
 
-Even if it is not counted as motorist-related, `VEH_CATEGORY` can be associated with the reasons behind a stop. For example, some officers may perceive young adults driving high-performance or "flashy" cars as reckless, or may hold biased views toward Black or Hispanic drivers behind the wheel of certain vehicles. This feature gives us a way to explore that: together with `VEH_SEARCHED_FLG` and `VEH_SEARCH_CONSENT_FLG` we might be able to create an ordinal feature that depicts the level of escalation during stops.
+Even if it is not counted as motorist-related, `VEH_CATEGORY` can be associated with the reasons behind a stop. For example, some officers may perceive young adults driving high-performance or "flashy" cars as reckless, or may hold biased views toward Black or Hispanic drivers behind the wheel of certain vehicles. This feature gives us a way to explore that: together with `VEH_SEARCHED_FLG` and `VEH_SEARCH_CONSENT_FLG` we could be able to create an ordinal feature that depicts the level of escalation during stops.
 
 ### Further considerations
 
 All the comments, feature engineering and data preparation ideas mentioned in these sections are going to be explored in the remaining part of this file. We are aware of the fact, this was only a preview and that we need to switch to more detailed means of analysis.
 
-Finally, as much as i would like to join different datasets to this one (like [NYPD Use of Force Incidents](https://data.cityofnewyork.us/Public-Safety/NYPD-Use-of-Force-Incidents/f4tj-796d/about_data) or [Moving Violation B Summons](https://data.cityofnewyork.us/Public-Safety/Moving-Violation-B-Summons-Historic-/bme5-7ty4/about_data)), it requires a very tough and long job, even though I might be able to dig deeper on the matter. This is a consideration to make for further analysis.
+Finally, as much as we would like to join different datasets to this one (like [NYPD Use of Force Incidents](https://data.cityofnewyork.us/Public-Safety/NYPD-Use-of-Force-Incidents/f4tj-796d/about_data) or [Moving Violation B Summons](https://data.cityofnewyork.us/Public-Safety/Moving-Violation-B-Summons-Historic-/bme5-7ty4/about_data)), it requires a very tough and long job, even though we might be able to dig deeper on the matter. This is a consideration to make for further analysis.
 
 ------------------------------------------------------------------------
 
 # Initial Feature Engineering
 
-As we can see from the graphs there is room for a long data preparation process. 
+As we can see from the graphs there is room for a long data preparation process.
 
 We begin to create new features from the initial dataset, such that we try to fine-grain or generalize their meaning. In particular, we are not guided by their relationship with the possible targets, rather by the standard approaches utilized in data analysis. For example, from a simple date feature we can extract the year, the month, the day, as we mentioned before. Furthermore, we can formulate some high level hypothesis to abstract from underlying relationships and engineer new features that might help us later. In fact, as stated above, we wondered about the age bracket that might be more concerned with excessive use of force. Thus, we proceed with this approach guided by intuition, and we will test in the EDA our new features to see whether we might have to adjust some aspects or remove them completely.
 
@@ -396,7 +401,7 @@ Just to be sure to include more context, we are going to look up days in which a
 
 -   In 2023, as we can see from [this article](https://www.amny.com/entertainment/new-york-city-events-milestones-2023/), we have: the Lunar New Year Celebration and Parade (Feb. 12, 2023), St. Patrick’s Day Parade (March 17, 2023), New York Yankees Home Opener (March 30, 2023), New York Mets Home Opener and First Day of Passover, public schools are closed, (April 6, 2023 ), Memorial Day (May 29, 2023), NYC Pride March (June 25, 2023), Last day of school (June 27, 2023), First day of school (Sept. 8, 2023), Anniversary of the Sept. 11, 2001 terrorist attacks (Sept. 11, 2023), New York Comic Con (Oct. 12-15 2023), Annual Village Halloween Parade (Oct. 31, 2023), New York City Marathon (Nov. 5, 2023), Election Day (Nov. 7, 2023), Macy’s Thanksgiving Day Parade (Nov. 23, 2023).
 -   In 2024, as we can see from [this article](https://www.amny.com/entertainment/things-to-do/2024-important-dates/), we have: the Lunar New Year Celebration and Parade (Feb. 10, 2024), St. Patrick’s Day Parade (March 17, 2024), New York Mets Home Opener (March 28, 2024), Presidential Preference Primary (April 2, 2024), New York Yankees Home Opener (April 5, 2024), Memorial Day (May 27, 2024), New York Primary (June 25, 2024), Last day of school (June 26, 2024), NYC Pride March (June 30, 2024), First day of school (Sept. 5, 2024), Anniversary of the Sept. 11, 2001 terrorist attacks (Sept. 11, 2024), New York Comic Con (Oct. 17-20 2024), Annual Village Halloween Parade (Oct. 31, 2024), New York City Marathon (Nov. 3, 2024), Election Day (Nov. 5, 2024), Macy’s Thanksgiving Day Parade (Nov. 28, 2024).
--   In 2025, as we can see from [this article](https://www.amny.com/news/2025-preview-important-dates-new-york-this-year/), we have only partial dates because of the relative recency of this dataset: the Lunar New Year Celebration and Parade (Feb. 16, 2025), St. Patrick’s Day Parade (March 17, 2025), New York Yankees Home Opener (March 27, 2025), New York Yankees Home Opener (April 4, 2025), Memorial Day (May 26, 2025), New York Primary (June 24, 2025), Last day of school (June 26, 2025), NYC Pride March (June 29, 2025).
+-   In 2025, as we can see from [this article](https://www.amny.com/news/2025-preview-important-dates-new-york-this-year/), we have only partial dates because of the relative recency of this dataset: the Lunar New Year Celebration and Parade (Feb. 16, 2025), St. Patrick’s Day Parade (March 17, 2025), New York Yankees Home Opener (March 27, 2025), New York Yankees Home Opener (April 4, 2025), Memorial Day (May 26, 2025), New York Primary (June 24, 2025), Last day of school (June 26, 2025), NYC Pride March (June 29, 2025), First day of school (Sept. 4, 2025), Anniversary of the Sept. 11, 2001 terrorist attacks (Sept. 11, 2025) (because the datasets dates stop at the 30th of September 2025).
 
 ```{r}
 vehiclestops$date <- as.Date(vehiclestops$date)
@@ -413,7 +418,8 @@ ny_events <- as.Date(c(
   "2024-10-18", "2024-10-19", "2024-10-20", "2024-10-31", 
   "2024-11-03", "2024-11-05", "2024-11-28",
   "2025-02-16", "2025-03-17", "2025-03-27", "2025-04-04",
-  "2025-05-26", "2025-06-24", "2025-06-26", "2025-06-29"
+  "2025-05-26", "2025-06-24", "2025-06-26", "2025-06-29",
+  "2025-09-04", "2025-09-11"
 ))
 
 # Add indicator column for ny events
@@ -424,9 +430,7 @@ We tried not to include too many events related to other cultures or religions, 
 
 ### Adding Week days and Weekend days indicator
 
-Now let us add the 
-- The name of the day, and the related integer number" (1-7)
-- An indicator variable to check whether the stopped happened on a weekend day.
+Now let us add the - The name of the day, and the related integer number" (1-7) - An indicator variable to check whether the stopped happened on a weekend day.
 
 ```{r}
 # Get days in american format
@@ -582,11 +586,11 @@ vehiclestops <- vehiclestops %>%
   mutate(
     veh_categ_clean = case_when(
       veh_categ %in% c("(null)", "OTHER") ~ NA_character_,
-      veh_categ == "CAR/SUV"              ~ "Private passenger",
+      veh_categ == "CAR/SUV" ~ "Private passenger",
       veh_categ %in% c("TRUCK/BUS", "TLC") ~ "Commercial",
       veh_categ %in% c("MCL", "MOPED", "DBIKE") ~ "Two-wheeled motorized",
-      veh_categ == "BIKE"                 ~ "Non-motorized",
-      TRUE                                ~ veh_categ
+      veh_categ == "BIKE" ~ "Non-motorized",
+      TRUE ~ veh_categ
     )
   )
 
@@ -622,8 +626,7 @@ vehiclestops <- vehiclestops %>%
 
 We previously started from the idea that the command unit was related from the a single patrol unit and then correct ourselves noticing the number of multiple stops performed by the same units at the same time (in different places). Thus, we want to try and understand whether this coincides with another version of the map of the NYC units, we found inside the [The Police Commisioner's Report of 2017](https://www.nyc.gov/assets/nypd/downloads/pdf/publications/pc-report-2017.pdf), which includes both the command units and an aggregation of them.
 
-![NYC Neighborhoods and Borough](./static/nyc_neighborhoods.png)
-### Adding Areas features from command units
+![NYC Neighborhoods and Borough](./static/nyc_neighborhoods.png) \### Adding Areas features from command units
 
 We would like want to understand whether the command units coincide with the neighborhood/ precincts area in this picture and and be more specific about the area of the stop. Thus, let us pick, say the Staten Island command units, and hope they coincide.
 
@@ -649,7 +652,7 @@ ggplot(stops_sf) +
   geom_sf(aes(color = command), size = 0.4, alpha = 0.5) +
   scale_color_viridis_d(option = "turbo") +
   labs(color = "Command",
-       title = "Vehicle Stops Colored by Command Code") +
+       title = "Vehicle Stops Colored by Command Code - Staten Island") +
   theme_minimal() +
   theme(legend.position = "right")
 ```
@@ -667,11 +670,11 @@ vehiclestops <- vehiclestops %>%
   dplyr::mutate(
     area = dplyr::case_when(
       command %in% staten_island_cmds ~ "Staten Island",
-      command %in% brooklyn_cmds      ~ "Brooklyn",
-      command %in% manhattan_cmds     ~ "Manhattan",
-      command %in% queens_cmds        ~ "Queens",
-      command %in% bronx_cmds         ~ "Bronx",
-      TRUE                            ~ "Unknown"
+      command %in% brooklyn_cmds ~ "Brooklyn",
+      command %in% manhattan_cmds ~ "Manhattan",
+      command %in% queens_cmds ~ "Queens",
+      command %in% bronx_cmds ~ "Bronx",
+      TRUE ~ "Unknown"
     )
   )
 ```
@@ -712,12 +715,12 @@ vehiclestops <- vehiclestops %>%
       command %in% se_brooklyn_cmds ~ "South East Brooklyn",
       command %in% north_manhattan_cmds ~ "North Manhattan",
       command %in% south_manhattan_cmds ~ "South Manhattan",
-      command %in% nw_queens_cmds        ~ "North West Queens",
-      command %in% ne_queens_cmds        ~ "North East Queens",
-      command %in% s_queens_cmds        ~ "South Queens",
-      command %in% west_bronx_cmds         ~ "West Bronx",
-      command %in% east_bronx_cmds         ~ "East Bronx",
-      TRUE                            ~ "Unknown"   # in case something is missing
+      command %in% nw_queens_cmds ~ "North West Queens",
+      command %in% ne_queens_cmds ~ "North East Queens",
+      command %in% s_queens_cmds ~ "South Queens",
+      command %in% west_bronx_cmds ~ "West Bronx",
+      command %in% east_bronx_cmds ~ "East Bronx",
+      TRUE ~ "Unknown"   # in case something is missing
     )
   )
 ```
@@ -729,7 +732,7 @@ Obviously, we cannot leave the features as the checkboxes they represent, we mus
 ```{r}
 # vehicle seized
 vehiclestops$veh_seized <- case_when(
-  vehiclestops$veh_seized == "true"  ~ 1,
+  vehiclestops$veh_seized == "true" ~ 1,
   vehiclestops$veh_seized == "false" ~ 0,
   vehiclestops$veh_seized == "(null)" ~ NA_real_,
   TRUE ~ NA_real_  # Catch anything unexpected as NA
@@ -739,9 +742,9 @@ vehiclestops$veh_seized <- case_when(
 ```{r}
 # vehicle searched
 vehiclestops$veh_searched <- case_when(
-  vehiclestops$veh_searched  == "true"  ~ 1,
-  vehiclestops$veh_searched  == "false" ~ 0,
-  vehiclestops$veh_searched  == "(null)" ~ NA_real_,
+  vehiclestops$veh_searched == "true" ~ 1,
+  vehiclestops$veh_searched == "false" ~ 0,
+  vehiclestops$veh_searched == "(null)" ~ NA_real_,
   TRUE ~ NA_real_
 )
 ```
@@ -749,7 +752,7 @@ vehiclestops$veh_searched <- case_when(
 ```{r}
 # vehicle search consent
 vehiclestops$veh_search_consent <- case_when(
-  vehiclestops$veh_search_consent == "Y"  ~ 1,
+  vehiclestops$veh_search_consent == "Y" ~ 1,
   vehiclestops$veh_search_consent == "N" ~ 0,
   vehiclestops$veh_search_consent == "(null)" ~ NA_real_,
   TRUE ~ NA_real_
@@ -759,7 +762,7 @@ vehiclestops$veh_search_consent <- case_when(
 ```{r}
 # vehicle checkpoint
 vehiclestops$veh_checkpoint <- case_when(
-  vehiclestops$veh_checkpoint == "true"  ~ 1,
+  vehiclestops$veh_checkpoint == "true" ~ 1,
   vehiclestops$veh_checkpoint == "false" ~ 0,
   vehiclestops$veh_checkpoint == "(null)" ~ NA_real_,
   TRUE ~ NA_real_
@@ -769,7 +772,7 @@ vehiclestops$veh_checkpoint <- case_when(
 ```{r}
 # force used
 vehiclestops$force_used <- case_when(
-  vehiclestops$force_used == "true"  ~ 1,
+  vehiclestops$force_used == "true" ~ 1,
   vehiclestops$force_used == "false" ~ 0,
   vehiclestops$force_used == "(null)" ~ NA_real_,
   TRUE ~ NA_real_
@@ -779,7 +782,7 @@ vehiclestops$force_used <- case_when(
 ```{r}
 # arrested
 vehiclestops$arrested <- case_when(
-  vehiclestops$arrested == "true"  ~ 1,
+  vehiclestops$arrested == "true" ~ 1,
   vehiclestops$arrested == "false" ~ 0,
   vehiclestops$arrested == "(null)" ~ NA_real_,
   TRUE ~ NA_real_
@@ -789,7 +792,7 @@ vehiclestops$arrested <- case_when(
 ```{r}
 # summoned
 vehiclestops$summoned <- case_when(
-  vehiclestops$summoned == "true"  ~ 1,
+  vehiclestops$summoned == "true" ~ 1,
   vehiclestops$summoned == "false" ~ 0,
   vehiclestops$summoned == "(null)" ~ NA_real_,
   TRUE ~ NA_real_
@@ -813,15 +816,17 @@ stops_bin <- vehiclestops %>%
 stops_bin[is.na(stops_bin)] <- 0
 
 # Plot intersections
-upset(stops_bin, 
-      sets = c("veh_searched","veh_seized","summoned","arrested","force_used"),
-      sets.bar.color = "firebrick", 
-      order.by = "freq")
+upset(
+  stops_bin, 
+  sets = c("veh_searched","veh_seized","summoned","arrested","force_used"),
+  sets.bar.color = "firebrick", 
+  order.by = "freq"
+)
 ```
 
-As we thought, this plot does not show what we expected. There is no ground to say we have some systematic relation between the outcomes as most of the data is concentrated around the summoning, the arrest and the search alone. While there is some connection, between the use of force and the arrests, and a connection between the seizure of the vehicle and the summoning, these intersections still account for a very small percentage of the data. 
+As we thought, this plot does not show what we expected. There is no ground to say we have some systematic relation between the outcomes as most of the data is concentrated around the summoning, the arrest and the search alone. While there is some connection, between the use of force and the arrests, and a connection between the seizure of the vehicle and the summoning, these intersections still account for a very small percentage of the data.
 
-We still need to dig deeper into this matter but for now we might as well add some escalation variable for the most common relations. 
+We still need to dig deeper into this matter but for now we might as well add some escalation variable for the most common relations.
 
 ```{r}
 vehiclestops <- vehiclestops %>%
@@ -830,13 +835,13 @@ vehiclestops <- vehiclestops %>%
     search_without_consent = ifelse(veh_searched == 1 & veh_search_consent == 0, 1, 0),
 
     # Vehicle seizure and summons
-    seizure_and_summoning  = ifelse(veh_seized == 1 & summoned == 1, 1, 0),
+    seizure_and_summoning = ifelse(veh_seized == 1 & summoned == 1, 1, 0),
 
     # Vehicle seizure and arrest
-    seizure_and_arrest     = ifelse(veh_seized == 1 & arrested == 1, 1, 0),
+    seizure_and_arrest = ifelse(veh_seized == 1 & arrested == 1, 1, 0),
 
     # Force used and arrest
-    force_and_arrest       = ifelse(force_used == 1 & arrested == 1, 1, 0)
+    force_and_arrest = ifelse(force_used == 1 & arrested == 1, 1, 0)
   )
 ```
 
@@ -844,7 +849,7 @@ We will evaluate later the utility of these ones.
 
 ### Introducing any escalation feature as main target feature
 
-Since our primary goal is to talk about a general idea of "escalation" due to bias, it comes naturally to think to aggregate all possible outcomes in one big category `any_escalation`. How does this connects back to "excessive enforcement"? Well, if this variable shows systematic disparities by race, sex, age, command, or area, there may be evidence of possible bias/excessive enforcement. Furthermore, if rare outcomes (`force_used`, `veh_seized`) disproportionately affect certain groups, that strengthens the case! In fact, if anormalities persist independently of, say, time and location, we have possibly found proof of this behavior. In the opposite case, we may have just rare events.
+Since our primary goal is to talk about a general idea of "escalation" due to bias, it comes naturally to think to aggregate all possible outcomes in one big category `any_escalation`. How does this connects back to "excessive enforcement"? Well, if this variable shows systematic disparities by race, sex, age, command, or area, there may be evidence of possible bias/excessive enforcement. Furthermore, if rare outcomes (`force_used`, `veh_seized`) disproportionately affect certain groups, that strengthens the case! In fact, if abnormalities persist independently of, say, time and location, we have possibly found proof of this behavior. In the opposite case, we may have just rare events.
 
 ```{r}
 vehiclestops <- vehiclestops %>%
@@ -880,7 +885,7 @@ rm(
 )
 ```
 
----
+------------------------------------------------------------------------
 
 # Data Correction, Coherence Check and some Feature Engineering
 
@@ -888,7 +893,7 @@ Thankfully we do not have much to do here for missing data, a part from the foll
 
 ## Date and Time features
 
-## Dropping date and time features
+### Dropping date and time features
 
 Since we managed to separate the values, we do no longer need these columns
 
@@ -899,7 +904,7 @@ vehiclestops <- vehiclestops %>%
 
 ## Geospatial features
 
-From looking up online, we found out that are **latitude and longitude are geographic coordinates in WGS84 (EPSG:4326)**, while the x,y are **projected planar coordinates in NAD83** or New York Long Island (EPSG:2263). Basically, x and y are map projected coordinates in feet (not meters). 
+From looking up online, we found out that are **latitude and longitude are geographic coordinates in WGS84 (EPSG:4326)**, while the x,y are **projected planar coordinates in NAD83** or New York Long Island (EPSG:2263). Basically, x and y are map projected coordinates in feet (not meters).
 
 However, we are sure of the presence of many erroneous entries, because we already know that the bounding box for NYC (in terms of latitude and longitude) amounts to something like `(xmin = -74.26, ymin = 40.48, xmax = -73.71, ymax = 40.92)`.
 
@@ -907,7 +912,7 @@ However, we are sure of the presence of many erroneous entries, because we alrea
 summary(vehiclestops$latitude)
 ```
 
-As we can see, the minimum here is `0.00` when this is not possible. Furthermore, it is not a surprise the presence of more than `428403` NA values. Let us ignore the `0` values and consider the remaining range.
+As we can see, the minimum here is `0.00` when this is not possible. Furthermore, it is not a surprise the fact 19% of the values are missing. Let us ignore the `0` values and consider the remaining range.
 
 We must be careful because we might have instances where the x,y coordinates are present, but we do not have any latitude and longitude values. Namely, if we might have even a larger range for both, once we impute the missing coordinates!
 
@@ -933,7 +938,7 @@ vehiclestops %>%
   summary()
 ```
 
-The problem lies in the instances that present `0` or missing values for either one of them. 
+The problem lies in the instances that present `0` or missing values for either one of them.
 
 ```{r}
 vehiclestops %>%
@@ -942,19 +947,19 @@ vehiclestops %>%
   count()
 ```
 
-Having more than `660.000` cases does not give us much hope for now, but after this process it would be surely better. If we ignore the missing values and focus on the problematic rows, we see the following amount.
+Having more than `850.000` cases does not give us much hope for now, but after this process it would be surely better. If we ignore the missing values and focus on the problematic rows, we see the following amount.
 
 ```{r}
-# Ignoring missing values this times
+# Ignoring missing values this time
 vehiclestops %>%
   filter((latitude == 0 | longitude == 0) & (!is.na(latitude) & !is.na(longitude))) %>%
   select(latitude, longitude) %>%
   count()
 ```
 
-There might be hope for those `234727` rows if we can use x and y.
+There might be hope for those `426818` rows if we can use x and y.
 
-Now let us check the same problem for x and y.
+Now let us check the same problem for x and y coordinates.
 
 ```{r}
 summary(vehiclestops$x_coord)
@@ -964,62 +969,92 @@ summary(vehiclestops$x_coord)
 summary(vehiclestops$y_coord)
 ```
 
-These coordinates have an even worse problem, since it looks likes some values were inserted in the wrong place. This is evident from the fact the minimum value for the x coordinate is `-74`, when we know this is not the right format (for the geospatial representation) nor it was supposed to be a possible value for this feature (a problem that comes up in API too). It may be the same case for y coordinate. Furthermore, we have evidence of `0` values in the y coordinate, that suggest a default behavior, which probably regards the x coordinate too. Last but not least, we do have `229220` missing values, less than the latitude and longitude, which is an incentive to start from correcting this data and eventually using it to infer the missing values of the other geospatial features.
+These features have an even worse problem, since it looks likes some values were inserted in the wrong place. This is evident from the fact the minimum value for the x coordinate is `-74` and the minimum for the y coordinate is `40`, when we know this is not the right format (for the geospatial representation) nor it was supposed to be a possible value for them (a problem that comes up in API too).
 
-Let us see more in detail the x coordinate by ignoring the values below 0 (since most of the latitude values are negative).
+However, we have only have `2594` missing values, way less problematic with respect to the latitude and longitude. Thus, we can see this as an incentive to start from correcting this data and eventually using it to infer the missing values of the other geospatial features.
+
+Now, we still need to address the possible wrong values in the respective coordinates, in order to correct default behavior and wrong entries. We want verify that:
+
+-   For the x coordinate, the minimum value must be strictly above 0, as in the worst case the wrong values would range from -74 to 0.
+-   For the y coordinate, we just need to filter the values to be above 40 (following the same line of thought).
 
 ```{r}
-# Filter for over the maximum latitude value
 vehiclestops %>%
   filter(x_coord > 0) %>%
   select(x_coord) %>%
   summary()
 ```
 
-Now, the range makes sense. For the y coordinate we avoid values that inside the range of the longitude, because we want to "skip" the errors as before.
-
 ```{r}
-# Filter for over the maximum longitude value
 vehiclestops %>%
-  filter(y_coord > 41) %>%
+  filter(y_coord > 40) %>%
   select(y_coord) %>%
   summary()
 ```
 
-Now let us see how many rows are affected by these issues.
+This filtering allows to partially confirm that we were right to focus on this matter right away.
+
+Now let us check the number of rows that either contain an error or have a missing value for these two features.
 
 ```{r}
 vehiclestops %>%
-  filter(x_coord <= 0 | y_coord <= 41 | is.na(x_coord) | is.na(y_coord)) %>%
+  filter(x_coord <= 0 | y_coord <= 40 | is.na(x_coord) | is.na(y_coord)) %>%
   select(x_coord, y_coord) %>%
   count()
 ```
 
-Well, `463935` is less than the amount of rows for latitude and longitude, but it is still problematic. Now let us forget about the missing values.
+Well, `2627` total rows means that we should have only `33` rows with wrong entries (considering that we had `2594` rows with missing values).
 
 ```{r}
 vehiclestops %>%
-  filter((x_coord <= 0 | y_coord <= 41) & (!is.na(x_coord) & !is.na(y_coord))) %>%
-  select(x_coord, y_coord) %>%
-  count()
+  filter((x_coord <= 0 | y_coord <= 40) & (!is.na(x_coord) & !is.na(y_coord))) %>%
+  select(x_coord, y_coord)
 ```
 
-And now we have `234715`, around the same amount as before. 
+This confirms the hypothesis.
 
-In general we cannot do much for rows that lack all 4 features, although we could impute their values as the mean or median of those for the same command unit, since they operate around that area. Unfortunately, it may be a bad idea because of the loss of meaning in the coordinates.
+As of now, unless the information related latitude and longitude (of the corresponding rows) is missing or wrong, we can use it to infer the correct values for these entries. Let us see
+
+-   How many rows have both correct latitude and longitude coordinates, but wrong or missing x,y coordinates;
+-   How many rows have correct latitude but wrong or missing x, and correct longitude but wrong or missing y.
+
+```{r}
+vehiclestops %>%
+  filter(
+    (latitude != 0 & longitude != 0 & !is.na(latitude) & !is.na(longitude)) &
+    (x_coord <= 0 | y_coord <= 40 | is.na(x_coord) | is.na(y_coord))
+  ) %>%
+  select(latitude, longitude, x_coord, y_coord)
+```
+
+```{r}
+vehiclestops %>%
+  filter(
+    (latitude != 0 & !is.na(latitude) & (x_coord <= 0 | is.na(x_coord))) |
+    (longitude != 0 & !is.na(longitude) & (y_coord <= 40 | is.na(y_coord)))
+  ) %>%
+  select(latitude, longitude, x_coord, y_coord)
+```
+
+These are columns we can hope to use for imputing from latitude and longitude to x and y.
+
+In fact, we cannot do much for rows that lack all 4 features, although we could impute their values as the mean or median of those for the same command unit, since they operate around that area. Unfortunately, it may be a bad idea because of the loss of meaning in the coordinates.
+
+The amount of columns that suffer from this problem are
 
 ```{r}
 vehiclestops %>%
   filter(
     (is.na(latitude) & is.na(longitude) & is.na(x_coord) & is.na(y_coord)) |
-    (latitude == 0 & longitude == 0 & x_coord == 0 & y_coord == 0)) %>%
+    (latitude == 0 & longitude == 0 & x_coord <= 0 & y_coord <= 40)
+  ) %>%
   select(latitude, longitude, x_coord, y_coord) %>%
   count()
 ```
 
-For these `463898` rows, we probably have no hope to update their values and the fact it is a large proportion suggests the geospatial data itself has less meaning. Before exploring this let us gather the rows where we actually have values, but we may lack one feature.
+For these `2584` rows, we probably have no hope to update their values. Although they represent only a small proportion of the data, we should still keep them to look for possible patterns.
 
-First, NA values are going to be set to 0.
+Therefore, we want to replace NAs (in the respective columns) with `0.0` in order to later identify these problematic rows.
 
 ```{r}
 vehiclestops <- vehiclestops %>%
@@ -1027,136 +1062,183 @@ vehiclestops <- vehiclestops %>%
     latitude  = ifelse(is.na(latitude),  0.0, latitude),
     longitude = ifelse(is.na(longitude), 0.0, longitude),
     x_coord = ifelse(is.na(x_coord) | x_coord <= 0, 0, x_coord),
-    y_coord = ifelse(is.na(y_coord) | y_coord <= 41, 0, y_coord)
+    y_coord = ifelse(is.na(y_coord) | y_coord <= 40, 0, y_coord)
   )
 ```
 
-Since there are more missing instances of latitude and longitude, then missing x,y coordinates we try to impute the latitude and longitude values from the rows that have exactly the same x,y and non-0 (and non-NA) values of latitude and longitude. Plus, we can do the opposite too
-
-### Imputing latitude and x 
-
-The following instances lack of either one or the other feature
-
 ```{r}
 vehiclestops %>%
-  filter(
-    (latitude == 0 & x_coord != 0) | (latitude != 0 & x_coord == 0)
-  ) %>%
-  select(latitude, x_coord) %>%
+  filter(is.na(latitude) | is.na(longitude) | is.na(x_coord) | is.na(y_coord)) %>%
+  select(latitude, longitude, x_coord, y_coord) %>%
   count()
 ```
 
-We want to use a kind of look up table approach only for the cases where we have the unique exact match between the two of them, to be safe. In fact, we might have some rounding error that we cannot account for, and we just want to deal with all the related issues as less as possible.
-
-```{r}
-# latitude and x_coord
-lat_x_pairs <- vehiclestops %>%
-  filter(latitude != 0, x_coord > 0) %>%
-  count(x_coord, latitude) %>%
-  add_count(x_coord, name = "n_x") %>%
-  add_count(latitude, name = "n_lat") %>%
-  filter(n_x == 1, n_lat == 1) %>%   # keep only true 1-to-1 matches
-  select(x_coord, latitude)
-```
-
-Now we can just substitute where possible
-
-```{r}
-# Update missing latitude from x
-vehiclestops <- vehiclestops %>%
-  left_join(lat_x_pairs, by = "x_coord", suffix = c("", "_pair")) %>%
-  mutate(
-    latitude = ifelse(
-      latitude == 0 & x_coord > 0,
-      latitude_pair, latitude
-    )
-  ) %>%
-  select(-latitude_pair)
-
-# Update missing x from latitude
-vehiclestops <- vehiclestops %>%
-  left_join(lat_x_pairs, by = "latitude", suffix = c("", "_pair")) %>%
-  mutate(
-    x_coord = ifelse(
-      x_coord <= 0 & latitude != 0,
-      x_coord_pair, x_coord
-    )
-  ) %>%
-  select(-x_coord_pair)
-```
-
-And hope we have less instances 
+Here we only have 0s as we wanted, but we can only confirm again that we have many problematic rows:
 
 ```{r}
 vehiclestops %>%
-  filter(
-    (latitude == 0 & x_coord != 0) | (latitude != 0 & x_coord == 0)
-  ) %>%
-  select(latitude, x_coord) %>%
+  filter(latitude == 0 | longitude == 0 | x_coord == 0 | y_coord == 0) %>%
+  select(latitude, longitude, x_coord, y_coord) %>%
   count()
 ```
 
-In fact, we got 0 now!
+Since there are more missing instances of latitude and longitude than missing x,y coordinates, we try to impute the latitude and longitude values from the rows that have exactly the same x,y and non-0 (and non-NA) values of latitude and longitude. Plus, we can do the opposite too!
 
-### Imputing longitude and y 
+### Issues with Imputing
 
-These rows lack some feature
+Unfortunately, during our analysis, we noticed a problematic aspect that concerns the type used for the values of latitude and longitude in R. In fact, we noticed that there are multiple instances where, for the same value of `x_coord`, we find different values of `latitude` (and viceversa). As an example let us check, say, `latitude == 40.90857`.
 
 ```{r}
 vehiclestops %>%
-  filter(
-    (longitude == 0 & y_coord != 0) | (longitude != 0 & y_coord == 0)
-  ) %>%
-  select(longitude, y_coord) %>%
-  count()
+  filter(near(latitude, 40.90857, tol = 1e-5), x_coord != 0) %>%
+  select(latitude, x_coord)
 ```
 
-The same approach we use for the longitude and y
+This looked strange to us, so we performed a research and came to the conclusion that, due to the way "View()" shows the format of these values, we were deceived. However, it complicates our job because we are in a misleading setting.
 
-```{r}
-long_y_pairs <- vehiclestops %>%
-  filter(longitude != 0, y_coord > 0) %>%
-  count(y_coord, longitude) %>%
-  add_count(y_coord, name = "n_y") %>%
-  add_count(longitude, name = "n_long") %>%
-  filter(n_y == 1, n_long == 1) %>%   # keep only strict 1-to-1 matches
-  select(y_coord, longitude)
-```
-
-And we fill
-
-```{r}
-# Fill missing longitude from y
-vehiclestops <- vehiclestops %>%
-  left_join(long_y_pairs, by = "y_coord", suffix = c("", "_pair")) %>%
-  mutate(
-    longitude = ifelse(longitude == 0 & y_coord > 0, longitude_pair, longitude)
-  ) %>%
-  select(-longitude_pair)
-
-# Fill missing y from longitude
-vehiclestops <- vehiclestops %>%
-  left_join(long_y_pairs, by = "longitude", suffix = c("", "_pair")) %>%
-  mutate(
-    y_coord = ifelse(y_coord <= 0 & longitude != 0, y_coord_pair, y_coord)
-  ) %>%
-  select(-y_coord_pair)
-```
-
-Did we improve?
+In case of the opposite check, we can still see multiple values of latitude for the same x.
 
 ```{r}
 vehiclestops %>%
-  filter(
-    (longitude == 0 & y_coord != 0) | (longitude != 0 & y_coord == 0)
+  filter(latitude != 0, x_coord != 0) %>%
+  group_by(x_coord) %>%
+  summarise(
+    n_lat = n_distinct(latitude),
+    lat_values = paste(sort(unique(latitude)), collapse = ", "),
+    n_rows = n(),
+    .groups = "drop"
   ) %>%
-  select(longitude, y_coord) %>%
+  filter(n_lat > 1) %>%
+  arrange(desc(n_lat), desc(n_rows))
+```
+
+This is issue is also present for `longitude` and `y_coord`.
+
+It seems to us that, while `latitude` and `longitude` are more "informative" as they are numerically more accurate in representing geographical information, they are also very hard to impute from x and y, as they are offer less precision. At the same time, the latter features do not suffer from a great lack of values. We initially thought of building a look-up table and pair latitude with x and longitude with y, with the goal of performing a quick imputing. This method clearly does not work well for us as, in case we must infer from either x or y, it is still unclear how to find the right latitude or longitude without compromising the precision and coherency provided by the data that is actually present.
+
+### Updating latitude and longitude by conversion
+
+Our choice is to convert the x,y coordinates from (EPSG:2263) to WGS84 (EPSG:4326) for latitude and longitude when missing. This can only happen for those rows where we have both x and y coordinates. This should be able to fill these many rows
+
+```{r}
+vehiclestops %>%
+  filter(latitude == 0 & longitude == 0 & x_coord != 0 & y_coord != 0) %>%
+  select(latitude, longitude, x_coord, y_coord) %>%
   count()
 ```
+
+Now, we proceed with the conversion
+
+```{r}
+# Save copy of dataset before conversion
+veh_before <- vehiclestops
+
+# Ensure they are numeric
+vehiclestops <- vehiclestops %>%
+  mutate(
+    x_coord   = as.numeric(x_coord),
+    y_coord   = as.numeric(y_coord),
+    latitude  = as.numeric(latitude),
+    longitude = as.numeric(longitude)
+  )
+
+# Get rows that we can convert
+idx_xy <- vehiclestops$x_coord != 0 & vehiclestops$y_coord != 0
+
+# Conversion
+pts <- st_as_sf(
+  vehiclestops[idx_xy, ],
+  coords = c("x_coord", "y_coord"),
+  crs = 2263,
+  remove = FALSE
+) %>%
+  st_transform(4326)
+
+xy <- st_coordinates(pts)
+
+# Insert results
+vehiclestops$lon_from_xy <- NA_real_
+vehiclestops$lat_from_xy <- NA_real_
+vehiclestops$lon_from_xy[idx_xy] <- xy[, 1]
+vehiclestops$lat_from_xy[idx_xy] <- xy[, 2]
+
+# Fill only where we find 0s
+vehiclestops <- vehiclestops %>%
+  mutate(
+    longitude = if_else(longitude == 0, coalesce(lon_from_xy, longitude), longitude),
+    latitude  = if_else(latitude  == 0, coalesce(lat_from_xy, latitude), latitude)
+  )
+```
+
+Let us check how many rows we managed to correct.
+
+```{r}
+vehiclestops %>%
+  summarise(
+    n_total = n(),
+    n_xy_present = sum(x_coord != 0 & y_coord != 0),
+    n_lat_filled = sum(latitude != 0 & !is.na(lat_from_xy)),
+    n_lon_filled = sum(longitude != 0 & !is.na(lon_from_xy)),
+    n_lat_still_0 = sum(latitude == 0),
+    n_lon_still_0 = sum(longitude == 0)
+  )
+```
+
+We are happy to show that we have brought up to date almost every row!
+
+We perform another check to see if the difference between values makes sense.
+
+```{r}
+vehiclestops %>%
+  filter(idx_xy, lat_from_xy %in% lat_from_xy, latitude != 0, longitude != 0) %>%
+  summarise(
+    max_abs_dlat = max(abs(lat_from_xy - latitude), na.rm = TRUE),
+    max_abs_dlon = max(abs(lon_from_xy - longitude), na.rm = TRUE)
+  )
+```
+
+These values, even if high, are not problematic because we are considering the maximum and it is easily affected by outliers. We can verify the distribution of the errors to understand if we have a satisfactory setting.
+
+```{r}
+check <- vehiclestops %>%
+  filter(idx_xy, !is.na(lat_from_xy), !is.na(lon_from_xy),
+         latitude != 0, longitude != 0) %>%
+  transmute(
+    dlat = abs(lat_from_xy - latitude),
+    dlon = abs(lon_from_xy - longitude)
+  )
+
+check %>%
+  summarise(
+    n = n(),
+    p50_dlat = quantile(dlat, 0.50, na.rm = TRUE),
+    p95_dlat = quantile(dlat, 0.95, na.rm = TRUE),
+    p99_dlat = quantile(dlat, 0.99, na.rm = TRUE),
+    max_dlat = max(dlat, na.rm = TRUE),
+    p50_dlon = quantile(dlon, 0.50, na.rm = TRUE),
+    p95_dlon = quantile(dlon, 0.95, na.rm = TRUE),
+    p99_dlon = quantile(dlon, 0.99, na.rm = TRUE),
+    max_dlon = max(dlon, na.rm = TRUE)
+  )
+```
+
+In fact, this confirms that the change in meters from the conversion is very small. The median signals a near zero change, while we still have outliers,, they are very moderate and only for outliers there are signs of error. We can work with this
+
+Finally, a last check to see the before vs now of the dataset.
+
+```{r}
+vehiclestops %>%
+  summarise(
+    changed_lat_nonzero = sum(veh_before$latitude  != 0 & latitude  != veh_before$latitude,  na.rm = TRUE),
+    changed_lon_nonzero = sum(veh_before$longitude != 0 & longitude != veh_before$longitude, na.rm = TRUE)
+  )
+```
+
+This correctly verifies that we did not change any column that had already a value.
 
 ### Embracing the hard truth
 
-However, we still need to deal with the cases where there is total absence of geospatial features
+Let us go back to the rows where there is total absence of geospatial features
 
 ```{r}
 vehiclestops %>%
@@ -1167,15 +1249,21 @@ vehiclestops %>%
   count()
 ```
 
-We have hundreds of thousands of rows where all four coordinates are 0 (missing). Furthermore, for many rows where one set is present (lat/long or x/y), the mapping is not 1-to-1 (so we risk mismatching), and even if we did "force fill" we run into the possibility of introducing systematic errors. For this reason, we will not try to pursue a complete imputing of the data and we will exclude the raw coordinates from our models.
+We have only `2590` rows where all four coordinates are 0 (missing). To avoid systematic errors, we will not try to pursue a complete imputing of the data.
+
+```{r, include=FALSE}
+rm(
+  check, pts, veh_before, xy, idx_xy
+)
+```
 
 ### Dropping x and y coordinates
 
-In our opinion is best just to keep the latitude and the longitude, as the remaining ones just replicate the same information.
+In our opinion is best just to keep the latitude and the longitude, as the remaining ones just replicate the same information. Plus, now that we have cleaned the dataset, we can proceed by dropping x and y (and the utility columns used before).
 
 ```{r}
 vehiclestops <- vehiclestops %>%
-  select(-x_coord, -y_coord)
+  select(-x_coord, -y_coord, -lon_from_xy, -lat_from_xy)
 ```
 
 ## Should we remove entries that show probable forgery?
@@ -1208,15 +1296,15 @@ vehiclestops %>%
   count()
 ```
 
-Although we might be tempted to remove them, we still need to understand the full picture in the EDA.
+Although we might be tempted to remove them, we still need to understand the full picture in the EDA. 
 
----
+------------------------------------------------------------------------
 
 # Final touches
 
 ## Re-Ordering Features
 
-We re-order the features for better display and remove the rows where we have null values.
+We re-order the features for better display and remove the rows where we have null values (which is probably a single entry).
 
 ```{r}
 vehiclestops_ord <- vehiclestops %>%
@@ -1243,7 +1331,6 @@ Here is the final version.
 print(dfSummary(vehiclestops_ord), method="render")
 ```
 
-
 ## Keeping a separate version of the dataset
 
 For now, we can decide to keep a separate copy of the dataset to include the rows and the features of interest and compare the performances and the inference of the models in the two datasets. This can help us also understand whether being picky with the data can be useful, since the main motivation is the large amount of rows.
@@ -1260,7 +1347,7 @@ vehiclestops_ord2 <- vehiclestops_ord2 %>%
   filter(
     !is.na(age_bracket), age <= 100,
     sex != "U",
-    latitude > 0, longitude < 0,
+    latitude != 0, longitude != 0,
     race != "UNKNOWN",
   )
 ```
