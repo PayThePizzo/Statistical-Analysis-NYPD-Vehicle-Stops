@@ -53,3 +53,11 @@ data/*
 
 # Ignore the todo
 TODO.*
+
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.docx
+*.xlsx
+*.pptx
