@@ -1,5 +1,6 @@
 ---
 title: "Predicting Excessive Enforcement Patterns in Police Behavior After Vehicles Stops in New York"
+subtitle: "Intro and Data Preparation"
 author: "Gianmaria Pizzo"
 output:
   html_document:
@@ -66,7 +67,6 @@ Obviously, we could not proceed forward if we did not have some designated quest
 **Is it more likely to be the subject of an arrest or a vehicle checkpoint**...
 
 -   When stopped in a specific area (or borough)?
--   When stopped by a specific command unit?
 -   When stopped outside of the 9am-5pm "window"?
 -   When stopped during a specific time bracket (ex: 0am-3am)?
 -   When stopped during the weekend (Saturday/Sunday)?
@@ -1254,6 +1254,16 @@ print(dfSummary(vehiclestops_ord), method="render")
 
 ## Saving the dataset
 
-```{r save-dataset}
-write.csv(vehiclestops_ord, "data/vehiclestops.csv", row.names = FALSE)
+As our next step is the EDA, we decide to perform two separate analyses. We split the data based on the vehicle category to investigate possible meaningful relationships with the predictors.
+
+```{r save-two-datasets}
+veh_4_wheels <- vehiclestops_ord %>%
+  filter(veh_categ == "4 wheels")
+
+write.csv(veh_4_wheels, "data/vehiclestops_4_wheels.csv", row.names = FALSE)
+
+veh_2_wheels <- vehiclestops_ord %>%
+  filter(veh_categ == "2 wheels")
+
+write.csv(veh_2_wheels, "data/vehiclestops_2_wheels.csv", row.names = FALSE)
 ```

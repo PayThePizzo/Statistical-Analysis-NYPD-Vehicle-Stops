@@ -92,7 +92,7 @@ The first to do, is to build a reproducible environment for our project.
 
 ```{r}
 requirements=c( 
-  "remotes", "summarytools", 
+  "remotes", "summarytools", "carData", "effects",
   "stringr", "plyr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
   "timeDate", "timechange", "tzdb", "hms", "readr",
   "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor", "ggbeeswarm", "emmeans",
@@ -118,6 +118,74 @@ for (req in requirements){
 }
 ```
 
+Let us load the data now.
+
+```{r}
+vehiclestops = read.csv("data/vehiclestops.csv", stringsAsFactors = TRUE)
+
+summary(vehiclestops)
+
+vehiclestops$command <-  as.factor(vehiclestops$command)
+vehiclestops$weekend <-  as.factor(vehiclestops$weekend)
+levels(vehiclestops$weekend) <- c("No", "Yes")
+
+vehiclestops$holiday <-  as.factor(vehiclestops$holiday)
+levels(vehiclestops$holiday) <- c("No", "Yes")
+
+vehiclestops$event_day <-  as.factor(vehiclestops$event_day)
+levels(vehiclestops$event_day) <- c("No", "Yes")
+
+vehiclestops$working_hour <-  as.factor(vehiclestops$working_hour)
+levels(vehiclestops$working_hour) <- c("No", "Yes")
+
+vehiclestops$veh_4_wheels <-  as.factor(vehiclestops$veh_4_wheels )
+levels(vehiclestops$veh_4_wheels) <- c("No", "Yes")
+
+vehiclestops$veh_private <-  as.factor(vehiclestops$veh_private)
+levels(vehiclestops$veh_private) <- c("No", "Yes")
+
+vehiclestops$veh_motorized <-  as.factor(vehiclestops$veh_motorized)
+levels(vehiclestops$veh_motorized) <- c("No", "Yes")
+
+vehiclestops$veh_checkpoint <-  as.factor(vehiclestops$veh_checkpoint)
+levels(vehiclestops$veh_checkpoint) <- c("No", "Yes")
+
+vehiclestops$veh_search_consent <-  as.factor(vehiclestops$veh_search_consent)
+levels(vehiclestops$veh_search_consent) <- c("No", "Yes")
+
+vehiclestops$veh_searched <-  as.factor(vehiclestops$veh_searched)
+levels(vehiclestops$veh_searched) <- c("No", "Yes")
+
+vehiclestops$search_without_consent <-  as.factor(vehiclestops$search_without_consent)
+levels(vehiclestops$search_without_consent) <- c("No", "Yes")
+
+vehiclestops$veh_seized <-  as.factor(vehiclestops$veh_seized)
+levels(vehiclestops$veh_seized) <- c("No", "Yes")
+
+vehiclestops$summoned <-  as.factor(vehiclestops$summoned)
+levels(vehiclestops$summoned ) <- c("No", "Yes")
+
+vehiclestops$force_used <-  as.factor(vehiclestops$force_used)
+levels(vehiclestops$force_used) <- c("No", "Yes")
+
+vehiclestops$arrested  <-  as.factor(vehiclestops$arrested)
+levels(vehiclestops$arrested) <- c("No", "Yes")
+
+vehiclestops$seizure_and_summoning <-  as.factor(vehiclestops$seizure_and_summoning)
+levels(vehiclestops$seizure_and_summoning) <- c("No", "Yes")
+
+vehiclestops$seizure_and_arrest <-  as.factor(vehiclestops$seizure_and_arrest)
+levels(vehiclestops$seizure_and_arrest) <- c("No", "Yes")
+
+vehiclestops$force_and_arrest <-  as.factor(vehiclestops$force_and_arrest)
+levels(vehiclestops$force_and_arrest) <- c("No", "Yes")
+
+vehiclestops$any_escalation <-  as.factor(vehiclestops$any_escalation)
+levels(vehiclestops$any_escalation) <- c("No", "Yes")
+
+summary(vehiclestops)
+```
+
 ------------------------------------------------------------------------
 
 # Choosing the models
@@ -125,6 +193,40 @@ for (req in requirements){
 ---
 
 # Feature and Model Selection
+
+For the following features we are going to see which may be the most useful and remove similar ones
+
+## Enforcement and Escalation features
+
+## Area, Borough and Command Unit
+
+Which one to keep? area, borough or command unit?
+
+## Time related features
+
+
+
+## 
+
+```{r}
+mod1 <- glm(
+  any_escalation ~ year + month + day + weekend + hour + working_hour + minute + area + boro + command + sex + race + age + veh_categ + veh_checkpoint , 
+  family = binomial, 
+  data = vehiclestops
+)
+summary(mod1)
+```
+
+```{r}
+mod2 <- glm(
+  any_escalation ~ year + weekend + hour + area + sex + race + age + veh_categ + veh_checkpoint, family = binomial, data = vehiclestops
+)
+summary(mod2)
+```
+
+```{r}
+plot(allEffects(mod1), ylab = "Probability of Excessive Escalation")
+```
 
 ## Stepwise Approach
 
