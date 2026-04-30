@@ -1,47 +1,5 @@
----
-title: "Predicting Excessive Enforcement Patterns in Police Behavior After Vehicles Stops in New York"
-subtitle: "Model Selection and Evaluation - 2 Wheels Vehicles"
-author: "Gianmaria Pizzo"
-output:
-  html_document:
-    fig_caption: yes
-    theme: flatly
-    highlight: pygments
-    code_folding: show
-    toc: yes
-    toc_depth: 4
-    number_sections: no
-    toc_float:
-      smooth_scroll: no
-editor_options:
-  chunk_output_type: console
----
-
-```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-```
 
-These `.Rmd` files represent the project submission for the course [Statistical Inference and Learning](https://www.unive.it/data/course/521944) by Professor [Cristiano Varin](https://www.unive.it/data/people/5592728) at [Ca' Foscari University of Venice](https://www.unive.it/) for the year 2025/2026.
-
----
-
-# Problem Statement
-
-## Goal of this notebook
-
-This notebook carries out model selection and evaluation for predicting **whether a two-wheel vehicle stop results in an arrest** (`arrested = 1`). The response is binary and exhibits severe class imbalance: approximately 5.5% of stops lead to an arrest. Accordingly, accuracy alone is a misleading performance metric—we rely instead on log-likelihood-based criteria (AIC, BIC), likelihood ratio tests where models are nested, and cross-validated AUC.
-
-The notebook is organised as follows:
-
-0. **Stratified train/test split** stratified jointly on `arrested`, `area`, `sex`, `ethnicity`, and `hour`.
-1. **Full logistic regression model** using `year`, `month`, `weekday`, `time_bracket`, `boro`, `sex`, `ethnicity`, `age_bracket` as predictors, followed by an analysis of coefficients, p-values, and odds ratios.
-2. **Predictor-form comparison** for three alternatives: (a) `hour` instead of `time_bracket`; (b) `area` instead of `boro`; (c) numeric `age` instead of `age_bracket`. Each comparison uses AIC, BIC, likelihood ratio tests where applicable, and 10-fold cross-validated AUC on the training set.
-
----
-
-# Environment
-
-```{r requirements}
 requirements <- c(
   "remotes", "summarytools", "forcats", "scales", "purrr", "broom",
   "stringr", "plyr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
@@ -49,30 +7,16 @@ requirements <- c(
   "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor",
   "sf", "ggplot2", "patchwork", "pROC", "kableExtra"
 )
-```
 
-```{r install-requirements, include=FALSE}
 for (req in requirements) {
   if (!requireNamespace(req, quietly = TRUE)) install.packages(req)
 }
-```
 
-```{r load-requirements, include=FALSE}
 for (req in requirements) library(req, character.only = TRUE)
 rm(requirements, req)
-```
 
----
-
-# Data Loading and Preparation
-
-```{r load-data}
 vehstop <- read.csv("data/vehiclestops_2_wheels_final.csv")
-```
 
-We convert all categorical predictors to factors and set interpretable reference levels before any modelling step, ensuring consistency between all downstream model fits and cross-validation folds.
-
-```{r factor-prep}
 # Ordered weekday levels (ISO order)
 wday_levels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
@@ -111,15 +55,7 @@ vehstop$time_bracket <- relevel(vehstop$time_bracket, ref = "Morning commute (8�
 vehstop$age_bracket  <- relevel(vehstop$age_bracket,  ref = "25–34")
 
 rm(wday_levels, tbkt_levels, abkt_levels)
-```
 
----
-
-# 0 · Stratified Train / Test Split
-
-We reserve 20% of observations as a hold-out test set. A simple random split preserves the overall `arrested` proportion but can distort the joint distribution of the target with key covariates in the minority class. We therefore stratify **jointly** on `arrested`, `area`, `sex`, `ethnicity`, and `hour`: within every non-empty combination of those five variables we sample 80% for training and 20% for testing.
-
-```{r stratified-split}
 set.seed(2026)
 
 # Joint stratum key; drop = TRUE removes empty combinations
@@ -137,9 +73,7 @@ train_rows <- vehstop %>%
 train <- vehstop[ train_rows, ] %>% select(-.strat)
 test  <- vehstop[-train_rows, ] %>% select(-.strat)
 vehstop <- vehstop %>% select(-.strat)
-```
 
-```{r split-verification}
 check_prop <- function(var, label) {
   tr <- prop.table(table(train[[var]]))
   te <- prop.table(table(test[[var]]))
@@ -166,45 +100,19 @@ bind_rows(
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
   collapse_rows(columns = 1, valign = "top")
-```
 
-```{r split-summary}
 cat(sprintf(
   "Training set : %d rows  |  Arrested: %.2f%%\nTest set     : %d rows  |  Arrested: %.2f%%\n",
   nrow(train), 100 * mean(train$arrested),
   nrow(test),  100 * mean(test$arrested)
 ))
-```
 
-The maximum absolute discrepancy between the two sets is on the order of fractions of a percentage point, confirming that the stratification preserved the joint distribution of the target and the key covariates.
-
----
-
-# i · Full Logistic Regression Model
-
-## Model Specification
-
-We fit a logistic regression model on the training data. All predictors enter as unordered factors, so each level is estimated against the chosen reference category. No interactions are included at this stage—they will be considered in later modelling steps once the main effects are understood.
-
-```{r fit-full-model}
 f_base <- arrested ~ year + month + weekday + time_bracket + boro + sex + ethnicity + age_bracket
 
 mod_base <- glm(f_base, family = binomial, data = train)
-```
 
-## Coefficient Summary
-
-```{r model-summary}
 summary(mod_base)
-```
 
-The model has `r length(coef(mod_base))` estimated parameters on `r nrow(train)` training observations (`r round(100 * mean(train$arrested), 1)`% positive). The null deviance is `r round(mod_base$null.deviance, 1)` and the residual deviance is `r round(mod_base$deviance, 1)`, a reduction of `r round(mod_base$null.deviance - mod_base$deviance, 1)` on `r mod_base$df.null - mod_base$df.residual` degrees of freedom.
-
-## Odds Ratios and Significance
-
-We exponentiate the coefficients to obtain odds ratios (OR) and compute 95% profile-likelihood confidence intervals. An OR above 1 indicates increased odds of arrest relative to the reference level; below 1 indicates decreased odds.
-
-```{r odds-ratios-table}
 predictors <- c("year", "month", "weekday", "time_bracket", "boro", "sex", "ethnicity", "age_bracket")
 
 or_tbl <- tidy(mod_base, conf.int = TRUE, exponentiate = TRUE) %>%
@@ -233,13 +141,7 @@ or_tbl %>%
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
   collapse_rows(columns = 1, valign = "top")
-```
 
-## Odds Ratio Plot
-
-The forest plot below displays estimated odds ratios with 95% confidence intervals, faceted by predictor. Points are coloured by significance at the 5% level. The vertical dashed line marks OR = 1 (no effect). Note the logarithmic x-axis.
-
-```{r or-plot, fig.width=11, fig.height=10}
 or_plot_data <- or_tbl %>%
   mutate(
     is_sig = p.value < 0.05,
@@ -277,38 +179,7 @@ ggplot(or_plot_data, aes(x = estimate, y = reorder(level, estimate), colour = is
     legend.position  = "bottom",
     panel.grid.minor = element_blank()
   )
-```
 
-## Key Findings
-
--   **Year**: Arrest probability shifted across years; interpret coefficients relative to 2023 to detect a temporal trend in enforcement intensity.
--   **Month**: Seasonal variation is present. Summer months (April–October, the "hot season" identified in the EDA) tend toward higher enforcement activity.
--   **Weekday**: There is variation by day of the week, with some days showing significantly different arrest odds relative to Monday. Weekday effects partially overlap with the time-of-day signal.
--   **Time bracket**: Late-night and early-morning stops carry higher arrest odds than the morning-commute reference period, consistent with the EDA finding that enforcement character changes after hours.
--   **Borough**: The Bronx (reference) and Staten Island show markedly higher arrest odds than the Manhattan sub-boroughs. The sub-borough granularity of `boro` is what we evaluate in comparison (b).
--   **Sex**: Female stops are estimated at lower arrest odds than male stops. The "Unknown" sex coefficient should be interpreted cautiously given the small cell count.
--   **Ethnicity**: Stops of Black and Hispanic motorists are associated with higher arrest odds relative to White motorists, consistent with the EDA bivariate analysis. These are observational associations and should not be read as causal.
--   **Age bracket**: Younger riders (especially Under 18) show elevated arrest odds; odds decrease with age beyond the 25–34 reference. The monotonicity assumption is tested in comparison (c).
-
----
-
-# ii · Predictor-Form Comparison
-
-## Strategy
-
-The base model uses `time_bracket` (6-level factor, 5 df), `boro` (8-level factor, 7 df), and `age_bracket` (7-level factor, 6 df). We compare each against a finer or coarser alternative:
-
-| Comparison | Base form | Alternative | Nesting | Tests |
-|---|---|---|---|---|
-| (a) | `time_bracket` (5 df) | `hour` as factor (23 df) | Base nested in alternative | AIC, BIC, LRT |
-| (b) | `boro` (7 df) | `area` (4 df) | Alternative nested in base | AIC, BIC, LRT |
-| (c) | `age_bracket` (6 df) | `age` numeric (1 df) | Not nested | AIC, BIC, CV AUC |
-
-For (a) and (b) we use the **likelihood ratio test**: `time_bracket` constrains all hours within a bin to share one coefficient (18 extra restrictions); `area` constrains boroughs within a geographic group to share one coefficient (3 extra restrictions). For (c) the LRT is not applicable—a linear numeric term and a step-function factor are not nested in either direction.
-
-**Cross-validated AUC** uses the same 10 stratified folds on the training set for all models.
-
-```{r cv-auc-function}
 cv_auc <- function(formula, data, folds_vec) {
   k        <- max(folds_vec)
   auc_vals <- numeric(k)
@@ -335,22 +206,10 @@ cv_auc <- function(formula, data, folds_vec) {
 # Shared fold assignment — same folds used for every model
 set.seed(2026)
 cv_folds <- sample(rep(1:10, length.out = nrow(train)))
-```
 
----
-
-## (a) `time_bracket` vs `hour`
-
-`hour` encodes the exact hour of stop (0–23) as a 24-level factor (23 df). `time_bracket` groups those hours into 6 bins (5 df). The `time_bracket` model is **nested** inside the `hour` model: it imposes the constraint that all hours within a bin have equal log-odds, a restriction with 23 − 5 = 18 degrees of freedom.
-
-```{r fit-model-hour, cache=TRUE}
 f_hour   <- arrested ~ year + month + weekday + hour + boro + sex + ethnicity + age_bracket
 mod_hour <- glm(f_hour, family = binomial, data = train)
-```
 
-### AIC and BIC
-
-```{r compare-a-aic}
 aic_a <- AIC(mod_base, mod_hour)
 bic_a <- BIC(mod_base, mod_hour)
 
@@ -367,25 +226,15 @@ tibble(
     col.names = c("Model", "# Param", "AIC", "BIC", "Δ AIC", "Δ BIC")
   ) %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-### Likelihood Ratio Test
-
-```{r lrt-a}
 lrt_a <- anova(mod_base, mod_hour, test = "Chisq")
 lrt_a
-```
 
-```{r lrt-a-interp}
 chi_a <- lrt_a[["Deviance"]][2]
 df_a  <- lrt_a[["Df"]][2]
 p_a   <- lrt_a[["Pr(>Chi)"]][2]
 cat(sprintf("LRT (a): χ²(%d) = %.2f,  p = %.4g\n", df_a, chi_a, p_a))
-```
 
-### CV AUC
-
-```{r cv-auc-a, cache=TRUE}
 auc_base_a <- cv_auc(f_base, train, cv_folds)
 auc_hour_a <- cv_auc(f_hour, train, cv_folds)
 
@@ -395,24 +244,10 @@ tibble(
 ) %>%
   kbl(caption = "10-fold CV AUC on training set — comparison (a)") %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-**Decision (a):** A significant LRT with a large chi-square statistic indicates that within-bracket hour-level variation is real—the bins conceal genuine non-linearity in the time-of-day effect. If the AIC of the `hour` model is meaningfully lower but BIC is higher (penalising the 18 extra parameters), and the CV AUC difference is small (< 0.002), the `time_bracket` parameterisation is preferred on parsimony grounds. If instead the CV AUC gain is substantial, `hour` better captures the enforcement cycle.
-
----
-
-## (b) `boro` vs `area`
-
-`area` (5 levels, 4 df) merges the sub-borough splits: both Brooklyn sub-boroughs become "Brooklyn", both Manhattan sub-boroughs become "Manhattan", both Queens sub-boroughs become "Queens". The `area` model is **nested** inside the `boro` model: it constrains three pairs of sub-borough coefficients to be equal, a restriction with 7 − 4 = 3 degrees of freedom.
-
-```{r fit-model-area, cache=TRUE}
 f_area   <- arrested ~ year + month + weekday + time_bracket + area + sex + ethnicity + age_bracket
 mod_area <- glm(f_area, family = binomial, data = train)
-```
 
-### AIC and BIC
-
-```{r compare-b-aic}
 aic_b <- AIC(mod_area, mod_base)
 bic_b <- BIC(mod_area, mod_base)
 
@@ -429,25 +264,15 @@ tibble(
     col.names = c("Model", "# Param", "AIC", "BIC", "Δ AIC", "Δ BIC")
   ) %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-### Likelihood Ratio Test
-
-```{r lrt-b}
 lrt_b <- anova(mod_area, mod_base, test = "Chisq")
 lrt_b
-```
 
-```{r lrt-b-interp}
 chi_b <- lrt_b[["Deviance"]][2]
 df_b  <- lrt_b[["Df"]][2]
 p_b   <- lrt_b[["Pr(>Chi)"]][2]
 cat(sprintf("LRT (b): χ²(%d) = %.2f,  p = %.4g\n", df_b, chi_b, p_b))
-```
 
-### CV AUC
-
-```{r cv-auc-b, cache=TRUE}
 auc_area_b <- cv_auc(f_area, train, cv_folds)
 auc_base_b <- cv_auc(f_base, train, cv_folds)
 
@@ -457,24 +282,10 @@ tibble(
 ) %>%
   kbl(caption = "10-fold CV AUC on training set — comparison (b)") %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-**Decision (b):** A significant LRT (on only 3 df) means that at least one pair of sub-boroughs has genuinely different arrest odds and the aggregation to `area` loses predictive information. Conversely, a non-significant result—and the EDA heatmaps suggested within-borough heterogeneity is moderate—supports retaining `area` for parsimony and reduced variance in the very sparse Staten Island stratum.
-
----
-
-## (c) `age_bracket` vs numeric `age`
-
-Numeric `age` enters as a single continuous term (1 df), assuming log-odds change linearly with age. `age_bracket` uses a step function over seven brackets (6 df). The EDA showed that arrest rates peak at younger ages and then decline, but not always monotonically. These two parameterisations are **not nested**: a linear function cannot reproduce a step function and vice versa. No LRT is applicable; we rely on AIC, BIC, and CV AUC.
-
-```{r fit-model-age, cache=TRUE}
 f_age   <- arrested ~ year + month + weekday + time_bracket + boro + sex + ethnicity + age
 mod_age <- glm(f_age, family = binomial, data = train)
-```
 
-### AIC and BIC
-
-```{r compare-c-aic}
 aic_c <- AIC(mod_base, mod_age)
 bic_c <- BIC(mod_base, mod_age)
 
@@ -491,11 +302,7 @@ tibble(
     col.names = c("Model", "# Param", "AIC", "BIC", "Δ AIC", "Δ BIC")
   ) %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-### CV AUC
-
-```{r cv-auc-c, cache=TRUE}
 auc_base_c <- cv_auc(f_base, train, cv_folds)
 auc_age_c  <- cv_auc(f_age,  train, cv_folds)
 
@@ -505,15 +312,7 @@ tibble(
 ) %>%
   kbl(caption = "10-fold CV AUC on training set — comparison (c)") %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-**Decision (c):** If `age_bracket` achieves lower AIC and higher CV AUC, the non-linear bracket structure captures genuine non-monotonicity in the age effect that a single linear slope misses. If `age` (1 df) achieves lower BIC with a similar CV AUC, the linearity assumption is adequate and the simpler parameterisation is preferred. Given the EDA evidence of a U-shaped age–arrest relationship (elevated Under 18 and 65+ rates), we expect the bracket model to perform better.
-
----
-
-## Full Comparison Summary
-
-```{r summary-table, cache=TRUE}
 # Collect all AUC values (shared folds)
 auc_summary <- c(
   cv_auc(f_base, train, cv_folds),
@@ -549,9 +348,7 @@ summary_tbl %>%
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE) %>%
   row_spec(which.min(summary_tbl$AIC), bold = TRUE, color = "white", background = "#2c7bb6")
-```
 
-```{r lrt-summary}
 tibble(
   Comparison = c("(a) time_bracket → hour (18 df freed)", "(b) boro → area (3 df constrained)"),
   `χ²` = round(c(chi_a, chi_b), 2),
@@ -560,11 +357,7 @@ tibble(
 ) %>%
   kbl(caption = "Likelihood ratio tests for nested comparisons") %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-### AIC / BIC profile
-
-```{r aic-bic-plot, fig.width=9, fig.height=4}
 summary_tbl %>%
   select(Model, AIC, BIC) %>%
   pivot_longer(c(AIC, BIC), names_to = "Criterion", values_to = "Value") %>%
@@ -581,11 +374,7 @@ summary_tbl %>%
   ) +
   theme_minimal(base_size = 11) +
   theme(legend.position = "bottom", panel.grid.minor = element_blank())
-```
 
-### CV AUC profile
-
-```{r auc-plot, fig.width=8, fig.height=3.5}
 summary_tbl %>%
   mutate(Model = stringr::str_wrap(Model, 35)) %>%
   ggplot(aes(x = reorder(Model, CV_AUC), y = CV_AUC)) +
@@ -602,23 +391,7 @@ summary_tbl %>%
   ) +
   theme_minimal(base_size = 11) +
   theme(panel.grid.minor = element_blank())
-```
 
----
-
-## Selected Predictor Forms
-
-Based on the three comparisons, the preferred predictor forms feeding into all subsequent models are:
-
-| Axis | Chosen form | Rationale |
-|---|---|---|
-| Time of day | `time_bracket` or `hour` | Prefer `time_bracket` unless LRT (a) is significant **and** CV AUC gain > 0.002 |
-| Geography | `boro` or `area` | Prefer `area` if LRT (b) is non-significant; prefer `boro` otherwise |
-| Age | `age_bracket` or `age` | Prefer whichever achieves lower AIC; expect bracket to win given the EDA |
-
-The winning form is determined programmatically from the AIC values already computed above and stored in `f_final`, which is used consistently by all subsequent models.
-
-```{r final-formula}
 use_time <- if (AIC(mod_hour) <= AIC(mod_base)) "hour"         else "time_bracket"
 use_geo  <- if (AIC(mod_base) <= AIC(mod_area)) "boro"         else "area"
 use_age  <- if (AIC(mod_base) <= AIC(mod_age))  "age_bracket"  else "age"
@@ -631,9 +404,7 @@ f_final <- reformulate(
   c("year", "month", "weekday", use_time, use_geo, "sex", "ethnicity", use_age),
   response = "arrested"
 )
-```
 
-```{r eval-helpers}
 # ── Threshold and confusion-matrix helpers ───────────────────────────────────
 
 best_thresh <- function(roc_obj) {
@@ -833,15 +604,7 @@ eval_quad_plot <- function(actual, prob, model_name) {
   p4 <- plot_threshold_single(actual, prob, paste(model_name, "— Threshold Analysis"))
   (p1 | p2) / (p3 | p4)
 }
-```
 
----
-
-# ii-b · Best Logistic Regression — Evaluation
-
-We fit the best logistic model (with the predictor forms selected in section ii) on the training set and evaluate it on the hold-out test set. All subsequent models use the same split and the same `f_final` formula.
-
-```{r logit-best-fit}
 mod_logit_best <- glm(f_final, family = binomial, data = train)
 prob_logit     <- predict(mod_logit_best, newdata = test, type = "response")
 roc_logit      <- pROC::roc(test$arrested, prob_logit, quiet = TRUE)
@@ -849,9 +612,7 @@ auc_logit      <- as.numeric(pROC::auc(roc_logit))
 thr_logit      <- best_thresh(roc_logit)
 class_logit    <- as.integer(prob_logit >= thr_logit)
 met_logit      <- class_metrics(test$arrested, class_logit)
-```
 
-```{r logit-metrics-table}
 compute_metrics(test$arrested, prob_logit, "Logistic Regression") %>%
   kbl(
     caption   = "Logistic Regression — full evaluation metrics (test set, Youden threshold)",
@@ -859,56 +620,20 @@ compute_metrics(test$arrested, prob_logit, "Logistic Regression") %>%
                   "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
   ) %>%
   kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
-```
 
-```{r logit-cm-plot, fig.width=4, fig.height=3.5}
 plot_cm(test$arrested, class_logit,
         "Logistic Regression — Confusion Matrix (Youden threshold)")
-```
 
-```{r logit-eval-plots, fig.width=10, fig.height=8}
 eval_quad_plot(test$arrested, prob_logit, "Logistic Regression")
-```
 
-### Notes
-
--   **ROC curve**: Measures overall discrimination regardless of threshold. AUC = P(score of random positive > score of random negative).
--   **PR curve**: More informative than ROC under class imbalance. A model with no skill scores PR-AUC ≈ prevalence (≈ 5.5%). PR-AUC above that baseline indicates genuine discrimination.
--   **Calibration**: A well-calibrated model has predicted probabilities that match observed proportions. Curves bowing above the diagonal indicate under-confidence; below the diagonal indicates over-confidence.
--   **Threshold analysis**: Shows how sensitivity, specificity, precision, and F1 change as the decision threshold varies. The Youden threshold maximises sensitivity + specificity − 1.
-
----
-
-# iii · QDA
-
-## Assumptions and Setup
-
-Quadratic Discriminant Analysis assumes each class follows a multivariate normal distribution with its own covariance matrix. This assumption is technically violated because our predictors are discrete (factor dummies), but QDA is often robust to this in practice when the sample size is large. Two specific caveats apply here:
-
--   **Class imbalance**: the arrested = 1 class represents ≈ 5.5% of training observations; the class-specific covariance matrix is estimated from this smaller sample.
--   **Dimensionality**: after dummy encoding the final formula produces `r ncol(model.matrix(f_final, train[1,])) - 1` features. The minority class has roughly `r sum(train$arrested)` observations, which exceeds the feature count, so the covariance matrix is full-rank.
-
-```{r load-MASS, include=FALSE}
 if (!requireNamespace("MASS", quietly = TRUE)) install.packages("MASS")
 # Do NOT library(MASS) — it masks dplyr::select; use MASS:: prefix throughout
-```
 
-## Model Fit
-
-```{r fit-qda}
 mod_qda <- MASS::qda(f_final, data = train)
-```
 
-## Prior Probabilities and Group Means
-
-`MASS::qda` reports the estimated prior probabilities (class proportions in the training set) and the within-class means of every dummy variable. The group means reveal which features are most discriminative.
-
-```{r qda-priors}
 cat("Prior probabilities:\n")
 print(mod_qda$prior)
-```
 
-```{r qda-means-plot, fig.width=11, fig.height=5}
 means_df <- as.data.frame(t(mod_qda$means)) %>%
   tibble::rownames_to_column("feature") %>%
   rename(arrested_0 = `0`, arrested_1 = `1`) %>%
@@ -931,11 +656,7 @@ ggplot(head(means_df, 30), aes(x = diff, y = reorder(feature, diff), fill = dire
   ) +
   theme_minimal(base_size = 10) +
   theme(legend.position = "bottom", panel.grid.minor = element_blank())
-```
 
-## Evaluation on the Test Set
-
-```{r qda-eval}
 pred_qda  <- predict(mod_qda, newdata = test)
 prob_qda  <- pred_qda$posterior[, "1"]
 roc_qda   <- pROC::roc(test$arrested, prob_qda, quiet = TRUE)
@@ -948,13 +669,9 @@ cat(sprintf(
   "AUC: %.4f  |  Threshold (Youden): %.4f\nSensitivity: %.3f  |  Specificity: %.3f  |  Balanced accuracy: %.3f\n",
   auc_qda, thr_qda, met_qda$sensitivity, met_qda$specificity, met_qda$balanced_acc
 ))
-```
 
-```{r qda-cm-plot, fig.width=4, fig.height=3.5}
 plot_cm(test$arrested, class_qda, title = "QDA — Confusion Matrix (Youden threshold)")
-```
 
-```{r qda-posterior-hist, fig.width=7, fig.height=3.5}
 tibble(prob = prob_qda, actual = factor(test$arrested, levels = c(0,1),
                                         labels = c("Not arrested","Arrested"))) %>%
   ggplot(aes(x = prob, fill = actual)) +
@@ -971,9 +688,7 @@ tibble(prob = prob_qda, actual = factor(test$arrested, levels = c(0,1),
   ) +
   theme_minimal(base_size = 11) +
   theme(legend.position = "bottom")
-```
 
-```{r qda-metrics-table}
 compute_metrics(test$arrested, prob_qda, "QDA") %>%
   kbl(
     caption   = "QDA — full evaluation metrics (test set, Youden threshold)",
@@ -981,28 +696,12 @@ compute_metrics(test$arrested, prob_qda, "QDA") %>%
                   "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
   ) %>%
   kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
-```
 
-```{r qda-eval-plots, fig.width=10, fig.height=8}
 eval_quad_plot(test$arrested, prob_qda, "QDA")
-```
 
----
-
-# iv · Naive Bayes
-
-## Assumptions and Setup
-
-Naive Bayes assumes conditional independence of all features given the class label. For purely categorical predictors it estimates a frequency table per feature–class combination (with optional Laplace smoothing to prevent zero-probability cells). The independence assumption is almost certainly violated—time of day, area, and demographic features are correlated—but Naive Bayes often produces competitive probabilistic rankings even when it is. The Laplace smoothing parameter $k$ is the only tuning knob; it is selected by 10-fold cross-validated AUC on the training set using the same folds as section ii.
-
-```{r load-e1071, include=FALSE}
 if (!requireNamespace("e1071", quietly = TRUE)) install.packages("e1071")
 library(e1071)
-```
 
-## Laplace Smoothing Tuning
-
-```{r nb-tune, cache=TRUE}
 laplace_grid <- c(0, 0.5, 1, 2, 5, 10)
 
 nb_cv_auc <- function(k, data, folds_vec, formula) {
@@ -1026,9 +725,7 @@ nb_aucs <- sapply(laplace_grid, nb_cv_auc,
                   data = train, folds_vec = cv_folds, formula = f_final)
 best_laplace <- laplace_grid[which.max(nb_aucs)]
 cat("Best Laplace k:", best_laplace, " | CV AUC:", round(max(nb_aucs), 4), "\n")
-```
 
-```{r nb-tune-plot, fig.width=6, fig.height=3.5}
 tibble(k = laplace_grid, CV_AUC = nb_aucs) %>%
   ggplot(aes(x = factor(k), y = CV_AUC)) +
   geom_col(fill = "#2c7bb6", width = 0.6) +
@@ -1041,19 +738,9 @@ tibble(k = laplace_grid, CV_AUC = nb_aucs) %>%
   coord_cartesian(ylim = c(min(nb_aucs) - 0.002, max(nb_aucs) + 0.005)) +
   theme_minimal(base_size = 11) +
   theme(panel.grid.minor = element_blank())
-```
 
-## Model Fit
-
-```{r fit-nb}
 mod_nb <- e1071::naiveBayes(f_final, data = train, laplace = best_laplace)
-```
 
-## Conditional Probability Tables — Key Predictors
-
-Each table entry shows $\hat{P}(\text{feature level} \mid \text{class})$. Features whose conditional distributions differ most between classes are the strongest discriminators under the independence assumption.
-
-```{r nb-tables-plot, fig.width=11, fig.height=6}
 # Extract tables for a selected set of substantively interesting predictors
 plot_nb_feature <- function(feature_name, mod) {
   tbl <- mod$tables[[feature_name]]
@@ -1086,11 +773,7 @@ patchwork::wrap_plots(plots_nb, ncol = 3) +
   ) +
   patchwork::plot_layout(guides = "collect") &
   theme(legend.position = "bottom")
-```
 
-## Evaluation on the Test Set
-
-```{r nb-eval}
 prob_nb  <- predict(mod_nb, newdata = test, type = "raw")[, 2]
 roc_nb   <- pROC::roc(test$arrested, prob_nb, quiet = TRUE)
 auc_nb   <- as.numeric(pROC::auc(roc_nb))
@@ -1102,13 +785,9 @@ cat(sprintf(
   "AUC: %.4f  |  Threshold (Youden): %.4f\nSensitivity: %.3f  |  Specificity: %.3f  |  Balanced accuracy: %.3f\n",
   auc_nb, thr_nb, met_nb$sensitivity, met_nb$specificity, met_nb$balanced_acc
 ))
-```
 
-```{r nb-cm-plot, fig.width=4, fig.height=3.5}
 plot_cm(test$arrested, class_nb, title = "Naive Bayes — Confusion Matrix (Youden threshold)")
-```
 
-```{r nb-metrics-table}
 compute_metrics(test$arrested, prob_nb, "Naive Bayes") %>%
   kbl(
     caption   = "Naive Bayes — full evaluation metrics (test set, Youden threshold)",
@@ -1116,28 +795,12 @@ compute_metrics(test$arrested, prob_nb, "Naive Bayes") %>%
                   "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
   ) %>%
   kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
-```
 
-```{r nb-eval-plots, fig.width=10, fig.height=8}
 eval_quad_plot(test$arrested, prob_nb, "Naive Bayes")
-```
 
----
-
-# v · LASSO
-
-## Setup
-
-Logistic LASSO penalises the sum of absolute coefficient values ($\ell_1$ penalty), which shrinks small effects to exactly zero and performs implicit variable selection. We use the `glmnet` package with `family = "binomial"` and `alpha = 1` (pure LASSO, no ridge component). All categorical predictors are dummy-encoded via `model.matrix`; the intercept column is excluded because `glmnet` adds its own unpenalised intercept. The penalty parameter $\lambda$ is selected by 10-fold cross-validated AUC on the training set.
-
-```{r load-glmnet, include=FALSE}
 if (!requireNamespace("glmnet", quietly = TRUE)) install.packages("glmnet")
 library(glmnet)
-```
 
-## Model Matrix
-
-```{r lasso-matrix}
 X_train <- model.matrix(f_final, data = train)[, -1]   # drop intercept column
 X_test  <- model.matrix(f_final, data = test)[, -1]
 y_train <- train$arrested
@@ -1145,13 +808,7 @@ y_test  <- test$arrested
 
 cat("Training matrix:", nrow(X_train), "×", ncol(X_train), "\n")
 cat("Test matrix    :", nrow(X_test),  "×", ncol(X_test),  "\n")
-```
 
-## Cross-Validated Lambda
-
-We optimise $\lambda$ by maximising cross-validated AUC (`type.measure = "auc"`), which is the appropriate metric for an imbalanced binary outcome.
-
-```{r fit-lasso-cv, cache=TRUE}
 set.seed(2026)
 cv_lasso <- cv.glmnet(
   X_train, y_train,
@@ -1167,9 +824,7 @@ cat(sprintf(
   cv_lasso$lambda.1se,
   cv_lasso$cvm[cv_lasso$lambda == cv_lasso$lambda.1se]
 ))
-```
 
-```{r lasso-cv-plot, fig.width=7, fig.height=4}
 # Replicate the cv.glmnet plot in ggplot2
 cv_df <- tibble(
   log_lambda = log(cv_lasso$lambda),
@@ -1198,11 +853,7 @@ ggplot(cv_df, aes(x = log_lambda, y = cvm)) +
   ) +
   theme_minimal(base_size = 11) +
   theme(panel.grid.minor = element_blank())
-```
 
-## Coefficient Path
-
-```{r lasso-path-plot, fig.width=9, fig.height=5}
 # Tidy the full coefficient path
 coef_path <- as.matrix(coef(cv_lasso$glmnet.fit))   # (p+1) × n_lambda
 lambdas   <- cv_lasso$glmnet.fit$lambda
@@ -1232,11 +883,7 @@ ggplot(path_df, aes(x = log_lambda, y = coef, group = feature,
   ) +
   theme_minimal(base_size = 11) +
   theme(panel.grid.minor = element_blank())
-```
 
-## Selected Coefficients
-
-```{r lasso-coef-tables}
 extract_coefs <- function(cv_fit, s_name) {
   cf <- coef(cv_fit, s = s_name)
   tibble(
@@ -1253,18 +900,14 @@ coef_1se <- extract_coefs(cv_lasso, "lambda.1se")
 
 cat("Non-zero coefficients at λ.min:", nrow(coef_min), "\n")
 cat("Non-zero coefficients at λ.1se:", nrow(coef_1se), "\n")
-```
 
-```{r lasso-coef-min-table}
 coef_min %>%
   kbl(
     caption   = "LASSO coefficients at λ.min (sorted by |estimate|)",
     col.names = c("Feature", "Log-odds", "Odds Ratio")
   ) %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
-```
 
-```{r lasso-coef-plot, fig.width=8, fig.height=0.35 * nrow(coef_min) + 1.5}
 coef_min %>%
   mutate(
     direction = ifelse(estimate > 0, "Increases odds", "Decreases odds"),
@@ -1282,11 +925,7 @@ coef_min %>%
   ) +
   theme_minimal(base_size = 10) +
   theme(legend.position = "bottom", panel.grid.minor = element_blank())
-```
 
-## Evaluation on the Test Set
-
-```{r lasso-eval}
 prob_lasso_min <- as.numeric(predict(cv_lasso, newx = X_test, s = "lambda.min", type = "response"))
 prob_lasso_1se <- as.numeric(predict(cv_lasso, newx = X_test, s = "lambda.1se", type = "response"))
 
@@ -1314,15 +953,11 @@ cat(sprintf(
   auc_lasso_1se, thr_lasso_1se,
   met_lasso_1se$sensitivity, met_lasso_1se$specificity, met_lasso_1se$balanced_acc
 ))
-```
 
-```{r lasso-cm-plots, fig.width=8, fig.height=3.5}
 p_cm_min <- plot_cm(y_test, class_lasso_min, "LASSO (λ.min) — Confusion Matrix")
 p_cm_1se <- plot_cm(y_test, class_lasso_1se, "LASSO (λ.1se) — Confusion Matrix")
 p_cm_min | p_cm_1se
-```
 
-```{r lasso-metrics-table}
 bind_rows(
   compute_metrics(y_test, prob_lasso_min, "LASSO λ.min"),
   compute_metrics(y_test, prob_lasso_1se, "LASSO λ.1se")
@@ -1333,23 +968,11 @@ bind_rows(
                   "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
   ) %>%
   kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
-```
 
-```{r lasso-eval-plots-min, fig.width=10, fig.height=8}
 eval_quad_plot(y_test, prob_lasso_min, "LASSO (λ.min)")
-```
 
-```{r lasso-eval-plots-1se, fig.width=10, fig.height=8}
 eval_quad_plot(y_test, prob_lasso_1se, "LASSO (λ.1se)")
-```
 
----
-
-# vi · All-Method Comparison
-
-## ROC Curves
-
-```{r roc-curves-all, fig.width=7, fig.height=6}
 # prob_logit / roc_logit / auc_logit already defined in section ii-b
 roc_list <- list(
   "Logistic"     = roc_logit,
@@ -1370,11 +993,7 @@ pROC::ggroc(roc_list, linewidth = 0.8) +
   ) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom")
-```
 
-## Metrics Summary
-
-```{r metrics-table}
 # All threshold/class/metric objects already defined in per-model sections
 bind_rows(
   compute_metrics(test$arrested, prob_logit,     "Logistic"),
@@ -1393,6 +1012,3 @@ bind_rows(
     as.numeric(pROC::auc(roc_logit)),
     auc_qda, auc_nb, auc_lasso_min, auc_lasso_1se
   )), bold = TRUE, colour = "white", background = "#2c7bb6")
-```
-
-The table reports AUC and PR-AUC as primary discrimination metrics, Log-Loss and Brier score as calibration metrics, and threshold-dependent metrics (Sensitivity, Specificity, Precision, F1, MCC, Balanced Accuracy) at each model's Youden-optimal threshold. Given the severe class imbalance (~5.5% positive rate), PR-AUC and MCC are more informative than raw accuracy or even balanced accuracy alone.

@@ -1,0 +1,3381 @@
+---
+title: "Predicting Excessive Enforcement Patterns in Police Behavior After Vehicles Stops in New York"
+subtitle: "EDA and Feature Engineering - 2 Wheels Vehicles"
+author: "Gianmaria Pizzo"
+output:
+  html_document:
+    fig_caption: yes
+    theme: flatly
+    highlight: pygments
+    code_folding: show
+    kee_md: yes
+    toc: yes
+    toc_depth: 4
+    number_sections: no
+    toc_float:
+      smooth_scroll: no
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+These `.Rmd` files represent the project submission for the course [Statistical Inference and Learning](https://www.unive.it/data/course/521944) by Professor [Cristiano Varin](https://www.unive.it/data/people/5592728) at [Ca' Foscari University of Venice](https://www.unive.it/) for the year 2025/2026.
+
+# Problem Statement
+
+TODO
+
+## Goal of this rmarkdown file
+
+TODO
+
+We explore the features in 3 different ways.
+
+1.  First, we separately analyze them and try to grasp their meaning, their distribution and other problematic aspects. This univariate analysis, although complicated by the presence of many categorical predictors, should give us an initial idea of how the data is distributed. For what concerns outliers, it will be possible to focus solely on the motorist-related predictors as
+2.  Then, we compare the possible predictors with respect to the targets, and try to understand if there is any notable relationship between them. Also, we try to see whether there is evidence of correlation, collinearity, or other problematic behaviors they may introduce.
+3.  Finally we explore the subsets of features that may be related (ex: geospatial features and command unit, or time of the day and some demographics), to find out whether some of them can be removed or replaced. Plus we try to investigate about multicollinearity and other complications.
+
+The EDA is the first step to understanding the data and its nature.
+
+This includes analyzing the single features (Univariate Analysis), their interactions with the target (Bivariate Analysis) and their interactions with other features (Multivariate Analysis and Collinearity Check). However, the latter might be hard to compute as it requires the estimation of a regression model that follows certain assumptions and it is usually easier to check this when using linear models.
+
+TODO: Say we will skip some visualizations
+
+During my exploration I will look out for possible outliers, correlation and any other statistically relevant problem that might affect my final prediction.
+
+We will start with the environment.
+
+Note that, from now on, I will shift adopt a more **formal or inclusive tone** (e.g., the "editorial we").
+
+FIXME: Comments should be done addressing 2 wheels vehicles. FIXME: Reduce colors, add annotation and title that is not just plain description FIXME: Univariate plots need both count and percentage on top
+
+------------------------------------------------------------------------
+
+# Environment
+
+The first to do, is to build a reproducible environment for our project.
+
+```{r}
+requirements=c( 
+  "remotes", "summarytools", "forcats", "scales", "purrr",
+  "stringr", "plyr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
+  "timeDate", "timechange", "tzdb", "hms", "readr", "tigris", "lsr", "corrplot",
+  "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor", "ggbeeswarm", "emmeans",
+  "sf", "plotly", "ggplot2", "ggmap", "ggdensity", "UpSetR", "patchwork"
+)
+```
+
+```{r install-requirements, include=FALSE}
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      install.packages(req)
+  }
+}
+```
+
+Note that some of the packages may not be used, but to avoid any error related to dependencies, we are going to keep all of these libraries. Now, the loading of all packages should be immediate.
+
+```{r load-requirements, include=FALSE}
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      library(req)
+  }
+}
+```
+
+```{r remove-vars, include=FALSE}
+rm(requirements, req)
+```
+
+## Plot Functions
+
+Here we add the plot functions to make some kinds of visualizations reproducible.
+
+```{r univariate-plot-helpers}
+# ==============================================================================
+# 1. Plots for Univariate Analysis
+# ==============================================================================
+#' @title Plot Binary Bar Chart
+#' 
+#' @description Creates a simple bar chart counting the occurrences of a binary feature, 
+#' with labels showing both the count and the percentage.
+#' 
+#' @param DF The input dataframe.
+#' @param FEATURE The binary column to plot (unquoted).
+#' @param OPTION_0 The text label for the "0" or "FALSE" category.
+#' @param OPTION_1 The text label for the "1" or "TRUE" category.
+#' @param X_LABEL Label for the X axis.
+#' @param Y_LABEL Label for the Y axis.
+#' @param TITLE Main title of the plot.
+#' @param pad Numeric padding for the top of the Y axis to fit text labels.
+#' @param text_vjust Vertical adjustment for the text labels on top of bars.
+#' 
+#' @return A ggplot2 object.
+plot_binary_bar <- function(DF, FEATURE, OPTION_0, OPTION_1, X_LABEL, Y_LABEL, TITLE, pad = 0.15, text_vjust = -0.3) {
+  
+  # Standardize the binary feature and calculate percentages
+  df_sum <- DF %>%
+    mutate(
+      .raw  = {{ FEATURE }},
+      .feat = dplyr::case_when(
+        as.character(.raw) %in% c("1","TRUE","true")  ~ 1L,
+        as.character(.raw) %in% c("0","FALSE","false") ~ 0L,
+        TRUE ~ NA_integer_
+      )
+    ) %>%
+    filter(!is.na(.feat)) %>%
+    count(.feat, name = "n") %>%
+    mutate(
+      .lab = factor(.feat, levels = c(0, 1), labels = c(OPTION_0, OPTION_1)),
+      # NEW: Calculate percentage and create combined label
+      pct = n / sum(n),
+      label_text = paste0(scales::comma(n), "\n(", scales::percent(pct, accuracy = 0.1), ")")
+    )
+  
+  # Get the maximum bar height
+  ymax <- max(df_sum$n, na.rm = TRUE)
+  
+  # Build the ggplot
+  ggplot(df_sum, aes(x = .lab, y = n, fill = .lab)) +
+    geom_col(width = 0.8, show.legend = FALSE) +
+    # Updated to use label_text
+    geom_text(aes(label = label_text), vjust = text_vjust, lineheight = 0.8) +
+    # Expand the Y axis slightly to accommodate the taller multi-line labels
+    scale_y_continuous(limits = c(0, ymax * (1 + pad)),
+                       expand = expansion(mult = c(0, 0.02))) +
+    coord_cartesian(clip = "off") +
+    theme_minimal() +
+    theme(
+      panel.grid.major.x = element_blank(), 
+      plot.margin = margin(t = 20, r = 5.5, b = 5.5, l = 5.5)
+    ) +
+    scale_fill_viridis_d(option = "mako", begin = 0.3, end = 0.8) +
+    labs(x = X_LABEL, y = Y_LABEL, title = TITLE)
+}
+
+
+# FIXME: Make title and subtitle like {r count-stops-by-year}
+
+#' @title Plot Univariate Bar Chart (Categorical)
+#' 
+#' @description Creates a bar chart counting the occurrences of a categorical feature with 2+ classes.
+#' Allows dynamic ordering (by frequency or original/alphabetical order).
+#' 
+#' @param DF The input dataframe.
+#' @param FEATURE The categorical column to analyze (unquoted).
+#' @param X_LABEL Label for the X axis.
+#' @param Y_LABEL Label for the Y axis (default is "Count").
+#' @param TITLE Main title of the plot.
+#' @param SUBTITLE Subtitle of the plot.
+#' @param top_n Optional integer; if set, keeps only the top N most frequent categories.
+#' @param order_by Method to order the X axis: "freq" (descending count) or "none" (alphabetical/original).
+#' @param pad Numeric padding for the top of the Y axis to fit text labels.
+#' @param text_vjust Vertical adjustment for the text labels on top of bars.
+#' 
+#' @return A ggplot2 object.
+plot_univariate_cat <- function(DF, FEATURE, X_LABEL, Y_LABEL = "Count", TITLE, SUBTITLE, top_n = NULL, order_by = c("freq", "none"), pad = 0.12, text_vjust = -0.35) {
+  
+  order_by <- match.arg(order_by)
+  
+  # Compute counts
+  df_sum <- DF %>%
+    filter(!is.na({{ FEATURE }})) %>%
+    count({{ FEATURE }}, name = "n")
+  
+  # Filter top n results
+  if (!is.null(top_n)) {
+    df_sum <- df_sum %>% slice_max(order_by = n, n = top_n)
+  }
+  
+  # X axis order (either frequency or std)
+  cat_levels <- switch(
+    order_by,
+    freq = df_sum %>% arrange(desc(n)) %>% pull({{ FEATURE }}),
+    none = sort(unique(df_sum %>% pull({{ FEATURE }})))
+  )
+  
+  # Apply sorting
+  df_sum <- df_sum %>%
+    mutate(.feat_f = factor(as.character({{ FEATURE }}), levels = as.character(cat_levels)))
+  
+  # Max height for dynamic padding
+  ymax <- max(df_sum$n, na.rm = TRUE)
+
+  # Construct plot
+  ggplot(df_sum, aes(x = .feat_f, y = n, fill = .feat_f)) +
+    geom_col(width = 0.8, show.legend = FALSE) +
+    geom_text(aes(label = scales::comma(n)), vjust = text_vjust, size = 3) +
+    scale_y_continuous(limits = c(0, ymax * (1 + pad)),
+                       expand = expansion(mult = c(0, 0.02))) +
+    coord_cartesian(clip = "off") +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14),
+      plot.subtitle = element_text(size = 10, color = "grey50"),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      panel.grid.major.x = element_blank(),
+      plot.margin = margin(t = 10, r = 5.5, b = 5.5, l = 5.5)) +
+    scale_fill_viridis_d(option = "mako", begin = 0.3, end = 0.8) +
+    labs(x = X_LABEL, y = Y_LABEL, title = TITLE, subtitle = SUBTITLE)
+}
+```
+
+```{r biviariate-plot-helpers}
+# ==============================================================================
+# 2. Plots for Bivariate Analysis
+# ==============================================================================
+
+#' @title Calculate Cramer's V
+#' 
+#' @description Calculates the Cramer's V measure of association between two 
+#' categorical vectors. Returns a value between 0 (no association) and 1 (perfect association).
+#' 
+#' @param x First categorical vector.
+#' @param y Second categorical vector.
+#' 
+#' @return A numeric value representing Cramer's V.
+cramer_v <- function(x, y) {
+  # Contingency Table
+  tbl <- table(x, y)
+  
+  # Execute Chi2 Test
+  chi2 <- suppressWarnings(chisq.test(tbl, correct = FALSE)$statistic)
+  
+  # Compute dim and min value
+  n <- sum(tbl)
+  min_dim <- min(nrow(tbl) - 1, ncol(tbl) - 1)
+  
+  # Avoid math error for 1 categ
+  if(min_dim == 0) return(0) 
+  
+  # Cramer's formula
+  v <- sqrt(chi2 / (n * min_dim))
+  return(as.numeric(v))
+}
+
+# ==============================================================================
+# Categorical "Correlation" Heatmap - Association Matrix based on Cramer's V
+# ==============================================================================
+
+#' @title Plot Categorical Correlation Matrix (Cramer's V)
+#' 
+#' @description Creates a correlation-like heatmap for multiple categorical variables
+#' using Cramer's V. Answers "How much do these categorical features overlap with each other?"
+#' 
+#' @param DF The input dataframe.
+#' @param FEATURES A character vector containing the names of the categorical columns to compare.
+#' @param TITLE Main title of the plot.
+#' 
+#' @return A ggplot2 object.
+plot_categorical_correlation <- function(DF, FEATURES, TITLE = "Association Matrix for Categorical Predictors (Cramer's V)") {
+  
+  # Select columns and drop NAs
+  df_sub <- DF %>% 
+    select(all_of(FEATURES)) %>%
+    drop_na()
+  
+  n_vars <- ncol(df_sub)
+  
+  # Initialize matrix and set main diag to 1s
+  mat <- matrix(1, nrow = n_vars, ncol = n_vars)
+  rownames(mat) <- colnames(df_sub)
+  colnames(mat) <- colnames(df_sub)
+  
+  # FIXME: Just do upper/lower part of matrix
+  # Compute Cramer's V for each possible pair
+  for(i in 1:(n_vars - 1)) {
+    for(j in (i + 1):n_vars) {
+      v <- cramer_v(df_sub[[i]], df_sub[[j]])
+      # Symmetric 
+      mat[i, j] <- v
+      mat[j, i] <- v
+    }
+  }
+  
+  # Make matrix compatible with ggplot2
+  mat_long <- as.data.frame(as.table(mat))
+  colnames(mat_long) <- c("Var1", "Var2", "CramerV")
+  
+  # Create heatmap
+  ggplot(mat_long, aes(x = Var1, y = Var2, fill = CramerV)) +
+    geom_tile(color = "white", width = 1, height = 1) +
+    # Rounding
+    geom_text(aes(label = round(CramerV, 2)), size = 4) +
+    # Setting colors
+    scale_fill_gradient(low = "whitesmoke", high = "steelblue", limits = c(0, 1), name = "Cramer's V") +
+    labs(title = TITLE, x = "", y = "") +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+      axis.text.y = element_text(size = 10),
+      panel.grid = element_blank()
+    )
+}
+
+# ==============================================================================
+# Plotting of Targets' Rate Against Categorical Predictors
+# ==============================================================================
+
+# FIXME: Percentage shown in the wrong place.
+
+#' @title Plot Target Ratio by Category
+#' 
+#' @description Creates a bivariate bar chart showing the relationship between a binary 
+#' TARGET and a single categorical variable (CAT). It supports two visual styles: 
+#' a 100% stacked bar chart ("stack") or a simple bar chart showing the rate of the target ("rate").
+#' 
+#' @param DF The input dataframe.
+#' @param TARGET The binary column to analyze (unquoted). It will be standardized to 0/1.
+#' @param CAT The categorical column for the X axis (unquoted).
+#' @param x_title Label for the X axis.
+#' @param y_title Label for the Y axis.
+#' @param title Main title of the plot.
+#' @param target_labels A character vector of length 2 defining the labels for 0 and 1 (e.g., c("Not escalated", "Escalated")).
+#' @param style The visual style of the plot: "stack" (100% stacked bars) or "rate" (single bar for target = 1).
+#' @param order_by Method to order the X axis categories: by "rate" (ascending target rate), "freq" (ascending frequency), or "none" (alphabetical/original).
+#' @param percent_accuracy Accuracy for the percent labels (e.g., 0.1 for one decimal place).
+#' @param colors A character vector of length 2 defining the hex color codes for the 0 and 1 categories respectively.
+#' 
+#' @return A ggplot2 object.
+ratio_by_cat <- function(DF, TARGET, CAT, x_title, y_title, title, 
+                         target_labels = c("Not escalated", "Escalated"), 
+                         style = c("stack", "rate"), 
+                         order_by = c("rate", "freq", "none"), 
+                         percent_accuracy = 0.1, 
+                         colors = c("grey80", "steelblue"),
+                         legend_title = "Legend",
+                         subtitle = NULL,
+                         label_vjust = 0.5) {
+  
+  # Validate arguments
+  style    <- match.arg(style)
+  order_by <- match.arg(order_by)
+  
+  # Standardize target and extract the category
+  dat <- DF %>%
+    mutate(
+      .t_raw = {{ TARGET }},
+      .t = case_when(
+        as.character(.t_raw) %in% c("1","TRUE","true") ~ 1L,
+        as.character(.t_raw) %in% c("0","FALSE","false") ~ 0L,
+        TRUE ~ NA_integer_
+      ),
+      .cat = {{ CAT }}
+    ) %>%
+    filter(!is.na(.t), !is.na(.cat))
+  
+  # Compute rates and frequencies
+  rates <- dat %>% 
+    group_by(.cat) %>%
+    summarise(total = n(), rate = mean(.t == 1), .groups = "drop")
+  
+  # Determine ordering
+  cat_levels <- switch(
+    order_by,
+    rate = rates %>% arrange(rate) %>% pull(.cat),
+    freq = rates %>% arrange(total) %>% pull(.cat),
+    none = unique(dat$.cat)
+  )
+  
+  # Build the plot based on style
+  if (style == "stack") {
+    stack <- dat %>%
+      count(.cat, .t, name = "n") %>%
+      group_by(.cat) %>%
+      mutate(ratio = n/sum(n)) %>%
+      ungroup() %>%
+      mutate(
+        .cat_f = factor(as.character(.cat), levels = as.character(cat_levels)),
+        .t_f = factor(.t, levels = c(0,1), labels = target_labels)
+      )
+    
+    ggplot(stack, aes(x = .cat_f, y = ratio, fill = .t_f)) +
+      geom_col(position = "fill") +
+      # CHANGED: Showing ONLY the percentage
+      geom_text(
+        aes(label = scales::percent(ratio, accuracy = percent_accuracy)),
+        position = position_fill(vjust = label_vjust), 
+        size = 3
+      ) +
+      scale_y_continuous(labels = scales::percent) +
+      scale_fill_manual(values = setNames(colors, target_labels)) +
+      labs(x = x_title, y = y_title, fill = legend_title, title = title, subtitle = subtitle) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank(),
+        plot.subtitle = element_text(color = "grey50")
+      )
+      
+  } else {
+    # Rate style
+    rates_data <- rates %>%
+      mutate(.cat_f = factor(as.character(.cat), levels = as.character(cat_levels)))
+    
+    ggplot(rates_data, aes(x = .cat_f, y = rate)) +
+      geom_col(width = 0.8, fill = colors[2]) +
+      geom_text(
+        aes(label = scales::percent(rate, accuracy = percent_accuracy)),
+        vjust = -0.35, size = 3
+      ) +
+      scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.12))) +
+      coord_cartesian(clip = "off") +
+      labs(x = x_title, y = y_title, title = title, subtitle = subtitle) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank(),
+        plot.subtitle = element_text(color = "grey50")
+      )
+  }
+}
+```
+
+```{r multivariate-plot-helpers}
+# ==============================================================================
+# 3. Plots for Multivariate Analysis
+# ==============================================================================
+
+#' @title Heatmap of Target Rate (Categorical Y vs Numeric X)
+#' 
+#' @description Plots a heatmap showing the rate of a binary TARGET across a categorical
+#' Y variable and a numeric (or factor) X variable.
+#' 
+#' @param DF The input dataframe.
+#' @param TARGET The binary column to calculate the rate for (unquoted).
+#' @param Y Categorical variable for the Y axis.
+#' @param X Numeric or categorical variable for the X axis.
+#' @param X_TITLE Label for the X axis.
+#' @param Y_TITLE Label for the Y axis.
+#' @param TITLE Main title of the plot.
+#' @param min_n Minimum number of observations required to show a tile.
+#' @param drop_na Boolean; if TRUE, rows with NA in X or Y are removed.
+#' @param x_as_factor Boolean; if TRUE, forces the X variable to be treated as a categorical factor.
+#' 
+#' @return A ggplot2 object.
+heat_target_yx <- function(DF, TARGET, Y, X, X_TITLE, Y_TITLE, TITLE, min_n = 0, drop_na = TRUE, x_as_factor = FALSE) {
+  # Standardize the binary target
+  dat <- DF %>%
+    mutate(
+      .target_raw = {{ TARGET }},
+      .target_bin = dplyr::case_when(
+        as.character(.target_raw) %in% c("1", "TRUE", "true")  ~ 1L,
+        as.character(.target_raw) %in% c("0", "FALSE", "false") ~ 0L,
+        TRUE ~ NA_integer_
+      )
+    )
+
+  # Filter NAs
+  if (drop_na) {
+    dat <- dat %>% filter(!is.na({{Y}}), !is.na({{X}}), !is.na(.target_bin))
+  } else {
+    dat <- dat %>% filter(!is.na(.target_bin))
+  }
+
+  # Incrementally sort Y axis based on the mean ratio of the target
+  y_order <- dat %>%
+    group_by({{Y}}) %>%
+    summarise(rate = mean(.target_bin == 1, na.rm = TRUE), .groups = "drop") %>%
+    arrange(rate) %>%
+    pull({{Y}})
+
+  # Compute the target rate for each combination of Y x X
+  grid <- dat %>%
+    group_by({{Y}}, {{X}}) %>%
+    summarise(
+      rate = mean(.target_bin == 1, na.rm = TRUE),
+      n = n(), .groups = "drop"
+    ) %>%
+    mutate(
+      .y = factor(as.character({{Y}}), levels = as.character(y_order)),
+      .x = if (x_as_factor) factor({{X}}) else {{X}},
+      # Hide cells that do not reach the minimum amount of observations
+      rate_plot = ifelse(n >= min_n, rate, NA_real_)
+    )
+
+  # Build ggplot heatmap
+  ggplot(grid, aes(.x, .y, fill = rate_plot)) +
+    geom_tile(width = 1, height = 0.9) +
+    scale_fill_viridis_c(labels = scales::percent, na.value = "grey90", name = "Rate") +
+    labs(x = X_TITLE, y = Y_TITLE, title = TITLE) +
+    theme_minimal() +
+    theme(panel.grid = element_blank())
+}
+
+
+#' @title Heatmap of Target Rate (Categorical Y vs Categorical X)
+#' 
+#' @description Plots a heatmap showing the rate of a binary TARGET across two categorical
+#' variables (Y and X). Allows dynamic ordering and shading based on sample size.
+#' 
+#' @param DF The input dataframe.
+#' @param TARGET The binary column to calculate the rate for (unquoted).
+#' @param Y Categorical variable for the Y axis.
+#' @param X Categorical variable for the X axis.
+#' @param X_TITLE Label for the X axis.
+#' @param Y_TITLE Label for the Y axis.
+#' @param TITLE Main title of the plot.
+#' @param min_n Minimum number of observations required to show a tile (filters noise).
+#' @param order_y_by Method to order the Y axis: by 'rate', 'freq' (frequency), or 'none'.
+#' @param order_x_by Method to order the X axis: by 'rate', 'freq' (frequency), or 'none'.
+#' @param alpha_by_n Boolean; if TRUE, shades tiles by count using alpha (transparency).
+#' 
+#' @return A ggplot2 object.
+heat_target_catcat <- function(DF, TARGET, Y, X, X_TITLE, Y_TITLE, TITLE, min_n = 0, order_y_by = c("rate","freq","none"), order_x_by = c("rate","freq","none"), alpha_by_n = FALSE ) {
+  order_y_by <- match.arg(order_y_by)
+  order_x_by <- match.arg(order_x_by)
+
+  # Standardize target
+  dat <- DF %>%
+    mutate(
+      .target_raw = {{ TARGET }},
+      .target_bin = dplyr::case_when(
+        as.character(.target_raw) %in% c("1", "TRUE", "true")  ~ 1L,
+        as.character(.target_raw) %in% c("0", "FALSE", "false") ~ 0L,
+        TRUE ~ NA_integer_
+      )
+    ) %>%
+    # Filter NAs
+    filter(!is.na({{Y}}), !is.na({{X}}), !is.na(.target_bin))
+
+  # Compute stats to determine the Y axis order
+  y_stats <- dat %>%
+    group_by({{Y}}) %>%
+    summarise(
+      rate = mean(.target_bin == 1, na.rm = TRUE),
+      n = n(), .groups = "drop"
+    )
+  
+  # Compute stats to determine the X axis order
+  x_stats <- dat %>%
+    group_by({{X}}) %>%
+    summarise(
+      rate = mean(.target_bin == 1, na.rm = TRUE), 
+      n = n(), .groups = "drop"
+    )
+
+  # Apply chosen "order by" to Y
+  y_levels <- switch(
+    order_y_by,
+    rate = y_stats %>% arrange(rate) %>% pull({{Y}}),
+    freq = y_stats %>% arrange(n) %>% pull({{Y}}),
+    none = unique(dat %>% pull({{Y}}))
+  )
+  
+  # Apply chosen "order by" to X
+  x_levels <- switch(
+    order_x_by,
+    rate = x_stats %>% arrange(rate) %>% pull({{X}}),
+    freq = x_stats %>% arrange(n) %>% pull({{X}}),
+    none = unique(dat %>% pull({{X}}))
+  )
+
+  # Compute the cell's target rate and counts for each combination of Y x X
+  grid <- dat %>%
+    group_by({{Y}}, {{X}}) %>%
+    summarise(
+      rate = mean(.target_bin == 1, na.rm = TRUE),
+      n = n(), .groups = "drop"
+    ) %>%
+    mutate(
+      .y = factor(as.character({{Y}}), levels = as.character(y_levels)),
+      .x = factor(as.character({{X}}), levels = as.character(x_levels)),
+      rate_plot = ifelse(n >= min_n, rate, NA_real_)
+    )
+
+  # Build the plot
+  p <- ggplot(grid, aes(.x, .y)) +
+    labs(x = X_TITLE, y = Y_TITLE, title = TITLE) +
+    theme_minimal() +
+    theme(panel.grid = element_blank()) +
+    # Use scales for displaying rates
+    scale_fill_viridis_c(labels = scales::percent, na.value = "grey90", name = "Rate")
+
+  if (alpha_by_n) {
+    p <- p +
+      geom_tile(aes(fill = rate_plot, alpha = n), width = 0.95, height = 0.95) +
+      scale_alpha_continuous(range = c(0.25, 1), name = "Stops")
+  } else {
+    p <- p +
+      geom_tile(aes(fill = rate_plot), width = 0.95, height = 0.95)
+  }
+
+  p
+}
+
+
+#' @title Stacked Ratio Bars Split by a Third Variable
+#' 
+#' @description Creates a faceted 100% stacked bar chart. This is highly effective 
+#' for visualizing how the rate of a binary TARGET changes across a primary category (CAT), 
+#' while simultaneously splitting the data by a third variable (SPLIT) to create side-by-side plots.
+#' 
+#' @param DF The input dataframe.
+#' @param TARGET The binary column to analyze (unquoted). It will be standardized to 0/1.
+#' @param CAT The main categorical variable for the X axis (unquoted).
+#' @param SPLIT The categorical variable used to split/facet the plots (unquoted).
+#' @param x_title Label for the X axis.
+#' @param y_title Label for the Y axis.
+#' @param title Main title of the entire plot.
+#' @param target_labels Character vector of length 2 defining labels for the binary outcomes (e.g., c("Not escalated", "Escalated")).
+#' @param split_labels Optional character vector to provide custom titles for the split panels (facets).
+#' @param palette A character string specifying an RColorBrewer palette name (e.g., "Paired", "Set1").
+#' @param percent_accuracy Accuracy for the percentage labels (e.g., 0.1 for one decimal place).
+#' 
+#' @return A ggplot2 object.
+ratio_by_cat_split <- function(DF, TARGET, CAT, SPLIT, x_title, y_title, title, target_labels = c("Not escalated", "Escalated"), split_labels = NULL, palette = "Paired", percent_accuracy = 0.1){
+  # Standardize target
+  dat <- DF %>%
+    mutate(
+      .target_raw = {{ TARGET }},
+      # Conversion to 0/1
+      .target_bin = case_when(
+        as.character(.target_raw) %in% c("1", "TRUE", "true") ~ 1L,
+        as.character(.target_raw) %in% c("0", "FALSE", "false") ~ 0L,
+        TRUE ~ NA_integer_
+      ),
+      .cat = {{ CAT }},
+      .split = {{ SPLIT }}
+    ) %>%
+    # Filter NAs
+    filter(!is.na(.cat), !is.na(.split), !is.na(.target_bin))
+
+  # Order the main categories based on the overall target rate (from lowest to highest)
+  cat_order <- dat %>%
+    group_by(.cat) %>%
+    summarise(
+      rate = mean(.target_bin == 1),
+      .groups = "drop"
+    ) %>%
+    arrange(rate) %>% 
+    pull(.cat)
+
+  # Tidy labels by converting character to factors
+  dat <- dat %>%
+    mutate(
+      # Apply the order to X axis
+      .cat = factor(as.character(.cat), levels = as.character(cat_order)),
+      # Apply custom labels to the target
+      .target_f = factor(.target_bin, levels = c(0, 1), labels = target_labels),
+      # Format the split variable
+      .split_f = {
+        lv <- unique(as.character(.split))
+        # If custom split labels are provided and the length matches, use them
+        if (!is.null(split_labels) && length(split_labels) == length(lv))
+          factor(as.character(.split), levels = lv, labels = split_labels)
+        else factor(as.character(.split), levels = lv)
+      }
+    )
+
+  # Compute rates
+  plot_df <- dat %>%
+    count(.split_f, .cat, .target_f, name = "n") %>%
+    group_by(.split_f, .cat) %>%
+    mutate(ratio = n/sum(n)) %>%
+    ungroup()
+
+  # Build plot
+  ggplot(plot_df, aes(x = .cat, y = ratio, fill = .target_f)) +
+    # Stacks the bars to exactly 100%
+    geom_col(position = "fill") +
+    # Add ratio text labels
+    geom_text(
+      aes(label = percent(ratio, accuracy = percent_accuracy)),
+      position = position_fill(vjust = 0.5), 
+      size = 3
+    ) +
+    # Format Y axis as percentages and make continuous
+    scale_y_continuous(labels = percent) +
+    # Use a clean palette for the target categories
+    scale_fill_brewer(palette = palette, name = rlang::as_name(rlang::enquo(TARGET))) +
+    labs(x = x_title, y = y_title, title = title) +
+    # Split the plot into separate panels based on the .split_f variable
+    facet_wrap(~ .split_f, nrow = 1) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          panel.grid = element_blank())
+}
+```
+
+```{r}
+#' @title Plot Temporal Trend of Target Rate
+#' 
+#' @description Creates a scatter plot with a LOESS smoothing curve to visualize 
+#' how the rate of a target event changes over a continuous temporal variable (e.g., date, day of year).
+#' The size of the points represents the volume of stops.
+#' 
+#' @param DF The input dataframe.
+#' @param TARGET The binary column to analyze (unquoted).
+#' @param TIME_VAR The continuous time variable for the X axis (e.g., date, doy).
+#' @param x_title Label for the X axis.
+#' @param y_title Label for the Y axis.
+#' @param title Main title of the plot.
+plot_temporal_trend <- function(DF, TARGET, TIME_VAR, x_title = "Tempo", y_title = "Tasso", title = "Trend Temporale") {
+  
+  # Step 1: Standardizzare il target a 0/1
+  dat <- DF %>%
+    mutate(
+      .target_raw = {{ TARGET }},
+      .target_bin = case_when(
+        as.character(.target_raw) %in% c("1","TRUE","true", "Yes")  ~ 1L,
+        as.character(.target_raw) %in% c("0","FALSE","false", "No") ~ 0L,
+        TRUE ~ NA_integer_
+      ),
+      .time = {{ TIME_VAR }}
+    ) %>%
+    filter(!is.na(.target_bin), !is.na(.time))
+  
+  # Step 2: Calcolare il tasso e il volume per ogni unità di tempo
+  plot_df <- dat %>%
+    group_by(.time) %>%
+    summarise(
+      rate = mean(.target_bin == 1, na.rm = TRUE),
+      n = n(),
+      .groups = "drop"
+    )
+  
+  # Step 3: Costruire il grafico
+  ggplot(plot_df, aes(x = .time, y = rate)) +
+    # Punti proporzionali al numero di stop per capire la robustezza del dato
+    geom_point(aes(size = n), alpha = 0.5, color = "steelblue") +
+    # Linea di tendenza morbida per evidenziare il trend generale ignorando il rumore
+    geom_smooth(se = FALSE, method = "loess", span = 0.3, color = "firebrick", size = 1.2) +
+    scale_y_continuous(labels = scales::percent) +
+    labs(x = x_title, y = y_title, size = "N. di Stop", title = title) +
+    theme_minimal() +
+    theme(panel.grid.minor = element_blank())
+}
+
+#' @title Plot Cyclic Time Heatmap
+#' 
+#' @description Creates a heatmap specifically designed for cyclic time variables 
+#' (like Hour of Day vs Day of Week) to spot temporal hotspots.
+#' 
+#' @param DF The input dataframe.
+#' @param TARGET The binary column to analyze (unquoted).
+#' @param HOUR_VAR The variable representing the hour (0-23).
+#' @param WEEKDAY_VAR The variable representing the day of the week.
+#' @param title Main title of the plot.
+plot_cyclic_time_heatmap <- function(DF, TARGET, HOUR_VAR, WEEKDAY_VAR, title = "Hotspots Temporali") {
+  
+  # Step 1: Standardizzare il target a 0/1
+  dat <- DF %>%
+    mutate(
+      .target_raw = {{ TARGET }},
+      .target_bin = case_when(
+        as.character(.target_raw) %in% c("1","TRUE","true", "Yes")  ~ 1L,
+        as.character(.target_raw) %in% c("0","FALSE","false", "No") ~ 0L,
+        TRUE ~ NA_integer_
+      ),
+      .hour = as.numeric({{ HOUR_VAR }}),
+      .day = {{ WEEKDAY_VAR }}
+    ) %>%
+    filter(!is.na(.target_bin), !is.na(.hour), !is.na(.day))
+  
+  # Step 2: Raggruppare e calcolare il tasso
+  plot_df <- dat %>%
+    group_by(.day, .hour) %>%
+    summarise(
+      rate = mean(.target_bin == 1, na.rm = TRUE),
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    # Mostriamo solo incroci con un minimo di stop per evitare rumore statistico
+    filter(n >= 10) 
+  
+  # Step 3: Costruire la mappa di calore temporale
+  ggplot(plot_df, aes(x = .hour, y = .day, fill = rate)) +
+    geom_tile(color = "white") +
+    scale_fill_viridis_c(option = "magma", labels = scales::percent, name = "Tasso") +
+    # Impostiamo l'asse X per mostrare tutte le 24 ore
+    scale_x_continuous(breaks = 0:23, expand = c(0,0)) +
+    labs(x = "Ora del Giorno", y = "", title = title) +
+    theme_minimal() +
+    theme(
+      panel.grid = element_blank(),
+      axis.text.y = element_text(face = "bold")
+    )
+}
+
+#' @title Plot Temporal Trend Split by a Group (Rate or Frequency)
+#' 
+#' @description Generates a line plot showing how a metric (rate or count) 
+#' changes over a generic time unit (X_VAR), split by another variable (Z_VAR).
+#' Adapts to any time unit and can display data as overlapping lines or faceted grids.
+#' 
+#' @param DF The input dataframe.
+#' @param X_VAR The generic time variable for the X axis (e.g., month, hour).
+#' @param Z_VAR The variable to group/split the plots by (e.g., year, weekend).
+#' @param TARGET The binary target variable. Required only if metric = "rate".
+#' @param metric "rate" (percentage of TARGET) or "freq" (absolute count of stops).
+#' @param style "overlay" (lines superimposed on one plot) or "facet" (separated sub-plots).
+#' @param x_title Label for the X axis.
+#' @param y_title Label for the Y axis. Default adjusts based on metric.
+#' @param title Main title of the plot.
+#' 
+#' @return A ggplot2 object.
+plot_temporal_split <- function(
+  DF, X_VAR, Z_VAR, TARGET = NULL, 
+  metric = c("rate", "freq"), 
+  style = c("overlay", "facet"),
+  x_title = "Tempo", y_title = NULL, title = "Trend Temporale"
+) {
+  
+  metric <- match.arg(metric)
+  style  <- match.arg(style)
+  
+  # Step 1: Sicurezza per il Target
+  target_quo <- rlang::enquo(TARGET)
+  if (metric == "rate" && rlang::quo_is_null(target_quo)) {
+    stop("Errore: Devi specificare la colonna TARGET se usi metric = 'rate'.")
+  }
+  
+  # Step 2: Estrazione variabili principali
+  dat <- DF %>%
+    mutate(
+      .x = {{ X_VAR }},
+      .z = {{ Z_VAR }}
+    ) %>%
+    filter(!is.na(.x), !is.na(.z))
+  
+  # Step 3: Calcolo delle Metriche
+  if (metric == "rate") {
+    dat <- dat %>%
+      mutate(
+        .t_raw = !!target_quo,
+        .t_bin = case_when(
+          as.character(.t_raw) %in% c("1","TRUE","true","Yes")  ~ 1L,
+          as.character(.t_raw) %in% c("0","FALSE","false","No") ~ 0L,
+          TRUE ~ NA_integer_
+        )
+      ) %>%
+      filter(!is.na(.t_bin))
+    
+    plot_df <- dat %>%
+      group_by(.z, .x) %>%
+      summarise(y_val = mean(.t_bin == 1), n = n(), .groups = "drop")
+    
+    if (is.null(y_title)) y_title <- "Tasso (%)"
+    
+  } else { # metric == "freq"
+    plot_df <- dat %>%
+      group_by(.z, .x) %>%
+      summarise(y_val = n(), n = n(), .groups = "drop")
+    
+    if (is.null(y_title)) y_title <- "Numero di Stop"
+  }
+  
+  # Assicuriamoci che l'asse X sia trattato correttamente nel disegno delle linee
+  plot_df <- plot_df %>% mutate(.z_f = factor(.z))
+  
+  # Step 4: Costruzione del Grafico base
+  p <- ggplot(plot_df, aes(x = .x, y = y_val))
+  
+  # Logica dello "Stile"
+  if (style == "overlay") {
+    # Tutte le linee nello stesso grafico
+    p <- p +
+      geom_line(aes(color = .z_f, group = .z_f), linewidth = 0.8) +
+      geom_point(aes(color = .z_f, size = n), alpha = 0.7) +
+      labs(color = rlang::as_name(rlang::enquo(Z_VAR)), size = "Stops Count") +
+      scale_color_viridis_d(option = "turbo") # Colori ben distinguibili
+      
+  } else { 
+    # Stile "Facet" (Grafici separati impilati)
+    p <- p +
+      geom_line(linewidth = 0.6, group = 1, color = "steelblue") +
+      geom_point(aes(size = n), alpha = 0.7, color = "steelblue") +
+      # free_x permette ad ogni grafico di avere il suo asse se necessario
+      facet_wrap(~ .z_f, ncol = 1, scales = "free_x") +
+      labs(size = "Stops Count")
+  }
+  
+  # Temi e Asse Y
+  p <- p +
+    labs(x = x_title, y = y_title, title = title) +
+    theme_minimal() +
+    theme(
+      panel.grid.minor = element_blank(),
+      strip.text = element_text(face = "bold", size = 11) # Titoli dei facet in grassetto
+    )
+  
+  # Formattazione dell'Asse Y in base alla metrica scelta
+  if (metric == "rate") {
+    p <- p + scale_y_continuous(labels = scales::percent)
+  } else {
+    p <- p + scale_y_continuous(labels = scales::comma)
+  }
+  
+  return(p)
+}
+```
+
+```{r}
+#' @title Plot Overlapping Density
+#' @description Compares the distribution of a numeric variable across different categories using density curves.
+#' @param DF The input dataframe.
+#' @param NUM_VAR The continuous numeric variable (unquoted, e.g., age).
+#' @param CAT_VAR The categorical grouping variable (unquoted, e.g., arrested).
+#' @param title Main title of the plot.
+plot_density_compare <- function(DF, NUM_VAR, CAT_VAR, x_title = "Valore", title = "Confronto Densità") {
+  
+  dat <- DF %>%
+    filter(!is.na({{ NUM_VAR }}), !is.na({{ CAT_VAR }})) %>%
+    mutate(.cat = factor({{ CAT_VAR }}))
+  
+  ggplot(dat, aes(x = {{ NUM_VAR }}, fill = .cat)) +
+    # alpha = 0.5 rende i colori trasparenti per vedere le sovrapposizioni
+    geom_density(alpha = 0.5, color = "white") +
+    scale_fill_brewer(palette = "Set1", name = "Gruppo") +
+    labs(x = x_title, y = "Densità (Probabilità)", title = title) +
+    theme_minimal() +
+    theme(panel.grid.minor = element_blank())
+}
+
+#' @title Plot Violin and Boxplot Combination
+#' @description Shows the distribution, median, and density of a numeric variable across multiple categories.
+#' @param DF The input dataframe.
+#' @param CAT_VAR The categorical variable for the X axis (unquoted).
+#' @param NUM_VAR The numeric variable for the Y axis (unquoted).
+#' @param title Main title of the plot.
+plot_violin_boxplot <- function(DF, CAT_VAR, NUM_VAR, x_title = "Categoria", y_title = "Valore Numerico", title = "Distribuzione Numerica per Categoria") {
+  
+  dat <- DF %>% filter(!is.na({{ CAT_VAR }}), !is.na({{ NUM_VAR }}))
+  
+  ggplot(dat, aes(x = reorder(factor({{ CAT_VAR }}), {{ NUM_VAR }}, FUN = median, na.rm=TRUE), y = {{ NUM_VAR }}, fill = factor({{ CAT_VAR }}))) +
+    # Il violino mostra la densità (più è largo, più dati ci sono)
+    geom_violin(alpha = 0.6, trim = FALSE, color = NA) +
+    # Il boxplot interno (molto stretto) mostra la mediana e i quartili
+    geom_boxplot(width = 0.1, fill = "white", color = "black", alpha = 0.8, outlier.size = 1) +
+    scale_fill_viridis_d(option = "turbo") +
+    coord_flip() + # Capovolgiamo per leggere meglio le etichette lunghe
+    labs(x = x_title, y = y_title, title = title) +
+    theme_minimal() +
+    theme(legend.position = "none", panel.grid.minor = element_blank())
+}
+
+#' @title Plot Spatial Map of Target
+#' @description Plots coordinates (Longitude vs Latitude) to create a visual map, coloring points by a target variable.
+#' @param DF The input dataframe.
+#' @param LON Longitude column (unquoted).
+#' @param LAT Latitude column (unquoted).
+#' @param TARGET Categorical or binary variable for coloring (unquoted).
+#' @param title Main title of the plot.
+plot_spatial_map <- function(DF, LON, LAT, TARGET, title = "Mappa Spaziale degli Stop") {
+  
+  dat <- DF %>% filter(!is.na({{ LON }}), !is.na({{ LAT }}), !is.na({{ TARGET }}))
+  
+  # Ordiniamo i dati in modo che i target "positivi" (es. arresti) 
+  # vengano disegnati per ultimi e non siano nascosti dalla massa di stop normali
+  dat <- dat %>% arrange({{ TARGET }})
+  
+  ggplot(dat, aes(x = {{ LON }}, y = {{ LAT }}, color = factor({{ TARGET }}))) +
+    # Usiamo punti molto piccoli e trasparenti per gestire l'overplotting (troppi punti sovrapposti)
+    geom_point(size = 0.5, alpha = 0.4) +
+    scale_color_brewer(palette = "Set1", name = "Esito") +
+    # Manteniamo le proporzioni geografiche corrette (coord_quickmap)
+    coord_quickmap() + 
+    labs(x = "Longitudine", y = "Latitudine", title = title) +
+    theme_minimal() +
+    theme(
+      axis.text = element_blank(), # Rimuoviamo i numeri degli assi per sembrare una vera mappa
+      panel.grid = element_blank()
+    )
+}
+```
+
+------------------------------------------------------------------------
+
+Let us load the data now, and remove the extra feature `veh_category` because we are **exclusively analyzing 2 wheels vehicles now**.
+
+```{r load-data-drop-veh-categ}
+vehstops = read.csv("data/vehiclestops_2_wheels.csv")
+
+vehstops <- vehstops %>%
+  select(-veh_categ)
+```
+
+So now we have the following dataset, that we present with the usual summary
+
+```{r summary-data}
+print(dfSummary(vehstops), method="render")
+```
+
+This preview is already interesting.
+
+------------------------------------------------------------------------
+
+# Univariate EDA
+
+TODO: Introduction TODO: Correct the following
+
+In this part we perform a deeper analysis of the target feature, and some of the most important features (according to the domain knowledge in notebook 0) against their distribution in the dataset. Our goal here is to polish the data, by removing outliers and possible confounders that may introduce bias. Furthermore, we need to understand its distribution and normalizing it if necessary. Possibly, we can introduce new variables that are transformations or combinations of other ones, and evaluate their contributions later with a bivariate analysis and/or model testing.
+
+Hopefully, this process will reduce the variance.
+
+TODO: Comment everything
+
+## Targets
+
+```{r enforcement-dist}
+p1 <- plot_binary_bar(
+  vehstops, veh_checkpoint, 
+  "No", "Yes",
+  "", "Count", "Was it a vehicle checkpoint?"
+)
+
+p2 <- plot_binary_bar(
+  vehstops, arrested, 
+  "No", "Yes",
+  "", "", "Was the motorist arrested?"
+)
+
+row1 <- p1 | p2
+
+row1 +
+plot_layout(heights = c(1, 0.080, 1), guides = "collect") + 
+plot_annotation(title = "Distribution of 2-Wheels Vehicles Stops by Target") &
+theme(legend.position = "bottom") 
+```
+
+```{r, include=FALSE}
+rm(p1, p2, row1)
+```
+
+What can we say?
+
+-   Key finding: The dataset, for 2 wheels-vehicles, exhibits extreme class imbalance. Vehicle checkpoints are highly sparse, representing only approximately 1.4% of the total stops (2,691 "Yes" out of 189,610 total records). The same goes for arrests which happen approximately 5.6% of the times (10,560 "Yes" out of 189,610 total records).
+-   Interpretation: `veh_checkpoint` constitute a "rare event" within this specific dataset. The distribution indicates that the vast majority of stops are standard patrol or traffic-related events, while checkpoint operations are infrequent activities. Even though, arrests are more frequent than checkpoint stops by a factor of nearly 4:1, they remain an infrequent occurrence relative to the total volume of police interactions.
+-   Comment: The high class disparity *renders global accuracy an insufficient metric*. A predictive model optimizing for accuracy could attain an score of \~98.6% by simply classifying every stop as "No," thereby completely failing to capture the latent features that characterize a checkpoint stop. The model is statistically biased towards the majority class by default. This is also suboptimal for our research, as capturing true arrest patterns is central to our investigation into enforcement bias.
+-   Proposed Action: Although we could employ cost-sensitive learning models, this is outside the scope of the course. Given the limitations of our available model suite, we will employ stratified downsampling of the majority class ("No") to create a balanced training set, ensuring compatibility across all models (LDA, QDA, KNN, etc...). For the GLM-based models (Logistic, Lasso, Ridge), we will specifically utilize observation weighting within the likelihood function to account for the class disparity. Finally, we will move away from the default 0.5 classification threshold, optimizing the decision boundary based on the Precision-Recall curve to ensure our model maintains sensitivity to the minority class ("Yes").
+
+## Command Unit, Geospatial and Area-related predictors
+
+### Area
+
+```{r count-stops-by-area}
+plot_univariate_cat(
+  DF = vehstops, 
+  FEATURE = area, 
+  X_LABEL = "Area", 
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Area",
+  SUBTITLE = "Brooklyn is where the most amount of vehicles are stopped",
+  order_by = "freq"
+)
+```
+
+What can we say?
+
+-   Key finding: There is a high degree of variance in the volume of stops across areas. We observe three "high-volume" areas (Brooklyn, Queens, and Manhattan) with comparable stop counts (ranging between \~50k and 56k), one "medium-volume" area (Bronx, \~30k), and a distinct "low-volume" area (Staten Island, \~1.5k).
+-   Interpretation: The distribution is highly non-uniform, or better, uneven. The lower frequency of stops in the Bronx and Staten Island suggests that geographic location could be a strong predictor of the probability of being stopped (in case the targets' ratio distributed by area follows a specific pattern).
+-   Comment: From a modeling perspective, this introduces a risk of **overfitting to the high-volume areas**. Since some of the available models (especially KNN or QDA) rely on local neighborhood data or global likelihoods, they will naturally prioritize minimizing errors in the areas with the most observations. Furthermore, the extreme sparsity of the Staten Island group may lead to high variance in the parameter estimates for that specific categorical level, potentially skewing the coefficients for the area predictor.
+-   Proposed Action: We still need to check its correlation with subject-related predictors. Also, we prefer to explore finer-grained versions of this geographical predictor, which may be able to yield better results when used in the models. Later on, we will use dummy coding to represent the areas, but we will interpret the coefficients with caution (which is our to-go tactic for most categorical variables). However, when using **Lasso or Ridge regression**, we will carefully tune the penalty parameter ($\lambda$) to ensure that the "Area" coefficients are not artificially inflated or suppressed due to the sample size disparity.
+
+### Borough
+
+```{r count-stops-by-boro}
+plot_univariate_cat(
+  DF = vehstops, 
+  FEATURE = boro, 
+  X_LABEL = "Borough", 
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Borough",
+  SUBTITLE = ""
+)
+```
+
+What can we say?
+
+-   Key finding: The comparison reveals that while "Staten Island" is uniformly sparse, boroughs like "Queens" and "Manhattan" are internally heterogeneous. Aggregating sub-boroughs into a single `area` feature assumes that police behavior is homogeneous across those sub-sectors.
+-   Interpretation: If the arrest rate in "North West Queens" (a high-volume area) is statistically distinct from "South Queens," the `area` variable acts as a source of **aggregation bias**. By averaging these rates, we lose the model’s ability to differentiate between high-risk and low-risk zones within the same borough, potentially obscuring patterns of excessive enforcement. On the other hand, in a regression or classification context, this means our parameter estimates for these low-frequency categories will likely suffer from high variance and wide confidence intervals, making them unreliable indicators of systematic enforcement bias.
+-   Comment: Discarding granularity prematurely is a legitimate methodological risk. If a specific sub-borough has a disproportionately higher event rate than its parent borough, the model will fail to capture that specific hotspot. We should not treat granularity as "noise" until we have empirical evidence that the target ratios are homogeneous within the boroughs. In fact, if the target ratio (arrest or checkpoint probability) differs significantly between "North West Queens" and "South Queens," aggregating them into a single "Queens" category would indeed "wash out" a genuine, predictive signal, resulting in an under-fitted model.
+-   Proposed Action: As previously stated, we wish to plot the arrest/checkpoint rate for each borough level, as well for the areas. Then, based on our observations, we could train two alternative versions of the same model using `area` and `boro`. In fact, we could employ means of model comparison (for instance, Stratified K-fold Cross Validation) and, in case the granular version yields lower CV error, we may be able to discard the hypothesis of introducing noise/variability.
+
+### Latitude and Longitude for Stop Density
+
+For what concerns these two predictors, we will use the to plot a spatial heat map of the stops with these values available.
+
+```{r stop-density}
+# Download NYC Borough boundaries once
+nyc_map <- counties(state = "NY", cb = TRUE) %>%
+  filter(NAME %in% c("Bronx", "Kings", "New York", "Queens", "Richmond"))
+
+# 1. Define the grid resolution (match this with your desired density)
+bins <- 100
+lon_breaks <- seq(-74.26, -73.71, length.out = bins + 1)
+lat_breaks <- seq(40.48, 40.92, length.out = bins + 1)
+
+# 2. Generate the grid_sum object from your main data
+grid_sum <- vehstops %>%
+  filter(!is.na(longitude) & !is.na(latitude)) %>%
+  mutate(
+    xbin = cut(longitude, breaks = lon_breaks, include.lowest = TRUE, right = FALSE),
+    ybin = cut(latitude, breaks = lat_breaks, include.lowest = TRUE, right = FALSE)
+  ) %>%
+  # Extract the center point of each bin for the tile plot
+  mutate(
+    x = as.numeric(gsub(".*\\[(.*),.*", "\\1", xbin)) + (lon_breaks[2] - lon_breaks[1])/2,
+    y = as.numeric(gsub(".*\\[(.*),.*", "\\1", ybin)) + (lat_breaks[2] - lat_breaks[1])/2
+  ) %>%
+  group_by(x, y) %>%
+  summarise(n = n(), .groups = "drop")
+
+# Plot with base layer
+ggplot() +
+  # Add NYC base layer
+  geom_sf(data = nyc_map, fill = "white", color = "grey80", size = 0.2) +
+  # Add density data on top
+  geom_tile(data = grid_sum, aes(x, y, fill = n), alpha = 0.8) +
+  # Use a more high-contrast color scale
+  scale_fill_viridis_c(trans = "log10", name = "Stops (log10)", option = "mako", direction = -1) +
+  coord_sf(xlim = c(-74.26, -73.71), ylim = c(40.48, 40.92)) +
+  theme_minimal() +
+  theme(panel.grid = element_blank()) +
+  labs(title = "Heatmap of 2-Wheels Vehicles Stops Density - 100 Bins", x = "Longitude", y = "Latitude")
+```
+
+```{r, include=FALSE}
+rm(grid_sum, nyc_map, bins, lat_breaks, lon_breaks)
+```
+
+What can we say?
+
+-   Key finding: The heatmap reveals a highly heterogeneous spatial distribution, characterized by distinct high-density corridors and hotspots.
+-   Interpretation: This spatial clustering indicates that police enforcement is not randomly distributed; it is structurally tied to urban infrastructure, likely following major traffic arteries or high-activity transit corridors.
+-   Comment: Again, high stop density does not necessarily imply aggressive policing; it may simply reflect high traffic exposure. Also, this plot just give us an idea, because we are skipping over missing data.
+-   Proposed Action: To prevent data leakage we cannot just include then in the models. These two predictors will be later removed.
+
+## Time-related predictors
+
+### Year
+
+```{r count-stops-by-year}
+vehstops %>%
+  filter(!is.na(year)) %>%
+  count(year) %>%
+  mutate(year = as.numeric(as.character(year))) %>%
+  arrange(year) %>%
+  # 1. Calculate growth and create the combined label
+  mutate(
+    prev_n = lag(n), pct_change = (n - prev_n) / prev_n * 100,
+    # Combine count and percentage with a newline character
+    label_text = ifelse(
+      is.na(pct_change), 
+      comma(n), 
+      paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)")
+    )) %>%
+  ggplot(aes(x = factor(year), y = n, group = 1)) +
+  # Draw the trend line
+  geom_line(color = "steelblue", linewidth = 1) +
+  # Add points for clarity
+  geom_point(color = "steelblue", size = 3) +
+  # 2. Add the combined label
+  # vjust = -0.5 helps center the multi-line text just above the point
+  geom_text(aes(label = label_text), vjust = -0.8, nudge_x = -0.1, size = 3.5, lineheight = 0.8) +
+  # Increase top expansion (0.3) to accommodate the taller labels
+  scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.2))) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(), 
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10, color = "grey50")
+    ) +
+  labs(
+    title = "Annual Volume of Stops for 2-Wheels Vehicles in NYC",
+    subtitle = "In 3 Years the Total Volume Increased by 2,5 Times",
+    x = "Year", y = "Count"
+    )
+```
+
+What can we say?
+
+-   Key finding: There has been a significant, multi-year surge in the volume of police stops involving 2-wheeled vehicles, with the number of encounters increasing from \~33k in 2023 to \~85k in 2025.
+-   Interpretation: The growth trajectory is non-linear. The 113% jump between 2023 and 2024 represents a massive inflection point, which is suggesting either a shift in departmental priority or a new legislation targeting these vehicles. On the other hand, the 19.8% increase in 2025 indicates that while activity is still rising, the rate of acceleration is starting to stabilize.
+-   Comment: The visualization clearly demonstrates that the "enforcement burden" or "public exposure" to these stops is intensifying. However, since the dataset analyzed was aggregated by 2-wheels vehicles, we could be seeing the result of policies regarding a specific subset. Plus, 3 years is not a sufficient time span for us to deliver some substantial proof.
+-   Proposed Action: We are going to look for some level of contextualization, in order to see if something changed during late 2023 or early 2024.
+
+In fact, we found the article ["New York City Council Votes to Pass New E-Bike Safety Rules in Continued Effort to Address the Dangers of Lithium-Ion Batteries"](https://council.nyc.gov/press/2024/02/28/2564/) published in February 28, 2024. From its content, we could justify the raise in volume as natural consequence to new laws being put in place.
+
+### Month
+
+```{r count-stops-by-month}
+# Aggregate and calculate monthly change
+month_data <- vehstops %>%
+  filter(!is.na(month)) %>%
+  count(month) %>%
+  mutate(month = factor(month, levels = 1:12)) %>%
+  arrange(month) %>%
+  mutate(
+    prev_n = lag(n), pct_change = (n - prev_n) / prev_n * 100,
+    # Create the label: Count on top, Percentage on bottom
+    label_text = ifelse(
+      is.na(pct_change), comma(n),
+      paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
+  )
+
+# Plot
+month_data %>%
+  ggplot(aes(x = month, y = n, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  # Apply text tweaks: nudge_x moves it left, vjust raises it
+  geom_text(aes(label = label_text), vjust = -1, nudge_x = -0.1, size = 3, lineheight = 0.8) +
+  scale_x_discrete(labels = month.abb) +
+  scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.3))) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10) # Styled as requested
+  ) +
+  labs(
+    title = "Monthly Volume of Stops for 2-Wheels Vehicles in NYC",
+    subtitle = "Over 3 Years, Most Vehichles are Stopped between June and October",
+    x = "Month",
+    y = "Count"
+  )
+```
+
+```{r, include=FALSE}
+rm(month_data)
+```
+
+What can we say?
+
+-   Key finding: The data exhibits strong seasonality, with stop volumes peaking in a sustained plateau between June and October (roughly 18k–19k stops/month). Enforcement bottoms out in the winter, with the sharpest declines occurring in November (-17%) and December (-28%).
+-   Interpretation: The stop volume is likely a direct proxy for "exposure." As temperatures rise, more 2-wheeled vehicles are on the road, increasing the opportunity for police to conduct stops. The "plateau" from June through October suggests that once the weather is consistently warm, ridership hits a saturation point, and enforcement activity maintains a high, stable operational baseline.
+-   Comment: The sharp drops at the end of the year demonstrate that enforcement is reactive: it tracks the behavior of the riders. In other words, the decline in stops during winter is likely due to **reduced vehicle usage** rather than a change in police behavior.
+-   Proposed Action: Given this clear seasonal pattern, we ensure our predictive models to include this time-related feature.
+
+Let us see this with respect to the year
+
+```{r year-monthly-distribution}
+# Data prep with explicit "+" sign logic
+plot_data <- vehstops %>%
+  filter(!is.na(year) & !is.na(month)) %>%
+  count(year, month) %>%
+  mutate(month = factor(month, levels = 1:12)) %>%
+  group_by(year) %>%
+  mutate(
+    n_jan = n[month == 1],
+    n_max = max(n),
+    is_max = n == n_max,
+    # Pre-calculate percentages for cleaner label logic
+    pct_max = round((n - n_jan) / n_jan * 100, 0),
+    pct_dec = round((n - n_max) / n_max * 100, 0),
+    
+    # Custom Label Logic
+    label_text = case_when(
+      month == 1 ~ comma(n), 
+      is_max ~ paste0(comma(n), "\n(", ifelse(pct_max > 0, "+", ""), pct_max, "%)"),
+      month == 12 ~ paste0(comma(n), "\n(", pct_dec, "%)"), # Dec is usually negative, so '-' is automatic
+      TRUE ~ ""
+    )
+  )
+
+# Faceted plot
+plot_data %>%
+  ggplot(aes(x = month, y = n, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_text(aes(label = label_text), vjust = -1, hjust = 0.2, size = 2.5, lineheight = 0.8) +
+  facet_wrap(~year, nrow = 1) +
+  scale_x_discrete(
+    labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), 
+    expand = expansion(mult = c(0.1, 0.1))
+    ) +
+  scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10),
+    strip.text = element_text(size = 11)
+  ) +
+  labs(
+    title = "Monthly Volume of Stops, by Year, for 2-Wheels Vehicles in NYC",
+    subtitle = "Custom Growth/Decline analysis: January vs Max, and Max vs December",
+    x = "Month",
+    y = "Count"
+  )
+```
+
+```{r, include=FALSE}
+rm(plot_data)
+```
+
+What can we say?
+
+-   Key finding: There is a pronounced "seasonal amplification" effect. While stop volume is increasing annually, the seasonal peaks are becoming more extreme, and the year-end "cooling off" period is becoming significantly sharper (from a -22% drop in 2023 to a -54% drop in 2025).
+-   Interpretation: The data indicates that enforcement is becoming increasingly "concentrated" in the summer/autumn months. The gap between your "active season" (Max) and "off-season" (Dec) is widening. This suggests that the NYPD's activity for 2-wheelers is highly reactive to seasonal changes—either directly due to weather (fewer riders in winter) or due to a policy strategy that focuses enforcement efforts heavily on warmer months.
+-   Comment: By highlighting the Jan-to-Max growth and the Max-to-Dec decline, we have moved the analysis beyond simple "volume counts". It clearly shows that while the baseline (January) is rising slightly, the *intensity* of the mid-year surges is growing much faster.
+-   Proposed Action: Creating a binary indicator for "Hot Season" (April–Oct), that can effectively tell our models: "There is a structural change in the world during these months." This is way more interpretable than just a list of months.
+
+### Checking out `hot_season`
+
+Let us proceed with this intuition
+
+```{r add-hot-season}
+vehstops <- vehstops %>%
+  mutate(hot_season = ifelse(month %in% 4:10, 1, 0))
+```
+
+Now, for plotting
+
+```{r year-hot-season-distribution}
+# 1. Create the indicator, count, and calculate percentages
+plot_data <- vehstops %>%
+  filter(!is.na(year) & !is.na(month)) %>%
+  mutate(
+    is_hot_season = ifelse(month %in% 4:10, "Hot Season", "Off Season"),
+    is_hot_season = factor(is_hot_season, levels = c("Hot Season", "Off Season"))
+  ) %>%
+  count(year, is_hot_season) %>%
+  group_by(year) %>%
+  mutate(
+    year_total = sum(n),
+    pct = n / year_total,
+    # Combine count and percentage into a single label string
+    label_text = paste0(comma(n), "\n(", round(pct * 100, 1), "%)")
+  )
+
+# 2. Build the faceted barplot
+plot_data %>%
+  ggplot(aes(x = is_hot_season, y = n, fill = is_hot_season)) +
+  geom_col(show.legend = FALSE) +
+  # Facet by year
+  facet_wrap(~year, nrow = 1) +
+  # Add labels: count on top, percentage below
+  geom_text(aes(label = label_text), vjust = -0.5, size = 3.5, lineheight = 0.8) +
+  # Add vertical breathing room for the text
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_brewer(palette = "Paired") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Volume of Stops for 2-Wheels Vehicles: Hot Season vs. Off Season",
+    subtitle = "While Overall Volume Increase, Percentages slightly Drift Towards Hot Season",
+    x = NULL,
+    y = "Count"
+  )
+```
+
+```{r, include=FALSE}
+rm(plot_data)
+```
+
+What can we say?
+
+-   Key finding: Total enforcement volume is surging, but more importantly, the enforcement pattern is becoming **increasingly concentrated** in the "Hot Season." While the hot season accounted for \~64% of stops in 2023, it climbed to \~68% of stops in 2025.
+-   Interpretation: The growth in stops is not uniform throughout the year. The rising percentage indicates that the "Hot Season" (April–Oct) is becoming a disproportionately larger driver of total annual stops year-over-year. This suggests that the NYPD's enforcement efforts for 2-wheelers are becoming more sensitive—or reactive—to the seasonal influx of riders.
+-   Comment: This plot confirms that `hot_season` could be a "high-signal" feature.
+-   Proposed Action: We could either use it in place of the month, or make it an interaction term with `year` (i.e., `is_hot_season * year`).
+
+### Dow/Weekday, Day and Doy
+
+We have decided to exclude 'Day of Month' (`day`) and 'Day of Year' (`doy`) from our feature set to mitigate 'calendar artifact' bias. These variables introduce artificial statistical noise rather than genuine operational signals.
+
+As we can see below, the structural variation in month length creates false activity dips for end-of-month dates
+
+```{r day-bias}
+vehstops %>%
+  filter(!is.na(day)) %>%
+  count(day) %>%
+  ggplot(aes(x = day, y = n)) +
+  geom_line(color = "grey60", alpha = 0.5) +
+  geom_smooth(method = "loess", color = "steelblue", se = FALSE) +
+  theme_minimal() +
+   theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(title = "Volume of Stops by Day of the Month (1–31) for 2-Wheels Vehicles",
+       subtitle = "Note the drop at 31: this is a calendar artifact, not a behavior!",
+       x = "Day of the Month", y = "Count")
+```
+
+Furthermore, `doy` variable suffers from inconsistent data density.
+
+```{r doy-incosistent-3-years-span}
+# 1. Ensure you have a Date object
+# If you don't have a 'date' column, create one from year, month, day
+plot_data <- vehstops %>%
+  mutate(date = as.Date(paste(year, month, day, sep = "-"))) %>%
+  count(date)
+
+# 2. Plot the timeline
+plot_data %>%
+  ggplot(aes(x = date, y = n)) +
+  # Raw data points (using alpha to reduce overplotting)
+  geom_line(color = "grey70", alpha = 0.6, linewidth = 0.5) +
+  # Trend line (using a slightly larger span to show the multi-year trajectory)
+  geom_smooth(method = "loess", span = 0.2, color = "steelblue", se = FALSE, linewidth = 1.2) +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b %Y") +
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Volume of Stops by Day of the Year (1–365) for 2-Wheels Vehicles",
+    subtitle = "Continuous time series shows that there might be a pattern drifting towards a bell centered in August",
+    x = "Period", 
+    y = "Daily Stop Count"
+  )
+```
+
+```{r, include=FALSE}
+rm(plot_data)
+```
+
+While we observe a consistent seasonal clustering peaking in late summer, our current 3-year dataset captures three seasonal cycles. This is sufficient to identify a recurring pattern, but insufficient to establish it as a long-term trend.
+
+The next plot, demonstrates high daily volatility (indicated by the grey jitter) that significantly obscures the underlying seasonal trend (the blue trend line). Because the daily fluctuation is massive relative to the overall pattern, including 'Day of Year' as a feature risks overfitting.
+
+```{r doy-inconsistent-density}
+vehstops %>%
+  filter(!is.na(doy)) %>%
+  count(doy) %>%
+  ggplot(aes(x = doy, y = n)) +
+  geom_line(color = "grey60", alpha = 0.5) +
+  geom_smooth(method = "loess", color = "steelblue", se = FALSE) +
+  theme_minimal() +
+   theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(title = "Volume of Stops by Day of the Year (1–365) for 2-Wheels Vehicles",
+       subtitle = "The extreme jitter confirms this feature is too noisy to predict",
+       x = "Day of Year", y = "Count")
+```
+
+Finally, these granular temporal markers are prone to overfitting. Excluding them allows the model to focus on more robust predictors, such as seasonality and weekly rhythms.
+
+On the other hand, we can study the "Day of the Week" which usually abstract better.
+
+```{r dow-dis}
+vehstops %>%
+  filter(!is.na(dow)) %>%
+  count(dow) %>%
+  mutate(
+    dow = factor(dow, levels = 1:7, 
+                 labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")),
+    # Calculate % change relative to the previous day
+    pct_change = (n - lag(n)) / lag(n) * 100,
+    # Create the label: Count on top, % change on bottom
+    label_text = ifelse(is.na(pct_change), 
+                        comma(n), 
+                        paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
+  ) %>%
+  ggplot(aes(x = dow, y = n, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  # vjust = -0.6 lifts text off the point, lineheight compacts the text
+  geom_text(aes(label = label_text), vjust = -1, size = 3, lineheight = 0.8) +
+  scale_y_continuous(labels = comma, 
+                     limits = c(0, NA), 
+                     expand = expansion(mult = c(0, 0.4))) + # Extra room for labels
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Daily Volume of Stops for 2-Wheels Vehicles",
+    subtitle = "Daily volume and day-over-day growth/decline show high stop counts during mid-week",
+    x = "Day of the Week", 
+    y = "Count"
+  )
+```
+
+What can we say?
+
+-   Key finding: Enforcement activity follows a distinct "Mid-Week Peak" cycle. The volume starts at its lowest on Monday, surges aggressively (+52.7%) into Tuesday, peaks on Wednesday/Thursday, and then exhibits a sustained decline toward the weekend.
+-   Interpretation: This pattern strongly suggests that these stops are primarily linked to **commercial usage** (e.g., food delivery/courier services) rather than recreational riding. Recreational riders typically peak on weekends; the fact that your stops drop off on Saturday and Sunday reinforces that this enforcement is targeting "work-hour" traffic. The +52% jump from Monday to Tuesday is the most critical signal here—it suggests that Monday may be a "low volume" day for this specific gig-economy demographic, or that enforcement resources are being ramped up as the work week settles into its rhythm.
+-   Comment: We have identified a non-linear relationship: the "Day of Week" effect isn't a straight line, it's a curve.
+-   Proposed Action: We may keep `weekday` as the new `day` in the model, and even think about an interaction with `hot_season`. Also we need first to check the signal from other indicators previously built.
+
+### Hour and Time Bracket
+
+First of all we look at the overall cycle of stops volume
+
+```{r hour-dist}
+# 1. Define the specific hours you want to highlight
+hours_to_show <- c(0, 4, 8, 12, 16, 19, 20, 23)
+
+# 2. Prepare the full dataset for the background line
+full_data <- vehstops %>%
+  filter(!is.na(hour)) %>%
+  count(hour)
+
+# 3. Prepare the highlighted data for points and labels
+highlight_data <- full_data %>%
+  filter(hour %in% hours_to_show) %>%
+  arrange(hour) %>%
+  mutate(
+    # Percent change relative to the PREVIOUS HOUR IN THE LIST
+    pct_change = (n - lag(n)) / lag(n) * 100,
+    label_text = ifelse(
+      is.na(pct_change), 
+      comma(n),
+      paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
+  )
+
+# 4. Plot
+ggplot() +
+  # Background line showing the full 24-hour context
+  geom_line(data = full_data, aes(x = hour, y = n), color = "grey80", linewidth = 1) +
+  # Points and labels for specific hours only
+  geom_point(data = highlight_data, aes(x = hour, y = n), color = "steelblue", size = 3) +
+  geom_text(data = highlight_data, aes(x = hour, y = n, label = label_text), 
+            vjust = -0.6, size = 3, lineheight = 0.8) +
+  # Scaling and Theme
+  scale_x_continuous(breaks = 0:23) +
+  scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Hourly Volume of Stops for 2-Wheels Vehicles",
+    subtitle = "Aggregated stops showing velocity between key hours",
+    x = "Hour of Day (0–23)", 
+    y = "Count"
+  )
+```
+
+```{r, include=FALSE}
+rm(hours_to_show, full_data, highlight_data)
+```
+
+What can we say? In our opinion this looks like a "sine wave broken by a bridge". To be more precise:
+
+-   Key finding: Enforcement volume is characterized by a "fractured" daily cycle. It follows a predictable overnight decline and morning ascent (0:00–12:00), but is interrupted by a distinct midday plateau (12:00–15:00) before reaching an aggressive evening peak at 19:00.
+-   Interpretation: The data behaves like a sine wave that hits a structural impediment at noon. This suggests that the enforcement cycle is divided into two distinct operational phases: the **Morning Phase** (likely commuter-driven) and the **Evening Phase** (likely delivery/service-driven). The plateau is the "bridge" between these two worlds—a period of transition where ridership demographics potentially shift from commuters to service workers. Therefore, the variability during 10:00 to 15:00 is limited because the amount of vehicles on the road remains stable, as well as the police work.
+-   Comment: This "bridge" (12:00–15:00) is the most revealing part of the graph. If this were a simple, smooth traffic curve, we would expect a direct climb to the peak. The fact that it plateaus indicates a "lull" or a shift in the operational tempo. It proves that a single `rush_hour` binary variable will be insufficient for your model; it will fail to capture the reality that the "evening rush" is a different phenomenon entirely from the "morning commute."
+-   Proposed Action: We could optionally modify our bucketing of `time_bracket` into: `Overnight` (22:00–05:00), `Morning_Commute` (06:00–11:00), `Midday_Transition` (12:00–15:00), and `Evening_Peak` (16:00–21:00).
+
+Before anything else, let us see whether this cycle changed throughout the years.
+
+TODO: Title and subtitle
+
+```{r hour-year-dist}
+# 1. Define the specific hours you want to highlight
+hours_to_show <- c(0, 4, 8, 12, 16, 20, 23)
+
+# 2. Prepare the full background data for the lines
+full_data <- vehstops %>%
+  filter(!is.na(year) & !is.na(hour)) %>%
+  count(year, hour)
+
+# 3. Prepare the highlighted data for points and labels
+# We filter for our key hours *before* calculating percentage change
+# so it calculates the jump between those specific selected points.
+highlight_data <- full_data %>%
+  filter(hour %in% hours_to_show) %>%
+  group_by(year) %>%
+  arrange(hour) %>%
+  mutate(
+    pct_change = (n - lag(n)) / lag(n) * 100,
+    label_text = ifelse(is.na(pct_change), 
+                        comma(n), 
+                        paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
+  )
+
+# 4. Plot
+ggplot() +
+  # Background line showing the full 24-hour context per year
+  geom_line(data = full_data, aes(x = hour, y = n), color = "grey85", linewidth = 0.8) +
+  # Points and labels for specific hours only
+  geom_point(data = highlight_data, aes(x = hour, y = n), color = "steelblue", size = 2) +
+  geom_text(data = highlight_data, aes(x = hour, y = n, label = label_text), 
+            vjust = -0.7, size = 2.5, lineheight = 0.8) +
+  # Facet by year
+  facet_wrap(~year, nrow = 1) +
+  # Scaling and Theme
+  scale_x_continuous(breaks = c(0, 4, 8, 12, 16, 20, 23)) +
+  scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10),
+    strip.text = element_text(size = 11)
+  ) +
+  labs(
+    title = "Hourly Volume of Stops for 2-Wheels Vehicles",
+    subtitle = "Aggregated stops showing velocity between key hours per year",
+    x = "Hour of Day (0–23)", 
+    y = "Count"
+  )
+```
+
+```{r, include=FALSE}
+rm(hours_to_show, full_data, highlight_data)
+```
+
+What can we say? \* Key finding: We are witnessing an "Evening Migration" of enforcement. While 2023 enforcement peaked at 16:00 (4:00 PM), the peak has decisively migrated to 20:00 (8:00 PM) in 2024 and 2025. Additionally, the enforcement volume near the 19:00-20:00 peak has nearly tripled between 2023 and 2025. \* Interpretation: The "operational center of gravity" has shifted later into the day. This suggests that the primary targets of enforcement (likely delivery/gig-economy riders) are increasingly active later into the evening, or that enforcement strategy has pivoted to address higher evening density. The "Morning Rush" (8:00–12:00) is growing, but the "Evening Rush" (16:00–20:00) is the clear driver of the total volume increase. \* Comment: It is critical to note that the shape of the curve is changing. In 2023, the distribution was flatter; by 2025, it has become a "sharper" curve with a very pronounced evening spike. This indicates that your predictive model cannot rely on a static "hour" feature. If the model treats "Hour 20" the same way in 2023 as it does in 2025, it will drastically under-predict the volume for 2025. \* Proposed Action: When building the model, we might consider to include an interaction term between `hour` and `year`. This will mathematically allow the model to learn that the "value" of 8:00 PM changes as the years progress. Alternatively we can better refine the binning dynamically over specific periods of time.
+
+What can we say?
+
+-   Key finding: Enforcement is defined by routine, daily operations rather than event-based triggers. Among the three temporal variables analyzed, only "Weekend" status provides a meaningful statistical differentiation.
+-   Interpretation: Police activity appears to be highly consistent, suggesting that enforcement is targeted at baseline daily traffic flow (likely commercial/commuter) rather than reacting to external calendar anomalies. The lack of variation during holidays and events indicates that these stops are not "surge" enforcement but rather a steady-state, daily commitment.
+-   Comment: The "Holiday" and "Event" categories suffer from severe class imbalance (96–97% 'No'). Statistically, these features lack the variance required to train a robust model and will function more as "background noise" than as actionable predictive indicators.
+-   Proposed Action: Exclude holiday and event_day from the feature set to reduce model complexity and prevent overfitting. Retain weekend as a core predictor.
+
+Now let us see if the hot season might shift this cycle
+
+TODO: Title and Subtitle
+
+```{r hour-hot-season}
+# 1. Prepare data with hot_season variable
+# Assuming month column exists. If not, you may need to join/create it.
+plot_data_full <- vehstops %>%
+  mutate(
+    hot_season = ifelse(month %in% 4:10, 1, 0),
+    hot_season_label = factor(hot_season, levels = c(0, 1), 
+                              labels = c("Off Season (Nov-Mar)", "Hot Season (Apr-Oct)"))
+  ) %>%
+  filter(!is.na(hour))
+
+# 2. Prepare full background data
+full_data <- plot_data_full %>%
+  count(hot_season_label, hour)
+
+# 3. Define key hours and calculate velocity
+hours_to_show <- c(0, 4, 8, 12, 16, 20, 23)
+
+highlight_data <- full_data %>%
+  filter(hour %in% hours_to_show) %>%
+  group_by(hot_season_label) %>%
+  arrange(hour) %>%
+  mutate(
+    pct_change = (n - lag(n)) / lag(n) * 100,
+    label_text = ifelse(is.na(pct_change), 
+                        comma(n), 
+                        paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
+  )
+
+# 4. Faceted plot
+ggplot() +
+  geom_line(data = full_data, aes(x = hour, y = n), color = "grey85", linewidth = 0.8) +
+  geom_point(data = highlight_data, aes(x = hour, y = n), color = "steelblue", size = 2) +
+  geom_text(data = highlight_data, aes(x = hour, y = n, label = label_text), 
+            vjust = -0.7, size = 2.5, lineheight = 0.8) +
+  facet_wrap(~hot_season_label, nrow = 1) +
+  scale_x_continuous(breaks = c(0, 4, 8, 12, 16, 20, 23)) +
+  scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10),
+    strip.text = element_text(size = 12)
+  ) +
+  labs(
+    title = "Hourly Cycle of Enforcement: Hot Season vs. Off Season",
+    subtitle = "Comparing daily volume and velocity between seasons",
+    x = "Hour of Day (0–23)", 
+    y = "Count"
+  )
+```
+
+```{r, include=FALSE}
+rm(plot_data_full, hours_to_show, full_data, highlight_data)
+```
+
+What can we say?
+
+-   Key finding: The "Center of Gravity" for enforcement shifts significantly between seasons. In the Off Season (Nov–Mar), activity peaks at 16:00 and declines rapidly thereafter. In the Hot Season (Apr–Oct), the peak is delayed until 20:00, with high volume sustained well into the evening.
+-   Interpretation: Enforcement curve is governed by the "Sun and Temperature" cycle. During the colder months, ridership and commercial delivery activity are compressed into the earlier, slightly warmer/brighter parts of the day. In the Hot Season, the extended daylight and milder evening temperatures allow the "rush" to sustain four hours longer, shifting the peak demand to later in the day.
+-   Comment: If we treat `hour` and `hot_season` as separate variables, our models will be "blind" to this shift. So it is best to use interaction terms and bin the hours in the best way possible.
+-   Proposed Action: We must check the hours against the targets' ratios to double check our previous binning and then we can consider restricting the bins.
+
+Let us check the time brackets previously built.
+
+```{r time-bracket-distribution}
+plot_univariate_cat(
+  DF = vehstops, 
+  FEATURE = time_bracket, 
+  X_LABEL = "Time Bracket", 
+  TITLE = "Distribution of Time Brackets",
+  SUBTITLE = "TODO"
+)
+```
+
+What can we say?
+
+-   Key finding: Enforcement is heavily skewed toward the latter half of the day. The "Afternoon/evening" (16–19) and "Night" (20–23) brackets collectively account for the majority of stops, with the afternoon/evening block acting as the dominant peak. Consistent time-bracket definitions are essential for maintaining longitudinal integrity. Modifying brackets to "fit" observed peaks introduces selection bias that invalidates historical comparisons across your three-year dataset.
+-   Interpretation: This confirms that the "Evening Migration" we observed in the previous charts is a structural trend. This effectively validates that your categorical buckets align with real-world activity peaks, rather than arbitrary time splits.
+-   Comment: This is a clean, robust way to feed time data into a machine learning model. By using these brackets, you have significantly reduced the "noise" (like the variance between 16:00 and 17:00) while keeping the "signal" (the fact that 16:00–23:00 is high volume). This reduces the risk of overfitting compared to using the raw hour (0–23) or day_of_year (1–365) variables we discarded earlier.
+-   Proposed Action: Maintain your existing time_bracket definitions exactly as they are. Instead of changing them, introduce an interaction term (time_bracket \* year) in your model.
+
+Also, we are going to drop minute as its level of granularity cannot be properly included in the dataset.
+
+## Motorist related predictors
+
+### Reported Age and Age Bracket
+
+We have mainly one issue here. First, we have many instances of drivers with unknown age,
+
+```{r age-bracket-dist}
+plot_univariate_cat(
+  DF = vehstops, 
+  FEATURE = age_bracket, 
+  X_LABEL = "Age Bracket", 
+  TITLE = "Distribution of Stops by Age Bracket",
+  SUBTITLE = "TODO"
+)
+```
+
+What can we say?
+
+-   Key finding: Enforcement is highly concentrated in the "Early Career" demographic (18–44), with a massive, dominant peak at 25–34. The "Unknown" age category represents roughly 4–5% of the total dataset—a significant enough portion to require a specific strategy, but not enough to undermine the reliability of the overall distribution.
+-   Interpretation: The data reflects a clear operational focus on younger, active drivers, which aligns perfectly with a gig-economy or courier demographic. The "Unknown" values are likely "Missing At Random" (MAR)—clerical omissions during the stop process (e.g., driver didn't have ID, officer was in a rush)—rather than a deliberate, systematic suppression of age data.
+-   Comment: We do not treat the "Unknown" category as garbage data to be discarded. However, we could find useful to merge some categories such as Under 18 and 18-24, and adults between 55-64 and senior of 65+ years of age. This could be paired with some re-binning to shift the volume of overall stops and reduce the number of bins.
+-   Proposed Action: We should check first how this
+
+And now, let us see how this looks when looking at the full distribution
+
+FIXME: Horrible color scale TODO: Title, subtitle, annotations
+
+```{r age-vs-age-bracket}
+# 1. Create the brackets and clean the data
+age_data <- vehstops %>%
+  filter(!is.na(age), age >= 0, age < 100) %>%
+  mutate(
+    age_group = case_when(
+      age < 18 ~ "<18",
+      age >= 18 & age <= 24 ~ "18–24",
+      age >= 25 & age <= 34 ~ "25–34",
+      age >= 35 & age <= 44 ~ "35–44",
+      age >= 45 & age <= 54 ~ "45–54",
+      age >= 55 & age <= 64 ~ "55–64",
+      age >= 65 ~ "65+"
+    ),
+    # Ensure the order is kept in the plot
+    age_group = factor(age_group, levels = c("<18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+"))
+  )
+
+# 2. Plotting
+ggplot(age_data, aes(x = age, fill = age_group)) +
+  # binwidth = 1 keeps the individual resolution
+  geom_histogram(binwidth = 1, color = "white", linewidth = 0.1) +
+  # Adding clear color differentiation for the brackets
+  scale_fill_viridis_d(option = "mako") +
+  theme_minimal() +
+   theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10),
+    strip.text = element_text(size = 11)
+  ) +
+  labs(
+    title = "Age Distribution of Drivers by Target Bracket",
+    subtitle = "Individual year resolution with custom enforcement brackets",
+    x = "Driver Age", 
+    y = "Count",
+    fill = "Age Group"
+  ) +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 2))
+```
+
+```{r, include=FALSE}
+rm(age_data)
+```
+
+What can we say?
+
+-   Key finding: Enforcement is heavily concentrated within the 20–45 age range, with a distinct operational peak occurring in the mid-20s. After age 50, there is a continuous, rapid decline in stop volume, forming a long, sparse "tail" that extends past 75.
+-   Interpretation:
+-   Comment:
+-   Proposed Action: Filter your dataset to exclude drivers over age 75. This clarifies the "true" shape of your enforcement curve without losing actionable predictive signal. Collapse Sparse Brackets: Since the 55–64 and 65+ buckets have significantly lower counts than the 25–34 bucket, consider collapsing all drivers aged 55+ into a single "55+" category. This increases the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic. After checking ratio.
+
+TODO: Boxplot to justfy this removal TODO: In 4-wheels, change this accordingly
+
+```{r remove-age-outliers}
+vehstops <- vehstops %>%
+  filter(age < 76)
+```
+
+From now on we will consider drivers of age in the range 16-75.
+
+### Reported Sex
+
+TODO: Make it better
+
+```{r sex-distribution}
+plot_univariate_cat(
+  DF = vehstops, 
+  FEATURE = sex, 
+  X_LABEL = "Reported Sex", 
+  TITLE = "Distribution of Stops by Reported Sex (Sorted by Count)",
+  SUBTITLE = "TODO",
+  order_by = "freq"
+)
+```
+
+What can we say?
+
+-   Key finding: The data exhibits extreme class imbalance. "Male" (M) drivers represent the overwhelming majority of enforcement stops (approximately 96%), while "Female" (F) and "Unknown" (U) represent a negligible fraction of the total volume.
+-   Interpretation: This is not a data quality issue—it is an operational reflection of the driver demographic being targeted Because the skew is so profound, "Sex" will inevitably become a high-importance feature in any model you train. The model will essentially learn that "Being Male = High Probability of Stop" simply because that is the status quo in the dataset.
+-   Comment: You must be cautious here. If you use this feature as-is, you risk creating a model that is "biased by design." Because the dataset is so skewed, the model could achieve very high mathematical accuracy by simply predicting "Male" for every single case. You are currently looking at exposure (who is on the road), not necessarily propensity (who is most likely to be stopped).
+-   Proposed Action: Run a correlation matrix to see if sex is highly correlated with other variables. When splitting your data for training/testing, ensure you use stratified sampling (preserving the M/F/U ratio in both sets). If you don't, your test set might end up with no "Female" or "Unknown" records, making it impossible to evaluate your model's performance on those sub-groups
+
+### Reported Ethnicity
+
+TODO: Better title, subtitle, annotation with percentage, less angle
+
+```{r ethnicity-distribution}
+plot_univariate_cat(
+  DF = vehstops, 
+  FEATURE = ethnicity, 
+  X_LABEL = "Reported Ethnicity", 
+  TITLE = "Distribution of Stops by Reported Ethnicity (Sorted by Count)",
+  SUBTITLE = "TODO",
+  order_by = "freq"
+)
+```
+
+What can we say?
+
+-   Key finding: The distribution is heavily skewed, with "Hispanic" drivers accounting for the plurality of stops (over 86,000), far outpacing other groups. The "Unknown" category is also statistically significant (\~16,800), mirroring the data quality patterns you observed with age.
+-   Interpretation: This data does not reflect a balanced, random sampling of the driving population; it reflects an enforcement density. The high concentration of specific demographics suggests that either the geographic areas targeted for enforcement have high Hispanic populations, or the specific types of vehicles/courier work being monitored are disproportionately staffed by this demographic.
+-   Comment: Because the distribution is so imbalanced, a machine learning model will aggressively use "ethnicity" to predict stops. It will effectively "learn" that a stop is more likely for one group over another based on the historical pattern.
+-   Proposed Action: Before including ethnicity in your regression, perform a correlation check against boro. When training your model, ensure your training and testing splits are stratified by ethnicity.
+
+------------------------------------------------------------------------
+
+# Bivariate EDA
+
+We have structured this analysis into three distinct phases. First, we employ a Cramer’s V association matrix to assess categorical relationships; this is preferred over a standard Chi-squared test as it provides a normalized measure of strength better suited to our large data volume.
+
+To complement this, we utilize visual trend analysis to detect potential collinearity. By plotting arrest rates over time and faceting by variables such as "Area," we can observe whether patterns "drift" in unison. Parallel movement across these facets strongly suggests collinearity.
+
+Finally, once we transition to the modeling phase, we will implement formal post-hoc diagnostics, such as Generalized Variance Inflation Factors (GVIF), to rigorously validate our model's integrity.
+
+## Association of Binary Response vs. Categorical Predictors
+
+When dealing with a massive dataset like ours (nearly 200,000 records), traditional p-values from Chi-squared tests become hypersensitive—nearly every relationship will appear "statistically significant" simply because of the sample size.
+
+To bypass this, we use Cramer’s V to measure Effect Size. It acts as a correlation coefficient for categorical data, scaling the association between two variables on a range from 0 to 1:
+
+-   0: Indicates no association between the variables.
+-   1: Indicates a perfect association.
+
+By calculating the square root of the Chi-squared statistic ($X^2$) divided by the sample size ($n$) and the minimum dimension of the contingency table ($k−1$), we obtain a normalized value. This allows us to move beyond "Is there a relationship?" and instead answer "How strong is this relationship?", effectively ranking our features by their practical importance rather than just their statistical noise.
+
+Because of how the `table()` function works in R, we are able to include numerical predictors, such as `hour` and `age`, due to the fact they do not take "continuous" values and can be treated like categorical predictors.
+
+FIXME: Do only upper half,
+
+```{r categorical-correlation-heatmap}
+# Excluding doy (redundant) and dow (we use weekday instead)
+columns <- c(
+  "year" , "month", "hot_season", "day", "weekday", 
+  "hour", "time_bracket",
+  "area", "boro", 
+  "sex", "ethnicity", "age", "age_bracket",
+  "veh_checkpoint", "arrested"
+  )
+
+plot_categorical_correlation(
+  DF = vehstops, 
+  FEATURES = columns,
+  TITLE = "Correlation between Categorical Variables (Cramer's V)"
+)
+```
+
+What can we say? Arrested and Veh Checkpoint is mostly associated with (sex?), age/age_bracket, ethnicity, area/boro, year, month/hot_seson, and hour/time_bracket
+
+-   Key finding:
+-   Interpretation: The low values across the arrested row suggest that no single categorical feature is a "smoking gun" for predicting an arrest on its own.
+-   Comment:
+-   Proposed Action:
+
+For bikers we have association: - arrested: sex, ethnicity, age/age_bracket, area/boro, year, month/hot_season, hour/time_bracket (same veh_checkpoint). - sex: ethnicity, age/age_bracket, area/boro,
+
+We replot
+
+```{r categorical-correlation-heatmap2}
+# TODO
+columns <- c(
+  "arrested", "veh_checkpoint","sex", "ethnicity", "age", "boro", 
+  "year" , "month", "hot_season",
+  "hour")
+
+plot_categorical_correlation(
+  DF = vehstops, 
+  FEATURES = columns,
+  TITLE = "Correlation between Categorical Variables (Cramer's V)"
+)
+```
+
+## Correlation of Numerical Features
+
+TODO: Comment that we can still check pearson's correlation of numerical columns and we could also try to use the binary response as a numerical one just to see what happens here.
+
+```{r}
+numerical_cols <- c(
+  "arrested", "veh_checkpoint",
+  "year", "month", "day", "hour", 
+  "latitude", "longitude", 
+  "age"
+  )
+
+cor_matrix <- cor(vehstops[, numerical_cols], use = "complete.obs")
+
+corrplot(cor_matrix, method = "color", type = "upper",
+         order = "hclust", addCoef.col = "black", number.cex = 0.7,
+         tl.col = "black", tl.srt = 45,
+         title = "Correlation Matrix of Numerical Features",
+         mar = c(0, 0, 2, 0))
+```
+
+```{r}
+cramersV(vehstops$sex, vehstops$ethnicity)
+```
+
+So we are going to check the following features against the responses:
+
+-   `sex`, `ethnicity`, `age` and `age_bracket`.
+
+We ca
+
+## Geospatial Features
+
+### Area vs Arrested
+
+```{r area-vs-arrested-ratio}
+ratio_by_cat(
+  vehstops, arrested, area,
+  "Area", "Arrest Rate (%)", "Arrest Ratio by Area",
+  style = "stack", legend_title = "Stop ended in arrest?",
+  target_labels = c("No", "Yes"),
+  subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio in Low Volume Areas",
+  label_vjust = 0.5
+)
+```
+
+Let us look at the numbers too
+
+```{r confirm-area-vs-arrested-ratio}
+vehstops %>%
+  group_by(area, arrested) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(percentage = count / sum(count))
+```
+
+What can we say? Remember that Staten Island and Bronx are the areas with the least volume of stops.
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Area vs Vehicle Checkpoint
+
+What about checkpoints? For ease of display we are not going to stack the bars, but just displaying the rate percentages of vehicle checkpoints.
+
+```{r area-vs-checkpoint-ratio}
+ratio_by_cat(
+  vehstops, veh_checkpoint, area,
+  "Area", "Vehichle Checkpoint Rate (%)", "Vehichle Checkpoint Rate by Area",
+  style = "rate", legend_title = "Stop was done by a checkpoint?",
+  target_labels = c("No", "Yes"),
+  subtitle = "For 2-Wheels Vehicles it shows Low Checkpoint Ratio in Low Volume Areas"
+)
+```
+
+Let us look at the numbers too
+
+```{r confirm-area-vs-checkpoint-ratio}
+vehstops %>%
+  group_by(area, veh_checkpoint) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(percentage = count / sum(count))
+```
+
+What can we say? Low volume areas have less checkpoints, but get proportionally more arrests
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Borough vs Arrested
+
+```{r boro-vs-arrested-ratio}
+ratio_by_cat(
+  vehstops, arrested, boro,
+  "Borough", "Arrest Rate (%)", "Arrest Ratio by Borough",
+  style = "stack", legend_title = "Stop ended in arrest?",
+  target_labels = c("No", "Yes"),
+  subtitle = "For 2-Wheels Vehicles it confirms the Increased Arrest Ratio in Low Volume Areas",
+  label_vjust = 0.5
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Boro vs Vehicle Checkpoint
+
+What about the checkpoint?
+
+```{r boro-vs-checkpoint-ratio}
+ratio_by_cat(
+  vehstops, veh_checkpoint, boro,
+  "Borough", "Vehicle Checkpoint Rate (%)", "Vehicle Checkpoint by Borough",
+  style = "rate", legend_title = "Stop was done by a checkpoint?",
+  target_labels = c("No", "Yes"),
+  subtitle = "For 2-Wheels Vehicles it confirms the Low Checkpoint Ratio in Low Volume Areas",
+  label_vjust = 0.5
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+We will need to choose between one or the other.
+
+### Latitude and Longitude for Stop Rate
+
+```{r}
+# Download NYC Borough boundaries once
+nyc_map <- counties(state = "NY", cb = TRUE) %>%
+  filter(NAME %in% c("Bronx", "Kings", "New York", "Queens", "Richmond"))
+
+# 1. Define the grid resolution (match this with your desired density)
+bins <- 100
+lon_breaks <- seq(-74.26, -73.71, length.out = bins + 1)
+lat_breaks <- seq(40.48, 40.92, length.out = bins + 1)
+
+# 1. Generate the grid_sum object for Arrest Rate
+grid_sum_rate <- vehstops %>%
+  filter(!is.na(longitude), !is.na(latitude), !is.na(arrested)) %>%
+  mutate(
+    xbin = cut(longitude, breaks = lon_breaks, include.lowest = TRUE, right = FALSE),
+    ybin = cut(latitude, breaks = lat_breaks, include.lowest = TRUE, right = FALSE)
+  ) %>%
+  # Extract the center point of each bin
+  mutate(
+    x = as.numeric(gsub(".*\\[(.*),.*", "\\1", xbin)) + (lon_breaks[2] - lon_breaks[1])/2,
+    y = as.numeric(gsub(".*\\[(.*),.*", "\\1", ybin)) + (lat_breaks[2] - lat_breaks[1])/2
+  ) %>%
+  group_by(x, y) %>%
+  summarise(
+    total_stops = n(),
+    arrest_rate = mean(arrested == 1),
+    .groups = "drop"
+  ) %>%
+  # Filter out low-volume bins to reduce statistical noise
+  filter(total_stops >= 5)
+
+# 2. Plot with NYC Map base layer
+ggplot() +
+  # NYC Borough Boundaries
+  geom_sf(data = nyc_map, fill = "white", color = "grey80", linewidth = 0.2) +
+  # Arrest Rate Tiles
+  geom_tile(data = grid_sum_rate, aes(x, y, fill = arrest_rate), alpha = 0.8) +
+  # Color scale: Highlighting high arrest rate areas
+  scale_fill_viridis_c(
+    labels = scales::percent, 
+    name = "Arrest Rate", 
+    option = "inferno", # 'Inferno' is great for highlighting "hot" spots
+    direction = -1
+  ) +
+  coord_sf(xlim = c(-74.26, -73.71), ylim = c(40.48, 40.92)) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Spatial Distribution of Arrest Rates - NYC",
+    subtitle = "Percentage of stops resulting in arrest (Bins with n < 5 removed)",
+    x = "Longitude", 
+    y = "Latitude"
+  )
+```
+
+## Time related features
+
+### Year vs Arrested
+
+FIXME: Do by line plot by year
+
+```{r year-vs-arrested-ratio}
+# 1. Calculate Arrest Rate per year
+arrest_trends <- vehstops %>%
+  filter(!is.na(year), !is.na(arrested)) %>%
+  group_by(year) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(arrested == 1),
+    rate = arrests / total_stops, 
+    .groups = 'drop'
+  ) %>%
+  arrange(year) %>%
+  # 2. Calculate the year-over-year change in percentage points
+  mutate(
+    prev_rate = lag(rate),
+    delta = (rate - prev_rate) * 100, # Convert to percentage points
+    # 3. Create labels: Rate + Delta
+    label_text = ifelse(
+      is.na(prev_rate), 
+      scales::percent(rate, accuracy = 0.1), 
+      paste0(scales::percent(rate, accuracy = 0.1), 
+             "\n(", ifelse(delta > 0, "+", ""), round(delta, 1), " pts)")
+    )
+  )
+
+# 4. Plotting
+ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
+  # Draw the trend line
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  # Add the labels
+  geom_text(aes(label = label_text), vjust = -0.8, size = 3.5, lineheight = 0.8) +
+  # Scale y-axis as percentage
+  scale_y_continuous(
+    labels = scales::percent, 
+    limits = c(0, max(arrest_trends$rate) * 1.3), # Extra room for labels
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10, color = "grey50")
+  ) +
+  labs(
+    title = "Annual Arrest Rate has been Slowly Rising in the last 3 years",
+    subtitle = "Calculated as the percentage of stops resulting in an arrest",
+    x = "Year", y = "Arrest Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Year vs Vehicle Checkpoint
+
+```{r year-vs-checkpoint-ratio}
+# 1. Calculate Arrest Rate per year
+arrest_trends <- vehstops %>%
+  filter(!is.na(year), !is.na(veh_checkpoint)) %>%
+  group_by(year) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(veh_checkpoint == 1),
+    rate = arrests / total_stops, 
+    .groups = 'drop'
+  ) %>%
+  arrange(year) %>%
+  # 2. Calculate the year-over-year change in percentage points
+  mutate(
+    prev_rate = lag(rate),
+    delta = (rate - prev_rate) * 100, # Convert to percentage points
+    # 3. Create labels: Rate + Delta
+    label_text = ifelse(
+      is.na(prev_rate), 
+      scales::percent(rate, accuracy = 0.1), 
+      paste0(scales::percent(rate, accuracy = 0.1), 
+             "\n(", ifelse(delta > 0, "+", ""), round(delta, 1), " pts)")
+    )
+  )
+
+# 4. Plotting
+ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
+  # Draw the trend line
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  # Add the labels
+  geom_text(aes(label = label_text), vjust = -0.8, size = 3.5, lineheight = 0.8) +
+  # Scale y-axis as percentage
+  scale_y_continuous(
+    labels = scales::percent, 
+    limits = c(0, max(arrest_trends$rate) * 1.3), # Extra room for labels
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10, color = "grey50")
+  ) +
+  labs(
+    title = "Annual Vehicle Checkpoint Rate has been barely decreasing in the last 3 years",
+    subtitle = "Calculated as the percentage of stops from vehicle checkpoints",
+    x = "Year", y = "Vehicle Checkpoint Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Month and Hot Season
+
+```{r month-vs-arrested-ratio}
+# 1. Aggregate and calculate monthly arrest rate
+monthly_arrest_data <- vehstops %>%
+  filter(!is.na(month), !is.na(arrested)) %>%
+  group_by(month) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(arrested == 1),
+    rate = arrests / total_stops,
+    .groups = "drop"
+  ) %>%
+  mutate(month = factor(month, levels = 1:12)) %>%
+  arrange(month) %>%
+  # 2. Calculate point difference (delta)
+  mutate(
+    prev_rate = lag(rate),
+    delta = (rate - prev_rate) * 100,
+    # Create the label: Rate on top, Point change on bottom
+    label_text = ifelse(
+      is.na(prev_rate), 
+      scales::percent(rate, accuracy = 0.1), 
+      paste0(scales::percent(rate, accuracy = 0.1), 
+             "\n(", ifelse(delta > 0, "+", ""), round(delta, 1), " pts)")
+    )
+  )
+
+# 3. Plot
+monthly_arrest_data %>%
+  ggplot(aes(x = month, y = rate, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  # Use nudge_y if labels overlap the line, vjust handles the vertical position
+  geom_text(aes(label = label_text), vjust = -1.2, size = 3, lineheight = 0.8) +
+  scale_x_discrete(labels = month.abb) +
+  scale_y_continuous(
+    labels = scales::percent, 
+    limits = c(0, max(monthly_arrest_data$rate) * 1.3), 
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Monthly Arrest Rate Trend",
+    subtitle = "Aggregated monthly arrest rate; variation shown in percentage points",
+    x = "Month",
+    y = "Arrest Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r month-vs-checkpoint-ratio}
+# 1. Aggregate and calculate monthly arrest rate
+monthly_arrest_data <- vehstops %>%
+  filter(!is.na(month), !is.na(veh_checkpoint)) %>%
+  group_by(month) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(veh_checkpoint == 1),
+    rate = arrests / total_stops,
+    .groups = "drop"
+  ) %>%
+  mutate(month = factor(month, levels = 1:12)) %>%
+  arrange(month) %>%
+  # 2. Calculate point difference (delta)
+  mutate(
+    prev_rate = lag(rate),
+    delta = (rate - prev_rate) * 100,
+    # Create the label: Rate on top, Point change on bottom
+    label_text = ifelse(
+      is.na(prev_rate), 
+      scales::percent(rate, accuracy = 0.1), 
+      paste0(scales::percent(rate, accuracy = 0.1), 
+             "\n(", ifelse(delta > 0, "+", ""), round(delta, 1), " pts)")
+    )
+  )
+
+# 3. Plot
+monthly_arrest_data %>%
+  ggplot(aes(x = month, y = rate, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  # Use nudge_y if labels overlap the line, vjust handles the vertical position
+  geom_text(aes(label = label_text), vjust = -1.2, size = 3, lineheight = 0.8) +
+  scale_x_discrete(labels = month.abb) +
+  scale_y_continuous(
+    labels = scales::percent, 
+    limits = c(0, max(monthly_arrest_data$rate) * 1.3), 
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Monthly Vehicle Checkpoint Rate Trend",
+    subtitle = "Aggregated monthly vehicle checkpoint rate; variation shown in percentage points",
+    x = "Month",
+    y = "Vehicle Checkpoint Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+What about `hot_season`?
+
+FIXME: Correct it
+
+```{r hot-season-vs-arrested-ratio}
+ratio_by_cat(
+  vehstops, arrested, hot_season,
+  "Hot Season", "Arrest Rate (%)", "Arrest Ratio by Season",
+  style = "stack", legend_title = "Stop ended in arrest?",
+  target_labels = c("No", "Yes"),
+  subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio in Low Volume Areas",
+  label_vjust = 0.5
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r hot-season-vs-checkpoint-ratio}
+ratio_by_cat(
+  vehstops, veh_checkpoint, hot_season,
+  "Hot Season", "Vehicle Checkpoint Rate (%)", "  Ratio by Season",
+  style = "stack", legend_title = " ",
+  target_labels = c("No", "Yes"),
+  subtitle = "For 2-Wheels Vehicles it shows  ",
+  label_vjust = 0.5
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+#### Faceted
+
+FIXME: Fix the annotations
+
+```{r month-faceted-vs-arrested-ratio}
+# Data prep: Calculate arrest rates and labeling logic
+plot_data <- vehstops %>%
+  filter(!is.na(year), !is.na(month), !is.na(arrested)) %>%
+  group_by(year, month) %>%
+  summarise(
+    arrest_rate = mean(arrested == 1), 
+    .groups = "drop"
+  ) %>%
+  mutate(month = factor(month, levels = 1:12)) %>%
+  group_by(year) %>%
+  mutate(
+    rate_jan = arrest_rate[month == 1],
+    rate_max = max(arrest_rate),
+    is_max = arrest_rate == rate_max,
+    
+    # Calculate percentage point differences
+    # Jan vs current, Max vs current
+    diff_jan = (arrest_rate - rate_jan) * 100,
+    diff_dec = (arrest_rate - rate_max) * 100, 
+    
+    # Custom Label Logic
+    label_text = case_when(
+      month == 1 ~ scales::percent(arrest_rate, accuracy = 0.1), 
+      is_max ~ paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", ifelse(diff_jan > 0, "+", ""), round(diff_jan, 1), " pts)"),
+      month == 12 ~ paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", round(diff_dec, 1), " pts)"),
+      TRUE ~ ""
+    )
+  )
+
+# Faceted plot for Arrest Rate
+plot_data %>%
+  ggplot(aes(x = month, y = arrest_rate, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_text(aes(label = label_text), vjust = -1, hjust = 0.2, size = 2.5, lineheight = 0.8) +
+  facet_wrap(~year, nrow = 1) +
+  scale_x_discrete(
+    labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), 
+    expand = expansion(mult = c(0.1, 0.1))
+  ) +
+  # Using percentage scale for Y
+  scale_y_continuous(labels = scales::percent, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10),
+    strip.text = element_text(size = 11)
+  ) +
+  labs(
+    title = "Monthly Arrest Rate, by Year, for 2-Wheels Vehicles in NYC",
+    subtitle = "Variation shown in percentage points (pts) relative to January and the Annual Peak",
+    x = "Month",
+    y = "Arrest Rate"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r month-faceted-vs-checkpoint-ratio}
+# Data prep: Calculate arrest rates and labeling logic
+plot_data <- vehstops %>%
+  filter(!is.na(year), !is.na(month), !is.na(veh_checkpoint)) %>%
+  group_by(year, month) %>%
+  summarise(
+    arrest_rate = mean(veh_checkpoint == 1), 
+    .groups = "drop"
+  ) %>%
+  mutate(month = factor(month, levels = 1:12)) %>%
+  group_by(year) %>%
+  mutate(
+    rate_jan = arrest_rate[month == 1],
+    rate_max = max(arrest_rate),
+    is_max = arrest_rate == rate_max,
+    
+    # Calculate percentage point differences
+    # Jan vs current, Max vs current
+    diff_jan = (arrest_rate - rate_jan) * 100,
+    diff_dec = (arrest_rate - rate_max) * 100, 
+    
+    # Custom Label Logic
+    label_text = case_when(
+      month == 1 ~ scales::percent(arrest_rate, accuracy = 0.1), 
+      is_max ~ paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", ifelse(diff_jan > 0, "+", ""), round(diff_jan, 1), " pts)"),
+      month == 12 ~ paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", round(diff_dec, 1), " pts)"),
+      TRUE ~ ""
+    )
+  )
+
+# Faceted plot for Arrest Rate
+plot_data %>%
+  ggplot(aes(x = month, y = arrest_rate, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_text(aes(label = label_text), vjust = -1, hjust = 0.2, size = 2.5, lineheight = 0.8) +
+  facet_wrap(~year, nrow = 1) +
+  scale_x_discrete(
+    labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), 
+    expand = expansion(mult = c(0.1, 0.1))
+  ) +
+  # Using percentage scale for Y
+  scale_y_continuous(labels = scales::percent, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10),
+    strip.text = element_text(size = 11)
+  ) +
+  labs(
+    title = "Monthly Vehicle Checkpoint Rate, by Year, for 2-Wheels Vehicles in NYC",
+    subtitle = "Variation shown in percentage points (pts) relative to January and the Annual Peak",
+    x = "Month",
+    y = "Vehicle Checkpoint Rate"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r faceted-hot-season-vs-arrested-ratio}
+# 1. Create the indicator, calculate rate and raw arrests
+plot_data <- vehstops %>%
+  filter(!is.na(year), !is.na(month), !is.na(arrested)) %>%
+  mutate(
+    is_hot_season = ifelse(month %in% 4:10, "Hot Season", "Off Season"),
+    is_hot_season = factor(is_hot_season, levels = c("Hot Season", "Off Season"))
+  ) %>%
+  group_by(year, is_hot_season) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(arrested == 1),
+    arrest_rate = arrests / total_stops,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Label: Rate (Raw Arrest Count)
+    label_text = paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", comma(arrests), " arrests)")
+  )
+
+# 2. Build the faceted barplot
+plot_data %>%
+  ggplot(aes(x = is_hot_season, y = arrest_rate, fill = is_hot_season)) +
+  geom_col(show.legend = FALSE) +
+  # Facet by year
+  facet_wrap(~year, nrow = 1) +
+  # Add labels
+  geom_text(aes(label = label_text), vjust = -0.5, size = 3, lineheight = 0.8) +
+  # Use percent scale for the Y axis
+  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_brewer(palette = "Paired") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Arrest Rate for 2-Wheels Vehicles: Hot Season vs. Off Season",
+    subtitle = "Comparing arrest intensity across seasons by year",
+    x = NULL,
+    y = "Arrest Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r faceted-hot-season-vs-checkpoint-ratio}
+# 1. Create the indicator, calculate rate and raw arrests
+plot_data <- vehstops %>%
+  filter(!is.na(year), !is.na(month), !is.na(veh_checkpoint)) %>%
+  mutate(
+    is_hot_season = ifelse(month %in% 4:10, "Hot Season", "Off Season"),
+    is_hot_season = factor(is_hot_season, levels = c("Hot Season", "Off Season"))
+  ) %>%
+  group_by(year, is_hot_season) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(veh_checkpoint == 1),
+    arrest_rate = arrests / total_stops,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Label: Rate (Raw Arrest Count)
+    label_text = paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", comma(arrests), " checkpoints)")
+  )
+
+# 2. Build the faceted barplot
+plot_data %>%
+  ggplot(aes(x = is_hot_season, y = arrest_rate, fill = is_hot_season)) +
+  geom_col(show.legend = FALSE) +
+  # Facet by year
+  facet_wrap(~year, nrow = 1) +
+  # Add labels
+  geom_text(aes(label = label_text), vjust = -0.5, size = 3, lineheight = 0.8) +
+  # Use percent scale for the Y axis
+  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.2))) +
+  scale_fill_brewer(palette = "Paired") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Vehicle Checkpoint Rate for 2-Wheels Vehicles: Hot Season vs. Off Season",
+    subtitle = "Comparing arrest intensity across seasons by year",
+    x = NULL,
+    y = "Arrest Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Day, Dow and Weekday
+
+```{r day-vs-arrested-ratio}
+# 1. Aggregate and calculate daily arrest rate
+daily_arrest_rate <- vehstops %>%
+  filter(!is.na(day), !is.na(arrested)) %>%
+  group_by(day) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(arrested == 1),
+    rate = arrests / total_stops,
+    .groups = "drop"
+  )
+
+# 2. Plotting
+daily_arrest_rate %>%
+  ggplot(aes(x = day, y = rate)) +
+  # Draw the raw daily variation
+  geom_line(color = "grey60", alpha = 0.5) +
+  # Add a smoothed trend to see if rates rise/fall over the month
+  geom_smooth(method = "loess", color = "steelblue", se = FALSE) +
+  # Format Y axis as percentage
+  scale_y_continuous(labels = scales::percent, limits = c(0, NA)) +
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Arrest Rate by Day of the Month (1–31)",
+    subtitle = "Aggregated percentage of stops resulting in arrest across all recorded months",
+    x = "Day of the Month", 
+    y = "Arrest Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r day-vs-checkpoint-ratio}
+# 1. Aggregate and calculate daily arrest rate
+daily_arrest_rate <- vehstops %>%
+  filter(!is.na(day), !is.na(veh_checkpoint)) %>%
+  group_by(day) %>%
+  summarise(
+    total_stops = n(),
+    arrests = sum(veh_checkpoint == 1),
+    rate = arrests / total_stops,
+    .groups = "drop"
+  )
+
+# 2. Plotting
+daily_arrest_rate %>%
+  ggplot(aes(x = day, y = rate)) +
+  # Draw the raw daily variation
+  geom_line(color = "grey60", alpha = 0.5) +
+  # Add a smoothed trend to see if rates rise/fall over the month
+  geom_smooth(method = "loess", color = "steelblue", se = FALSE) +
+  # Format Y axis as percentage
+  scale_y_continuous(labels = scales::percent, limits = c(0, NA)) +
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title = "Vehicle Checkpoint Rate by Day of the Month (1–31)",
+    subtitle = "Aggregated percentage of stops resulting in arrest across all recorded months",
+    x = "Day of the Month", 
+    y = "Vehicle Checkpoint Rate (%)"
+  )
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+TODO
+
+```{r dow-vs-arrested-ratio}
+
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r dow-vs-checkpoint-ratio}
+
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+#### Faceted
+
+```{r dow-faceted-vs-checkpoint-ratio}
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Hour and Time Bracket
+
+```{r hour-vs-arrested-ratio}
+ratio_by_cat(
+  vehstops, arrested, hour,
+  "Hot Season", "Vehicle Checkpoint Rate (%)", "  Ratio by Season",
+  style = "stack", legend_title = " ",
+  target_labels = c("No", "Yes"),
+  subtitle = "For 2-Wheels Vehicles it shows  ",
+  label_vjust = 0.5
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r hour-vs-checkpoint-ratio}
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r hour-vs-target}
+vehstops |>
+  filter(!is.na(arrested), !is.na(hour), !is.na(year)) |>
+  group_by(year, hour) |>
+  summarise(rate = mean(arrested), n = n(), .groups = "drop") |>
+  ggplot(aes(hour, rate, group = 1)) +
+  geom_line(linewidth = 0.6) +
+  geom_point(size = 0.8, alpha = 0.7) +
+  scale_x_continuous(breaks = seq(0, 23, by = 1)) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(title = "Escalation rate by Hour", x = "Hour", y = "Rate") +
+  facet_wrap(~ year, ncol = 1, scales = "free_x") +
+  theme_minimal()
+```
+
+Let us look at our grouping now
+
+```{r time-bracket-vs-arrested-ratio}
+ratio_by_cat(
+  vehstops, arrested, time_bracket,
+  "Time bracket", "Rate", "Arrest ratio by time bracket",
+  style = "stack"
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+```{r time-bracket-vs-checkpoint-ratio}
+ratio_by_cat(
+  vehstops, veh_checkpoint, time_bracket,
+  "Time bracket", "Rate", "Arrest ratio by time bracket",
+  style = "stack"
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+## Motorist related features
+
+### Reported Age
+
+```{r age-bracket-vs-target}
+ratio_by_cat(
+  vehstops, arrested, age_bracket,
+  "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket",
+  style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
+  subtitle = "TODO",
+  label_vjust = 0.5
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+In fact,
+
+TODO: Comment that escalation rate remains fixed after 25
+
+```{r age-by-target}
+vehstops %>%
+  filter(!is.na(age), between(age, 16, 100)) %>%
+  mutate(bin = ntile(age, 10)) %>%
+  group_by(bin) %>%
+  summarize(
+    age_mid = median(age, na.rm = TRUE),
+    rate = mean(arrested == 1, na.rm = TRUE),
+    n = n(), .groups = "drop"
+  ) %>%
+  mutate(
+    se = sqrt(rate * (1 - rate) / n),
+    lo = pmax(rate - 1.96 * se, 0),
+    hi = pmin(rate + 1.96 * se, 1)
+  ) %>%
+  ggplot(aes(age_mid, rate)) +
+  geom_point(size = 1.5) +
+  geom_line(linewidth = 0.6) +
+  geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.15) +
+  scale_y_continuous(labels = percent) +
+  labs(x = "Age (bin median)", y = "Event rate", title = "Escalation rate vs age (deciles)")
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+### Reported Sex
+
+```{r sex-vs-target}
+ratio_by_cat(
+  vehstops, arrested, sex,
+  "Reported sex", "Share of stops", "Escalation ratio by reported sex",
+  style = "stack"
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+TODO: Contextualize with counts
+
+### Reported Ethnicity
+
+```{r ethnicity-vs-target}
+ratio_by_cat(
+  vehstops, arrested, ethnicity,
+  "Reported ethnicity", "Share of stops", "Escalation ratio by reported ethnicity",
+  style = "stack"
+)
+```
+
+What can we say?
+
+-   Key finding:
+-   Interpretation:
+-   Comment:
+-   Proposed Action:
+
+------------------------------------------------------------------------
+
+# Multivariate EDA
+
+Since multivariate analysis is very complex, and we just want to get rid of some extra features, we are going to look at some of the percentages, with respect to escalation, of multiple variables (ex: sex x ethnicity)
+
+## Two-way event-rate heatmaps (interactions)
+
+```{r two-way-heatmaps}
+boro_order <- vehstops %>%
+  group_by(boro) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
+  arrange(rate) %>%
+  pull(boro)
+
+vehstops %>%
+  filter(!is.na(boro)) %>%
+  group_by(boro, hour) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  mutate(boro = factor(boro, levels = boro_order)) %>%
+  ggplot(aes(hour, boro, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = scales::percent) +
+  labs(x = "Hour", y = "Borough", fill = "Rate",
+       title = "Escalation rate by borough × hour")
+
+# 2) Sex × ethnicity
+vehstops %>%
+  filter(!is.na(sex), !is.na(ethnicity)) %>%
+  group_by(sex, ethnicity) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  mutate(ethnicity = fct_lump_n(ethnicity, n = 8, other_level = "Other")) %>%
+  ggplot(aes(ethnicity, sex, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = scales::percent) +
+  labs(x = "ethnicity (lumped)", y = "Sex", fill = "Arrest Rate",
+       title = "Escalation rate across sex × ethnicity")
+```
+
+### Space × Time interaction (gridded)
+
+```{r space-time}
+vehstops %>%
+  filter(!is.na(latitude), !is.na(longitude),
+         between(latitude, 40.48, 40.92), between(longitude, -74.27, -73.68)) %>%
+  mutate(hour_bin = cut(hour, breaks = c(-1,5,11,17,23), labels = c("Night","Morning","Afternoon","Evening"))) %>%
+  group_by(hour_bin) %>%
+  sample_n(size = min(n(), 200000), replace = FALSE) %>%  # cap points per facet for speed
+  ggplot(aes(longitude, latitude)) +
+  stat_summary_2d(aes(z = arrested), fun = ~ mean(.x == 1, na.rm = TRUE), bins = 50) +
+  facet_wrap(~ hour_bin) +
+  coord_equal() +
+  scale_fill_viridis_c(labels = percent) +
+  labs(x = "Longitude", y = "Latitude", fill = "Rate",
+       title = "Escalation rate across space by time-of-day")
+```
+
+## Enforcement and Escalation features vs Target
+
+## Command Unit, Geospatial and Area related Features vs Target
+
+Per command unit amount of stops during time (per year, per month, per day)
+
+Per command unit escalation rate during time (per year, per month, per day)
+
+### Area
+
+```{r area-x-hour}
+area_order <- vehstops %>%
+  group_by(area) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
+  arrange(rate) %>%
+  pull(area)
+
+vehstops %>%
+  filter(!is.na(area)) %>%
+  group_by(area, hour) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  mutate(area = factor(area, levels = area_order)) %>%
+  ggplot(aes(hour, area, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = scales::percent) +
+  labs(x = "Hour", y = "Area", fill = "Rate",
+       title = "Escalation rate by area × hour")
+```
+
+```{r area-x-sex}
+ratio_by_cat_split(
+  DF = vehstops,
+  TARGET = arrested,
+  CAT    = area,
+  SPLIT  = sex,
+  x_title = "Area",
+  y_title = "Share of stops",
+  title   = "Escalation ratio by area (split by reported sex)",
+  target_labels = c("Not escalated","Escalated"),
+  split_labels  = c("No","Yes")
+)
+```
+
+```{r}
+# heat_target_catcat(
+#   vehstops, Y = boro, X = time_bracket,
+#   X_TITLE = "Time bracket", Y_TITLE = "Borough",
+#   TITLE = "Escalation rate by borough × time bracket",
+#   min_n = 30, order_y_by = "rate", order_x_by = "freq", alpha_by_n = TRUE
+# )
+```
+
+```{r}
+area_order <- vehstops %>%
+  group_by(area) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
+  arrange(rate) %>%
+  pull(area)
+
+vehstops %>%
+  filter(!is.na(area)) %>%
+  group_by(area, month) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  mutate(area = factor(area, levels = area_order)) %>%
+  ggplot(aes(month, area, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = scales::percent) +
+  labs(x = "Month", y = "Area", fill = "Rate",
+       title = "Escalation rate by area × month")
+```
+
+Per area amount of stops during time (per year, per month, per day)
+
+Per area escalation rate during time (per year, per month, per day)
+
+```{r area-by-weekend-vs-target}
+p1 <- ratio_by_cat_split(
+  DF = vehstops,
+  TARGET = arrested,
+  CAT    = area,
+  SPLIT  = weekend,
+  x_title = "Time bracket",
+  y_title = "Share of stops",
+  title   = "Escalation ratio by area (split by weekend)",
+  target_labels = c("Not escalated","Escalated"),
+  split_labels  = c("Weekday","Weekend")
+)
+
+p1
+```
+
+### Borough
+
+```{r boro-x-year-escalation}
+boro_order <- vehstops %>%
+  group_by(boro) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
+  arrange(rate) %>%
+  pull(boro)
+
+vehstops %>%
+  filter(!is.na(boro)) %>%
+  group_by(boro, year) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  mutate(boro = factor(boro, levels = boro_order)) %>%
+  ggplot(aes(year, boro, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = scales::percent) +
+  labs(x = "Year", y = "Borough", fill = "Rate",
+       title = "Escalation rate by borough × year")
+
+
+```
+
+```{r boro-x-month-escalation}
+boro_order <- vehstops %>%
+  group_by(boro) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
+  arrange(rate) %>%
+  pull(boro)
+
+vehstops %>%
+  filter(!is.na(boro)) %>%
+  group_by(boro, month) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  mutate(boro = factor(boro, levels = boro_order)) %>%
+  ggplot(aes(month, boro, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = scales::percent) +
+  labs(x = "Month", y = "Borough", fill = "Rate",
+       title = "Escalation rate by borough × month")
+```
+
+```{r boro-x-hour-escalation}
+boro_order <- vehstops %>%
+  group_by(boro) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
+  arrange(rate) %>%
+  pull(boro)
+
+vehstops %>%
+  filter(!is.na(boro)) %>%
+  group_by(boro, hour) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  mutate(boro = factor(boro, levels = boro_order)) %>%
+  ggplot(aes(hour, boro, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = scales::percent) +
+  labs(x = "Hour", y = "Borough", fill = "Rate",
+       title = "Escalation rate by borough × hour")
+```
+
+### Command Unit
+
+Per command unit amount of stops during time (per year, per month, per day)
+
+Per command unit escalation rate during time (per year, per month, per day)
+
+```{r}
+# # Borough × Time bracket (both categorical), hide very sparse cells
+# p1 <- heat_target_catcat(
+#   vehstops, Y = boro, X = time_bracket,
+#   X_TITLE = "Time bracket", Y_TITLE = "Borough",
+#   TITLE = "Escalation rate by borough × time bracket",
+#   min_n = 30, order_y_by = "rate", order_x_by = "freq", alpha_by_n = TRUE
+# )
+# 
+# # Cleaned vehicle category × Weekend (0/1 already labeled)
+# p2 <- heat_target_catcat(
+#   vehstops, Y = ethnicity, X = sex,
+#   "Sex", "ethnicity",
+#   "Rate by ethnicity × sex",
+#   min_n = 50, order_y_by = "freq", order_x_by = "freq"
+# )
+# 
+# 
+# p1
+# p2
+
+```
+
+```{r}
+# heat_target_catcat(
+#   vehstops, Y = ethnicity, X = sex,
+#   "Sex", "ethnicity",
+#   "Rate by ethnicity × sex",
+#   min_n = 50, order_y_by = "freq", order_x_by = "freq"
+# )
+```
+
+Unknown and Unknown matter somehow!!!
+
+```{r}
+# # Borough × hour (hide cells with < 50 stops)
+# p_boro_hour <- heat_escalation_yx(
+#   DF = vehstops, Y = boro, X = hour,
+#   X_TITLE = "Hour of day", Y_TITLE = "Borough",
+#   TITLE = "Escalation rate by borough × hour",
+#   min_n = 50
+# )
+# 
+# # Area × day-of-week (X is numeric 1–7)
+# p_area_dow <- heat_escalation_yx(
+#   vehstops, Y = area, X = dow,
+#   "Day of week (1–7)", "Area",
+#   "Escalation rate by area × DOW", min_n = 25
+# )
+# 
+# # If X is not integer-spaced (e.g., minute) treat as factor to make equal-width tiles
+# p_boro_min <- heat_escalation_yx(
+#   vehstops, Y = boro, X = minute,
+#   "Minute", "Borough", "Rate by borough × minute",
+#   x_as_factor = TRUE
+# )
+
+```
+
+```{r}
+#p_boro_hour
+#p_area_dow
+#p_boro_min
+```
+
+## Time related features
+
+### Hour
+
+#### Grouped by Month
+
+```{r month-lines}
+# TODO: use? Move to multivariate
+vehstops %>%
+  filter(year %in% c(2023, 2024, 2025)) %>%
+  group_by(year, month) %>%
+  summarize(stops = n(), .groups = "drop") %>%
+  ggplot(aes(month, stops, group = factor(year), linetype = factor(year))) +
+  geom_line(linewidth = 0.6) + geom_point(size = 1.5) +
+  scale_x_continuous(breaks = 1:12) +
+  labs(x = "Month", y = "Stops", linetype = "Year",
+       title = "Monthly stops: 2023–2025")
+```
+
+```{r hour-vs-stops-by-month}
+vehstops %>%
+  filter(month %in% c(1,2,3,4,5,6,7,8,9,10,11,12)) %>%
+  group_by(month, hour) %>%
+  summarize(stops = n(), .groups = "drop") %>%
+  ggplot(aes(hour, stops, group = factor(month), linetype = factor(month))) +
+  geom_line(linewidth = 0.6) + geom_point(size = 1.5) +
+  scale_x_continuous(breaks = 0:23) +
+  labs(x = "Hour", y = "Stops", linetype = "Month",
+       title = "Count of Hourly Stops by Month")
+```
+
+```{r hour-vs-dow-by-month}
+vehstops %>%
+  group_by(dow, hour) %>%
+  summarize(stops = n(), .groups = "drop") %>%
+  ggplot(aes(hour, stops, group = factor(dow), linetype = factor(dow))) +
+  geom_line(linewidth = 0.6) + geom_point(size = 1.5) +
+  scale_x_continuous(breaks = 0:23) +
+  labs(x = "Hour", y = "Stops", linetype = "Day of the Week",
+       title = "Count of Hourly Stops by Day of the Week")
+```
+
+```{r hour-vs-target-by-year}
+vehstops %>%
+  mutate(date = ymd(paste(year, month, day, sep = "-"))) %>%
+  group_by(month, hour) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  ggplot(aes(hour, rate, group = factor(month), linetype = factor(month))) +
+  geom_line(linewidth = 0.6) + geom_point(aes(size = n)) +
+  scale_y_continuous(labels = percent) +
+  scale_x_continuous(breaks = 0:23) +
+  labs(x = "Hour", y = "Event rate", linetype = "Hour", size = "Stops count",
+       title = "Hourly Escalation Rate by Month")
+```
+
+```{r dow-hour-heatmap}
+vehstops %>%
+  filter(!is.na(dow)) %>%
+  group_by(dow, hour) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  ggplot(aes(hour, dow, fill = rate)) +
+  geom_tile(width = 1, height = 1) +
+  scale_fill_viridis_c(labels = percent) +
+  scale_x_continuous(breaks = seq(0, 23, 1)) +
+  scale_y_continuous(breaks = seq(0, 7, 1)) +
+  labs(x = "Hour", y = "Day of week", fill = "Event rate",
+       title = "Escalation rate by day and hour")
+```
+
+#### Grouped by Year
+
+```{r hour-vs-stops-by-year}
+vehstops %>%
+  filter(year %in% c(2023, 2024, 2025)) %>%
+  group_by(year, hour) %>%
+  summarize(stops = n(), .groups = "drop") %>%
+  ggplot(aes(hour, stops, group = factor(year), linetype = factor(year))) +
+  geom_line(linewidth = 0.6) + geom_point(size = 1.5) +
+  scale_x_continuous(breaks = 0:23) +
+  labs(x = "Hour", y = "Stops", linetype = "Year",
+       title = "Count of Hourly stops by Year")
+```
+
+```{r hour-vs-any-escalation-by-year}
+vehstops %>%
+  mutate(date = ymd(paste(year, month, day, sep = "-"))) %>%
+  group_by(year, hour) %>%
+  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
+  ggplot(aes(hour, rate, group = factor(year), linetype = factor(year))) +
+  geom_line(linewidth = 0.6) + geom_point(aes(size = n)) +
+  scale_y_continuous(labels = percent) +
+  scale_x_continuous(breaks = 0:23) +
+  labs(x = "Hour", y = "Event rate", linetype = "Year", size = "Stops count",
+       title = "Hourly Escalation Rate by Year")
+```
+
+## Motorist related features
+
+### Reported Age
+
+```{r}
+ratio_by_cat_split(
+  DF = vehstops,
+  TARGET = arrested,
+  CAT    = age_bracket,
+  SPLIT  = sex,
+  x_title = "Reported Age bracket",
+  y_title = "Arrest Rate (%)",
+  title   = "Escalation ratio by reported age (split by weekend)",
+  target_labels = c("Not Arrested","Arrested"),
+  split_labels  = c("M", "F", "U")
+)
+```
+
+### Reported Sex
+
+### Reported Ethnicity
+
+------------------------------------------------------------------------
+
+# Recap
+
+------------------------------------------------------------------------
+
+# Final touches
+
+## Re-Ordering Features
+
+We re-order the features for better display
+
+```{r re-order-dataset}
+vehstops_ord <- vehstops %>%
+  select(
+    year, month, hot_season, weekday,
+    hour, time_bracket,
+    area, boro,
+    sex, ethnicity, 
+    age, age_bracket,
+    veh_checkpoint, arrested
+  )
+```
+
+Here is the final version.
+
+```{r summary-final-dataset}
+print(dfSummary(vehstops_ord), method="render")
+```
+
+## Saving the dataset
+
+```{r save-dataset}
+write.csv(vehstops_ord, "data/vehiclestops_2_wheels_final.csv", row.names = FALSE)
+```
