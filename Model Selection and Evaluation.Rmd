@@ -52,13 +52,24 @@ requirements <- c(
 ```
 
 ```{r install-requirements, include=FALSE}
-for (req in requirements) {
-  if (!requireNamespace(req, quietly = TRUE)) install.packages(req)
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      install.packages(req)
+  }
 }
 ```
 
+Note that some of the packages may not be used, but to avoid any error related to dependencies, we are going to keep all of these libraries. Now, the loading of all packages should be immediate.
+
 ```{r load-requirements, include=FALSE}
-for (req in requirements) library(req, character.only = TRUE)
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      library(req)
+  }
+}
+```
+
+```{r remove-vars, include=FALSE}
 rm(requirements, req)
 ```
 
@@ -312,22 +323,31 @@ For (a) and (b) we use the **likelihood ratio test**: `time_bracket` constrains 
 cv_auc <- function(formula, data, folds_vec) {
   k        <- max(folds_vec)
   auc_vals <- numeric(k)
+
   for (i in seq_len(k)) {
     tr  <- data[folds_vec != i, ]
     te  <- data[folds_vec == i, ]
+
     fit <- tryCatch(
       glm(formula, family = binomial, data = tr),
       error = function(e) NULL
     )
-    if (is.null(fit)) { auc_vals[i] <- NA_real_; next }
+
+    if (is.null(fit)) {
+      auc_vals[i] <- NA_real_;
+      next
+    }
+
     prob <- tryCatch(
       predict(fit, newdata = te, type = "response"),
       error = function(e) rep(NA_real_, nrow(te))
     )
+
     auc_vals[i] <- tryCatch(
       as.numeric(pROC::auc(te$arrested, prob, quiet = TRUE)),
       error = function(e) NA_real_
     )
+
   }
   mean(auc_vals, na.rm = TRUE)
 }
@@ -1022,9 +1042,14 @@ nb_cv_auc <- function(k, data, folds_vec, formula) {
   mean(auc_vals, na.rm = TRUE)
 }
 
-nb_aucs <- sapply(laplace_grid, nb_cv_auc,
-                  data = train, folds_vec = cv_folds, formula = f_final)
+nb_aucs <- sapply(
+  laplace_grid, nb_cv_auc,
+  data = train, folds_vec = cv_folds, 
+  formula = f_final
+  )
+
 best_laplace <- laplace_grid[which.max(nb_aucs)]
+
 cat("Best Laplace k:", best_laplace, " | CV AUC:", round(max(nb_aucs), 4), "\n")
 ```
 
@@ -1058,7 +1083,7 @@ Each table entry shows $\hat{P}(\text{feature level} \mid \text{class})$. Featur
 plot_nb_feature <- function(feature_name, mod) {
   tbl <- mod$tables[[feature_name]]
   as.data.frame(tbl) %>%
-    rename(level = 1, class = 2, prob = Freq) %>%
+    rename(level = 2, class = 1, prob = Freq) %>%
     mutate(class = factor(class, labels = c("Not arrested", "Arrested"))) %>%
     ggplot(aes(x = level, y = prob, fill = class)) +
     geom_col(position = position_dodge(width = 0.75), width = 0.65) +
@@ -1389,10 +1414,10 @@ bind_rows(
                   "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
   ) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = TRUE) %>%
-  row_spec(which.max(c(
-    as.numeric(pROC::auc(roc_logit)),
-    auc_qda, auc_nb, auc_lasso_min, auc_lasso_1se
-  )), bold = TRUE, colour = "white", background = "#2c7bb6")
+  row_spec(
+    which.max(c(as.numeric(pROC::auc(roc_logit)), auc_qda, auc_nb, auc_lasso_min, auc_lasso_1se)), 
+    bold = TRUE, color = "white", background = "#2c7bb6"
+    )
 ```
 
 The table reports AUC and PR-AUC as primary discrimination metrics, Log-Loss and Brier score as calibration metrics, and threshold-dependent metrics (Sensitivity, Specificity, Precision, F1, MCC, Balanced Accuracy) at each model's Youden-optimal threshold. Given the severe class imbalance (~5.5% positive rate), PR-AUC and MCC are more informative than raw accuracy or even balanced accuracy alone.
