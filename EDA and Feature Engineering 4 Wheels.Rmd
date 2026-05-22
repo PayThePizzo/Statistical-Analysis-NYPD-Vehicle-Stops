@@ -1108,15 +1108,6 @@ What can we say?
 -   Comment: Retaining `boro` rather than `area` increases the number of dummy variables in the model but also increases interpretability for readers familiar with NYC geography. The trade-off is additional degrees of freedom versus richer spatial resolution; this is a substantive modelling choice rather than a purely technical one.
 -   Proposed Action: Conduct a likelihood ratio test (or compare AICs) between a model using `area` and one using `boro` on the same data to empirically quantify whether the finer granularity of `boro` is warranted by the data.
 
-### Command Unit
-
-For what concerns `command`, we can say that \* Interpretation: This granularity is likely prohibitive for inference. \* Comment: Retaining this level of granularity creates a high risk of overfitting. \* Proposed Action: We will remove the feature, since there is no easy way to evaluate its role inside a parsimonious model.
-
-```{r drop-command}
-vehstops <- vehstops %>%
-  select(-command)
-```
-
 ### Latitude and Longitude
 
 For what concerns these two predictors, we will use the to plot a spatial heat map of the stops with these values available.
@@ -1581,53 +1572,6 @@ What can we say?
 -   Interpretation: The gentler weekly cycle for 4-wheel stops suggests that enforcement of this category is less tied to gig-economy work rhythms and more uniformly distributed across daily traffic patterns. While Tuesday–Thursday still concentrates more stops, the "Mid-Week Peak" hypothesis is less pronounced than for 2-wheel vehicles where delivery cycling dominates.
 -   Comment: The reduced weekly amplitude in 4-wheel enforcement implies that `dow` (or `weekend`) will carry less predictive signal in 4-wheel models than in 2-wheel models. Treating `weekend` as a simple binary may adequately capture the week-structure effect without requiring full day-of-week encoding.
 -   Proposed Action: Compare AIC between a model with a full 7-level `dow` factor versus a model with just the `weekend` binary for 4-wheel vehicles. Retain whichever specification achieves lower AIC; if both are equivalent, prefer the simpler binary for interpretability.
-
-### Weekend, Holiday and Event Day
-
-Let us see our feature-engineered variables.
-
-```{r weekend-holiday-event-distribution}
-p1 <- plot_binary_bar(
-  vehstops, weekend, 
-  "No", "Yes",
-  "", "Count", "During a weekend?"
-)
-
-p2 <- plot_binary_bar(
-  vehstops, holiday,
-  "No", "Yes",
-  "", "", "During an holiday?"
-)
-
-p3 <- plot_binary_bar(
-  vehstops, event_day,
-  "No", "Yes",
-  "", "", "During an event?"
-)
-
-(p1 + p2 + p3) + 
-  plot_layout(ncol = 3, nrow = 1, widths = c(1, 1), guides = "collect") +
-  plot_annotation(title = "When did the stop take place?") &
-  theme(legend.position = "bottom") 
-```
-
-```{r, include=FALSE}
-rm(p1, p2, p3)
-```
-
-What can we say?
-
--   Key finding: Enforcement is defined by routine, daily operations rather than event-based triggers. Among the three temporal variables analyzed, only "Weekend" status provides a meaningful statistical differentiation.
--   Interpretation: Police activity appears to be highly consistent, suggesting that enforcement is targeted at baseline daily traffic flow (likely commercial/commuter) rather than reacting to external calendar anomalies. The lack of variation during holidays and events indicates that these stops are not "surge" enforcement but rather a steady-state, daily commitment.
--   Comment: The "Holiday" and "Event" categories suffer from severe class imbalance (96–97% 'No'). Statistically, these features lack the variance required to train a robust model and will function more as "background noise" than as actionable predictive indicators.
--   Proposed Action: Exclude holiday and event_day from the feature set to reduce model complexity and prevent overfitting. Retain weekend as a core predictor.
-
-What can we say?
-
--   Key finding: The near-total concentration of 4-wheel vehicle stops on non-holiday, non-event days is even more pronounced than in the overall dataset, confirming that enforcement of this vehicle category is driven by routine daily operations rather than calendar-triggered deployments.
--   Interpretation: Unlike policing strategies that intensify around public events (e.g., DUI checkpoints on New Year's Eve), 4-wheel vehicle enforcement in our dataset appears to be an everyday operational baseline. The 96–97% non-holiday, non-event share means these two flags carry negligible discriminative information for our 4-wheel models.
--   Comment: The operational consistency implied by this distribution is actually informative for our research goal: it suggests that enforcement patterns for 4-wheel vehicles are systemic rather than episodic, making demographic and geographic predictors more meaningful than calendar-event markers for understanding where and to whom enforcement is applied.
--   Proposed Action: Drop `holiday` and `event_day` from the 4-wheel feature set immediately. Document this decision in the model selection notebook to ensure reproducibility.
 
 ### Hour, Working Hour and Time Bracket
 
@@ -3854,3 +3798,33 @@ ratio_by_cat_split(
 ### Reported Race
 
 ------------------------------------------------------------------------
+
+# Final touches
+
+## Re-Ordering Features
+
+We re-order the features for better display
+
+```{r re-order-dataset}
+vehstops_ord <- vehstops %>%
+  select(
+    year, month, weekday,
+    hour, time_bracket,
+    area, boro,
+    sex, ethnicity, 
+    age, age_bracket,
+    veh_checkpoint, arrested
+  )
+```
+
+Here is the final version.
+
+```{r summary-final-dataset}
+print(dfSummary(vehstops_ord), method="render")
+```
+
+## Saving the dataset
+
+```{r save-dataset}
+write.csv(vehstops_ord, "data/vehiclestops_4_wheels_final.csv", row.names = FALSE)
+```

@@ -1,6 +1,6 @@
 ---
 title: "Predicting Excessive Enforcement Patterns in Police Behavior After Vehicles Stops in New York"
-subtitle: "Model Selection and Evaluation - 2 Wheels Vehicles (Arrested)"
+subtitle: "Model Selection and Evaluation - 4 Wheels Vehicles (Arrested)"
 author: "Gianmaria Pizzo"
 output:
   html_document:
@@ -78,7 +78,7 @@ rm(requirements, req)
 # Data Loading and Preparation
 
 ```{r load-data}
-vehstop <- read.csv("data/vehiclestops_2_wheels_final.csv")
+vehstop <- read.csv("data/vehiclestops_4_wheels.csv")
 ```
 
 We convert all categorical predictors to factors and set interpretable reference levels before any modelling step, ensuring consistency between all downstream model fits and cross-validation folds.
@@ -218,7 +218,7 @@ We exponentiate the coefficients to obtain odds ratios (OR) and compute 95% prof
 ```{r odds-ratios-table}
 predictors <- c("year", "month", "weekday", "time_bracket", "boro", "sex", "ethnicity", "age_bracket")
 
-or_tbl <- tidy(mod_base, conf.int = TRUE, exponentiate = TRUE) %>%
+or_tbl <- tidy(mod_base, conf.int = TRUE, conf.method = "wald", exponentiate = TRUE) %>%
   filter(term != "(Intercept)") %>%
   mutate(
     group = purrr::map_chr(term, function(t) {
