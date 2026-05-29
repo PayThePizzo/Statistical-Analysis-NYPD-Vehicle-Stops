@@ -34,7 +34,7 @@ In particular, we focus on studying if there exist **relationships between arres
 
 However, some of the limiting factors for our study include:
 
-- The small window of time used to gather the data (around 3ys and 3 months);
+- The small window of time used to gather the data (around 3ys);
 - The absence of information about the reason behind the halt;
 - The self-report nature of some variables and the partial anonymization of the values.
 
@@ -64,7 +64,7 @@ We hope this analysis dissipates or pinpoints the police bias clearly, even with
 
 Obviously, we could not proceed forward if we did not have some designated questions for our data.
 
-**Is it more likely to be the subject of an arrest **...
+**Is it more likely to be the subject of an arrest** ...
 
 - When stopped in a specific area (or borough)?
 - When stopped during a specific time bracket (ex: 0am-3am)?
@@ -151,15 +151,15 @@ Here we try to introduce the data, elaborate on its nature and make hypothesis a
 
 ## Data Description
 
-The dataset was published during February 27th 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in April 28th 2026 and downloaded less than 13000 times at the time of download (End of May 2026).
+The dataset was published during February 27th 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in February 6th 2026 and downloaded less than 8000 times at the time of download (Mid March 2026).
 
 Let us load the data now.
 
 ```{r load-data}
-vehiclestops = read.csv("data/NYPD_Vehicle_Stop_Reports_20260529.csv")
+vehiclestops = read.csv("data/NYPD_Vehicle_Stop_Reports_20260319.csv")
 ```
 
-The [data overview landing page](https://data.cityofnewyork.us/Public-Safety/NYPD-Vehicle-Stop-Reports/hn9i-dwpr/about_data) confirms that the number of rows are 2.7M+ rows and has 19 columns
+The [data overview landing page](https://data.cityofnewyork.us/Public-Safety/NYPD-Vehicle-Stop-Reports/hn9i-dwpr/about_data) confirms that the number of rows are 2.48M+ rows and has 19 columns
 
 ```{r dim-data}
 dim(vehiclestops)
@@ -297,13 +297,13 @@ Although the first step, regarding `date` and `time`, should be to split the val
 
 In fact, by extracting the hour predictor (from the date) it is possible to create a new categorical predictor that **groups different time frames of the day with a label** (ex: assigning "early-morning" to time between and 5 AM and 7 AM). The main motivation behind this, is fact that hours, minutes or seconds alone may be good for visualization but they could be too fine-grained. This kind of feature engineering may prove more meaningful than representing time as a numerical predictor, as its behavior is circular, but we will have to assess this later.
 
-However, there is a caveat: the data spans throughout 3 years and three months (from beginning of 2023, to end of March 2026). This is one of the constraints that we cannot remove, but the volume of the data will still help us back up our claims in the end.
+However, there is a caveat: the data spans throughout 3 years. This is one of the constraints that we cannot remove, but the volume of the data will still help us back up our claims in the end.
 
 For future analysis, we should also dig into the NY community life and reveal the presence of manifestations, construction works and other aspects that can help us explain the patterns we are going to see.
 
 ### Geospatial Predictors
 
-Geospatial predictors like `latitude`, `longitude`, suffer from some **lack of information**. In fact, without checking null or 0 values, there is already around 7.4% of missing data. Also, there is evidence of errors in the range of `x_coord` and `y_coord`, which should not have values like `-74` or `40`. This indicates a mix-up with the previously mentioned columns. Fortunately, it is possible to convert one into the other and viceversa.
+Geospatial predictors like `latitude`, `longitude`, suffer from some **lack of information**. In fact, without checking null or 0 values, there is already 8% of missing data. Also, there is evidence of errors in the range of `x_coord` and `y_coord`, which should not have values like `-74` or `40`. This indicates a mix-up with the previously mentioned columns. Fortunately, it is possible to convert one into the other and viceversa.
 
 For what concerns the presence of 0 values in `latitude` and `longitude`, we guessed that it might depend on **whether the stop occurred at a fixed location (checkpoint) or not** (like a patrol stop or traffic violation observed in motion). In our case, we have to discard this other target because the analysis becomes extremely long.
 
@@ -341,9 +341,9 @@ When working with *self-reported demographic* predictors (age, sex, and ethnicit
 
 The `age` field, for instance, allows us to **segment drivers into age brackets** (like we would do for the time of the day). This idea comes from the fact, the preview highlights a good amount of stops involved people under 30 years of age. Thus (with a new representation) we might be able to confirm whether younger drivers are treated differently, such as being more likely to get arrested. More interesting aspects will emerge later on.
 
-For `sex`, we usually treat it as a binary or categorical variable, but the presence of `unknown` as a possibility may suggest that the form used by police officers is not "inclusive". By not being able to represent people that do not identify themselves with traditional labels "Male" or "Female", `15680` records are left with this ambiguous value. Unlike other numerical data, we have no means to impute this information, although our first thought would be assuming these persons are part of the LGBT+ community. On the other hand, the self-reported nature of the variable does not help us understand if the data was exploited by the motorist to take advantage of the line of defense that involve minorities, so we must take a faith leap on that. Anyway, we cannot just assume people belong to the LGBT+ community (even if we could check the statistics regarding the month of July, the international pride month), nor that they are always honest (especially with the police).
+For `sex`, we usually treat it as a binary or categorical variable, but the presence of `unknown` as a possibility may suggest that the form used by police officers is not "inclusive". By not being able to represent people that do not identify themselves with traditional labels "Male" or "Female", `15092` records are left with this ambiguous value. Unlike other numerical data, we have no means to impute this information, although our first thought would be assuming these persons are part of the LGBT+ community. On the other hand, the self-reported nature of the variable does not help us understand if the data was exploited by the motorist to take advantage of the line of defense that involve minorities, so we must take a faith leap on that. Anyway, we cannot just assume people belong to the LGBT+ community (even if we could check the statistics regarding the month of July, the international pride month), nor that they are always honest (especially with the police).
 
-The `ethnicity` variable is particularly important for identifying possible disparities. However, it is hard to understand how to approach the fact we have `8116` instances of `OTHER` values and `225975` of `UNKNOWN` values. They represent almost `10%` of the total data, and it seems hard even to distinguish between the meaning of other and unknown as labels. Again, this might be an attempt of forgery as a response to fear of police enforcement, but we can only make a weak assumption about this. We could pair the `UNKNOWN` and `OTHER` values for sex, age and ethnicity, to infer that this was an attempt to confound the stop agent, but it is hard to assess with certainty. Alternatively we can just merge rare categories in all predictors and discard extremely rare ones. We will see more about this later on.
+The `ethnicity` variable is particularly important for identifying possible disparities. However, it is hard to understand how to approach the fact we have `7374` instances of `OTHER` values and `221822` of `UNKNOWN` values. They represent almost `10%` of the total data, and it seems hard even to distinguish between the meaning of other and unknown as labels. Again, this might be an attempt of forgery as a response to fear of police enforcement, but we can only make a weak assumption about this. We could pair the `UNKNOWN` and `OTHER` values for sex, age and ethnicity, to infer that this was an attempt to confound the stop agent, but it is hard to assess with certainty. Alternatively we can just merge rare categories in all predictors and discard extremely rare ones. We will see more about this later on.
 
 Even if it is not counted as motorist-related, `veh_category` can be associated with the reasons behind a stop. For example, some officers may perceive young adults driving high-performance or "flashy" cars as reckless, or may hold biased views toward Black or Hispanic drivers behind the wheel of certain vehicles.
 
@@ -559,7 +559,7 @@ vehiclestops %>%
   count()
 ```
 
-`2337` arrests were made. 
+`2279` arrests were made. 
 
 So both numbers seem really important to us, and when considering the merged labels we would get the following
 
@@ -572,7 +572,7 @@ vehiclestops %>%
   count()
 ```
 
-We barely reach `2832` arrests, which seems a small number but not if we consider the proportion.
+We barely reach `2731` arrests, which seems a small number but not if we consider the proportion.
 
 For the time being, we can decide to leave the label `UNKNOWN` as a separated category, and wait for the EDA to decide whether it is best for us to merge it with the `Other` category.
 
@@ -832,7 +832,7 @@ vehiclestops %>%
   count()
 ```
 
-There might be hope for those `48` rows if we can use x and y.
+There might be hope for those `35` rows if we can use x and y.
 
 Now let us check the same problem for x and y coordinates.
 
@@ -878,7 +878,7 @@ vehiclestops %>%
   count()
 ```
 
-Well, `2548` total rows means that we should have only `32` rows with wrong entries (considering that we had `2503` rows with missing values).
+Well, `2535` total rows means that we should have only `32` rows with wrong entries (considering that we had `2503` rows with missing values).
 
 ```{r verify-rows}
 vehiclestops %>%
@@ -927,7 +927,7 @@ vehiclestops %>%
   count()
 ```
 
-For these `2513` rows, we probably have no hope to update their values. Although they represent only a small proportion of the data, we should still keep them to look for possible patterns (also because there is no missing value for command).
+For these `2500` rows, we probably have no hope to update their values. Although they represent only a small proportion of the data, we should still keep them to look for possible patterns (also because there is no missing value for command).
 
 Therefore, we want to replace NAs (in the respective columns) with `0.0` in order to later identify these problematic rows, because it is outside any possible geospatial range.
 
@@ -1049,7 +1049,7 @@ upset(
 )
 ```
 
-If we count the arrests, by adding the values related to `arrested` and its intersections, we have around 90k total instances. In case we exclude any possible intersection with the "unknown value", we are left with less than 85k rows which do not present any `Unknown` value for those 3 predictors. Thus, we have around 5k stops that resulted in arrests where we miss an at least one entry and removing them for possible forgery, could affect negatively our analysis.
+If we count the arrests, by adding the values related to `arrested` and its intersections, we have `81160` total instances. In case we exclude any possible intersection with the "unknown value", we are left with `76147` rows which do not present any `Unknown` value for those 3 predictors. Thus, we have `5013` stops (around 6%) that resulted in arrests where we miss an at least one entry and removing them for possible forgery, could affect negatively our analysis.
 
 At this point, as a change of strategy, we postpone any action related to this discussion after the EDA.
 
