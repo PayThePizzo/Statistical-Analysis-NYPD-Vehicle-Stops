@@ -64,7 +64,7 @@ Note that some of the packages may not be used, but to avoid any error related t
 ```{r load-requirements, include=FALSE}
 for (req in requirements){
   if (!require(req, character.only = TRUE)){
-      library(req)
+      library(req, character.only = TRUE)
   }
 }
 ```
@@ -218,9 +218,12 @@ We exponentiate the coefficients to obtain odds ratios (OR) and compute 95% prof
 ```{r odds-ratios-table}
 predictors <- c("year", "month", "weekday", "time_bracket", "boro", "sex", "ethnicity", "age_bracket")
 
-or_tbl <- tidy(mod_base, conf.int = TRUE, exponentiate = TRUE) %>%
+or_tbl <- tidy(mod_base, conf.int = FALSE, exponentiate = FALSE) %>%
   filter(term != "(Intercept)") %>%
   mutate(
+    conf.low  = exp(estimate - qnorm(0.975) * std.error),
+    conf.high = exp(estimate + qnorm(0.975) * std.error),
+    estimate  = exp(estimate),
     group = purrr::map_chr(term, function(t) {
       g <- predictors[purrr::map_lgl(predictors, ~ startsWith(t, .x))]
       if (length(g) == 0) "Other" else g[which.max(nchar(g))]
@@ -321,10 +324,9 @@ For (a) and (b) we use the **likelihood ratio test**: `time_bracket` constrains 
 
 ```{r cv-auc-function}
 cv_auc <- function(formula, data, folds_vec) {
-  k        <- max(folds_vec)
-  auc_vals <- numeric(k)
+  k <- max(folds_vec)
 
-  for (i in seq_len(k)) {
+  auc_vals <- parallel::mclapply(seq_len(k), function(i) {
     tr  <- data[folds_vec != i, ]
     te  <- data[folds_vec == i, ]
 
@@ -332,24 +334,20 @@ cv_auc <- function(formula, data, folds_vec) {
       glm(formula, family = binomial, data = tr),
       error = function(e) NULL
     )
-
-    if (is.null(fit)) {
-      auc_vals[i] <- NA_real_;
-      next
-    }
+    if (is.null(fit)) return(NA_real_)
 
     prob <- tryCatch(
       predict(fit, newdata = te, type = "response"),
       error = function(e) rep(NA_real_, nrow(te))
     )
 
-    auc_vals[i] <- tryCatch(
+    tryCatch(
       as.numeric(pROC::auc(te$arrested, prob, quiet = TRUE)),
       error = function(e) NA_real_
     )
+  }, mc.cores = parallel::detectCores() - 1)
 
-  }
-  mean(auc_vals, na.rm = TRUE)
+  mean(unlist(auc_vals), na.rm = TRUE)
 }
 
 # Shared fold assignment — same folds used for every model
@@ -535,12 +533,7 @@ tibble(
 
 ```{r summary-table, cache=TRUE}
 # Collect all AUC values (shared folds)
-auc_summary <- c(
-  cv_auc(f_base, train, cv_folds),
-  cv_auc(f_hour, train, cv_folds),
-  cv_auc(f_area, train, cv_folds),
-  cv_auc(f_age,  train, cv_folds)
-)
+auc_summary <- c(auc_base_a, auc_hour_a, auc_area_b, auc_age_c)
 
 models_list <- list(mod_base, mod_hour, mod_area, mod_age)
 
@@ -896,6 +889,370 @@ eval_quad_plot(test$arrested, prob_logit, "Logistic Regression")
 -   **PR curve**: More informative than ROC under class imbalance. A model with no skill scores PR-AUC ≈ prevalence (≈ 5.5%). PR-AUC above that baseline indicates genuine discrimination.
 -   **Calibration**: A well-calibrated model has predicted probabilities that match observed proportions. Curves bowing above the diagonal indicate under-confidence; below the diagonal indicates over-confidence.
 -   **Threshold analysis**: Shows how sensitivity, specificity, precision, and F1 change as the decision threshold varies. The Youden threshold maximises sensitivity + specificity − 1.
+
+---
+
+# ii-c · Interactions and Marginal Effects
+
+## Motivation
+
+The additive logistic model fitted in section ii-b (`mod_logit_best`) assumes that every predictor's contribution to the log-odds is independent of all other predictors. The EDA and the main-effects model suggest this may be too restrictive:
+
+-   **`ethnicity:sex`** — Both ethnicity and sex have significant main effects on arrest odds. If the male–female gap in arrests is systematically wider for some ethnic groups than others, the additive model misrepresents the data; the interaction term captures that differential.
+-   **`ethnicity:` + geographic variable** — Ethnic composition and police enforcement intensity co-vary by neighbourhood. If the ethnic disparity in arrest odds is structurally larger in some areas than others, the additive model distributes the geographic and demographic effects independently when in reality they overlap.
+
+We fit one model for each interaction, compare each against `mod_logit_best` via likelihood ratio test and BIC, then visualise the interaction on the probability scale through marginal effect plots.
+
+## Model Specifications
+
+```{r inter-formulas}
+f_inter1 <- update(f_final, ~ . + ethnicity:sex)
+f_inter2 <- update(f_final, as.formula(paste0("~ . + ethnicity:", use_geo)))
+
+cat("f_inter1 :", deparse(f_inter1), "\n\n")
+cat("f_inter2 :", deparse(f_inter2), "\n")
+```
+
+```{r inter-fit}
+mod_logit_inter1 <- glm(f_inter1, family = binomial, data = train)
+mod_logit_inter2 <- glm(f_inter2, family = binomial, data = train)
+```
+
+---
+
+## Model 1 — `ethnicity:sex`
+
+### Interaction Odds Ratios
+
+The interaction OR for the cell `ethnicity_X:sexF` answers: *relative to White males, is the female odds ratio for ethnic group X different from the female odds ratio for White motorists?* An OR > 1 means the sex gap is wider for that group; OR < 1 means it is narrower.
+
+```{r inter1-or-table}
+or_inter1 <- tidy(mod_logit_inter1, conf.int = FALSE, exponentiate = FALSE) %>%
+  filter(grepl(":", term)) %>%
+  mutate(
+    conf.low  = exp(estimate - qnorm(0.975) * std.error),
+    conf.high = exp(estimate + qnorm(0.975) * std.error),
+    estimate  = exp(estimate),
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    )
+  ) %>%
+  select(term, estimate, conf.low, conf.high, p.value, sig)
+
+or_inter1 %>%
+  kbl(
+    digits    = 3,
+    caption   = "Model 1 (ethnicity:sex) — Interaction odds ratios with 95% CI",
+    col.names = c("Term", "OR", "CI 2.5%", "CI 97.5%", "p-value", "")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
+```
+
+### LRT and BIC vs `mod_logit_best`
+
+```{r inter1-lrt}
+lrt_inter1 <- anova(mod_logit_best, mod_logit_inter1, test = "Chisq")
+chi_i1 <- lrt_inter1[["Deviance"]][2]
+df_i1  <- lrt_inter1[["Df"]][2]
+p_i1   <- lrt_inter1[["Pr(>Chi)"]][2]
+bic_i1_base  <- BIC(mod_logit_best)
+bic_i1_inter <- BIC(mod_logit_inter1)
+
+cat(sprintf(
+  "LRT (ethnicity:sex): χ²(%d) = %.2f,  p = %.4g\n",
+  df_i1, chi_i1, p_i1
+))
+cat(sprintf(
+  "BIC — mod_logit_best: %.1f  |  mod_logit_inter1: %.1f  |  ΔBIC = %.1f\n",
+  bic_i1_base, bic_i1_inter, bic_i1_inter - bic_i1_base
+))
+```
+
+A significant LRT ($p < 0.05$) indicates the sex effect on arrest probability is not uniform across ethnic groups. ΔBIC > 0 means the extra parameters are not justified on parsimony grounds even if the LRT rejects; ΔBIC < 0 means the interaction is both statistically and informationally beneficial.
+
+---
+
+## Model 2 — `ethnicity:` + geographic variable
+
+### Interaction Odds Ratios
+
+Each interaction OR answers: *for motorists of ethnic group X, is the area-specific odds ratio for arrest different from the area-specific OR for White motorists?*
+
+```{r inter2-or-table}
+or_inter2 <- tidy(mod_logit_inter2, conf.int = FALSE, exponentiate = FALSE) %>%
+  filter(grepl(":", term)) %>%
+  mutate(
+    conf.low  = exp(estimate - qnorm(0.975) * std.error),
+    conf.high = exp(estimate + qnorm(0.975) * std.error),
+    estimate  = exp(estimate),
+    sig = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    )
+  ) %>%
+  select(term, estimate, conf.low, conf.high, p.value, sig)
+
+or_inter2 %>%
+  kbl(
+    digits    = 3,
+    caption   = paste0("Model 2 (ethnicity:", use_geo, ") — Interaction odds ratios with 95% CI"),
+    col.names = c("Term", "OR", "CI 2.5%", "CI 97.5%", "p-value", "")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
+```
+
+### LRT and BIC vs `mod_logit_best`
+
+```{r inter2-lrt}
+lrt_inter2 <- anova(mod_logit_best, mod_logit_inter2, test = "Chisq")
+chi_i2 <- lrt_inter2[["Deviance"]][2]
+df_i2  <- lrt_inter2[["Df"]][2]
+p_i2   <- lrt_inter2[["Pr(>Chi)"]][2]
+bic_i2_base  <- BIC(mod_logit_best)
+bic_i2_inter <- BIC(mod_logit_inter2)
+
+cat(sprintf(
+  "LRT (ethnicity:%s): χ²(%d) = %.2f,  p = %.4g\n",
+  use_geo, df_i2, chi_i2, p_i2
+))
+cat(sprintf(
+  "BIC — mod_logit_best: %.1f  |  mod_logit_inter2: %.1f  |  ΔBIC = %.1f\n",
+  bic_i2_base, bic_i2_inter, bic_i2_inter - bic_i2_base
+))
+```
+
+---
+
+## Joint AIC / BIC / LRT Summary
+
+```{r inter-joint-comparison}
+aic_inter <- AIC(mod_logit_best, mod_logit_inter1, mod_logit_inter2)
+bic_inter <- BIC(mod_logit_best, mod_logit_inter1, mod_logit_inter2)
+
+tibble(
+  Model     = c(
+    "mod_logit_best (additive)",
+    "mod_logit_inter1  (+ethnicity:sex)",
+    paste0("mod_logit_inter2  (+ethnicity:", use_geo, ")")
+  ),
+  df        = aic_inter$df,
+  AIC       = round(aic_inter$AIC, 1),
+  BIC       = round(bic_inter$BIC, 1),
+  delta_AIC = round(aic_inter$AIC - min(aic_inter$AIC), 1),
+  delta_BIC = round(bic_inter$BIC - min(bic_inter$BIC), 1)
+) %>%
+  kbl(
+    caption   = "AIC / BIC — mod_logit_best vs interaction models (lower is better)",
+    col.names = c("Model", "# Param", "AIC", "BIC", "Δ AIC", "Δ BIC")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+  row_spec(which.min(bic_inter$BIC), bold = TRUE, color = "white", background = "#2c7bb6")
+```
+
+```{r inter-lrt-summary}
+tibble(
+  Comparison = c(
+    "mod_logit_best → mod_logit_inter1  (ethnicity:sex)",
+    paste0("mod_logit_best → mod_logit_inter2  (ethnicity:", use_geo, ")")
+  ),
+  `χ²`    = round(c(chi_i1, chi_i2), 2),
+  df      = c(df_i1, df_i2),
+  p_value = signif(c(p_i1, p_i2), 3),
+  ΔBIC    = round(c(bic_i1_inter - bic_i1_base, bic_i2_inter - bic_i2_base), 1),
+  verdict = case_when(
+    p_i1 < 0.05 & (bic_i1_inter - bic_i1_base) < 0 ~ "Supported (LRT sig + BIC ↓)",
+    p_i1 < 0.05 ~ "Detectable but costly (LRT sig, BIC ↑)",
+    TRUE ~ "Not supported"
+  ) %>% c(
+    case_when(
+      p_i2 < 0.05 & (bic_i2_inter - bic_i2_base) < 0 ~ "Supported (LRT sig + BIC ↓)",
+      p_i2 < 0.05 ~ "Detectable but costly (LRT sig, BIC ↑)",
+      TRUE ~ "Not supported"
+    )
+  )
+) %>%
+  kbl(caption = "Likelihood ratio tests and BIC change: additive vs each interaction model") %>%
+  kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
+```
+
+**Interpretation guide:**
+
+-   LRT significant + ΔBIC < 0: the interaction is both statistically detectable and informationally justified — include it.
+-   LRT significant + ΔBIC > 0: the interaction is real but the number of extra parameters exceeds the BIC penalty budget — the additive model is preferred on parsimony grounds.
+-   LRT non-significant: no evidence of genuine non-additivity at the 5% level.
+
+---
+
+## Marginal Effects
+
+Predicted probabilities are computed by fixing all non-focal predictors at their modal (most frequent) training-set value and varying the two focal predictors across all level combinations. This isolates the interaction pattern on the probability scale.
+
+```{r inter-helpers}
+# One-row data frame of modal / median values for a set of variable names
+build_modal_row <- function(data, vars) {
+  row_list <- lapply(vars, function(v) {
+    x <- data[[v]]
+    if (is.factor(x)) {
+      factor(names(sort(table(x), decreasing = TRUE))[1], levels = levels(x))
+    } else if (is.numeric(x)) {
+      median(x, na.rm = TRUE)
+    } else {
+      names(sort(table(x), decreasing = TRUE))[1]
+    }
+  })
+  as.data.frame(setNames(row_list, vars))
+}
+```
+
+### Model 1 — Predicted P(arrested = 1) by Ethnicity × Sex
+
+```{r inter1-marginal-plot, fig.width=9, fig.height=4.5}
+vars_i1    <- setdiff(all.vars(f_inter1)[-1], c("ethnicity", "sex"))
+modal_i1   <- build_modal_row(train, vars_i1)
+
+pred_grid1 <- expand.grid(
+  ethnicity = levels(train$ethnicity),
+  sex       = levels(train$sex)
+)
+pred_grid1 <- cbind(pred_grid1, modal_i1[rep(1L, nrow(pred_grid1)), , drop = FALSE])
+rownames(pred_grid1) <- NULL
+pred_grid1$prob <- predict(mod_logit_inter1, newdata = pred_grid1, type = "response")
+
+ggplot(pred_grid1, aes(x = ethnicity, y = prob, fill = sex)) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.65) +
+  geom_text(
+    aes(label = scales::percent(prob, accuracy = 0.1)),
+    position = position_dodge(width = 0.75),
+    vjust = -0.4, size = 3
+  ) +
+  scale_fill_viridis_d(option = "mako", begin = 0.25, end = 0.75) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 0.1),
+    expand = expansion(mult = c(0, 0.12))
+  ) +
+  labs(
+    x        = "Ethnicity",
+    y        = "Predicted P(arrested = 1)",
+    fill     = "Sex",
+    title    = "Model 1 — Marginal predicted arrest probability: Ethnicity × Sex",
+    subtitle = "All other predictors held at modal training values",
+    caption  = "mod_logit_inter1: f_final + ethnicity:sex"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x      = element_text(angle = 30, hjust = 1),
+    legend.position  = "bottom",
+    panel.grid.minor = element_blank()
+  )
+```
+
+### Model 2 — Predicted P(arrested = 1) by Ethnicity × Geography
+
+```{r inter2-marginal-plot, fig.width=10, fig.height=5}
+vars_i2  <- setdiff(all.vars(f_inter2)[-1], c("ethnicity", use_geo))
+modal_i2 <- build_modal_row(train, vars_i2)
+
+geo_levels <- levels(train[[use_geo]])
+pred_grid2 <- expand.grid(
+  ethnicity = levels(train$ethnicity),
+  geo__     = geo_levels,
+  stringsAsFactors = FALSE
+)
+names(pred_grid2)[2] <- use_geo
+pred_grid2[[use_geo]] <- factor(pred_grid2[[use_geo]], levels = geo_levels)
+
+pred_grid2 <- cbind(pred_grid2, modal_i2[rep(1L, nrow(pred_grid2)), , drop = FALSE])
+rownames(pred_grid2) <- NULL
+pred_grid2$prob <- predict(mod_logit_inter2, newdata = pred_grid2, type = "response")
+
+ggplot(pred_grid2, aes(x = ethnicity, y = prob, fill = .data[[use_geo]])) +
+  geom_col(position = position_dodge(width = 0.75), width = 0.65) +
+  scale_fill_viridis_d(option = "turbo", begin = 0.05, end = 0.92) +
+  scale_y_continuous(
+    labels = scales::percent_format(accuracy = 0.1),
+    expand = expansion(mult = c(0, 0.08))
+  ) +
+  labs(
+    x        = "Ethnicity",
+    y        = "Predicted P(arrested = 1)",
+    fill     = use_geo,
+    title    = paste0("Model 2 — Marginal predicted arrest probability: Ethnicity × ", use_geo),
+    subtitle = "All other predictors held at modal training values",
+    caption  = paste0("mod_logit_inter2: f_final + ethnicity:", use_geo)
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x      = element_text(angle = 30, hjust = 1),
+    legend.position  = "bottom",
+    panel.grid.minor = element_blank()
+  )
+```
+
+### Model 2 — Interaction Heatmap
+
+The heatmap surface makes deviations from a pure additive pattern immediately visible: under pure additivity the colour gradient across each row would be identical; any row that breaks the uniform pattern reveals an interaction effect.
+
+```{r inter2-heatmap, fig.width=9, fig.height=4.5}
+ggplot(pred_grid2, aes(x = .data[[use_geo]], y = ethnicity, fill = prob)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  geom_text(aes(label = scales::percent(prob, accuracy = 0.1)), size = 3.2, fontface = "bold") +
+  scale_fill_gradient2(
+    low      = "#4575b4",
+    mid      = "#ffffbf",
+    high     = "#d73027",
+    midpoint = mean(pred_grid2$prob),
+    labels   = scales::percent_format(accuracy = 0.1),
+    name     = "P(arrested)"
+  ) +
+  labs(
+    x        = use_geo,
+    y        = "Ethnicity",
+    title    = paste0("Model 2 — P(arrested=1) surface: Ethnicity × ", use_geo),
+    subtitle = "Non-uniform colour rows signal interaction; all other predictors at modal values",
+    caption  = paste0("mod_logit_inter2: f_final + ethnicity:", use_geo)
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x     = element_text(angle = 30, hjust = 1),
+    panel.grid      = element_blank(),
+    legend.position = "right"
+  )
+```
+
+---
+
+## Test Set Evaluation
+
+```{r inter-test-eval}
+prob_inter1 <- predict(mod_logit_inter1, newdata = test, type = "response")
+prob_inter2 <- predict(mod_logit_inter2, newdata = test, type = "response")
+
+bind_rows(
+  compute_metrics(test$arrested, prob_logit,   "mod_logit_best (additive)"),
+  compute_metrics(test$arrested, prob_inter1,  "mod_logit_inter1  (+ethnicity:sex)"),
+  compute_metrics(test$arrested, prob_inter2,  paste0("mod_logit_inter2  (+ethnicity:", use_geo, ")"))
+) %>%
+  kbl(
+    caption   = "Interaction models vs mod_logit_best — test set metrics (Youden threshold)",
+    col.names = c("Model","AUC","PR-AUC","Log-Loss","Brier",
+                  "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+```
+
+### Notes
+
+-   **LRT significance**: A significant LRT indicates genuine non-additivity — the combined ethnicity–sex (or ethnicity–geography) effect cannot be decomposed into independent additive contributions. This is a statistical claim, not a causal one.
+-   **BIC as parsimony judge**: BIC penalises model complexity more heavily than AIC (penalty $\ln n$ vs 2 per parameter). Given ~5.5% positive-class prevalence and sparse ethnicity × area cells in 2-wheel stops, BIC is the more appropriate arbiter of whether the interaction parameters are earning their keep.
+-   **Marginal effect plots**: Probabilities are computed at modal covariate values, not averaged over the full covariate distribution. Patterns visible here are interpretable as the interaction effect *at the modal stop profile*; marginal standardisation (average marginal effects) would give a population-averaged estimate but requires more computation.
+-   **Observational caution**: Disparities in predicted probabilities across demographic groups are associations in observational, self-reported data. They may reflect policing patterns, reporting artefacts, or data collection differences rather than causal differences in underlying behaviour. Comparative interpretations across ethnic groups must be made with this limitation in mind.
 
 ---
 
@@ -1975,7 +2332,7 @@ Predictors with $\text{GVIF}^{1/(2\,\text{df})} > \sqrt{5}$ (red bars, if any) s
 
 Cook's Distance measures how much all fitted values change when observation $i$ is deleted. Values above $4/n$ (a common rule of thumb) flag leverage points that may disproportionately drive the estimates.
 
-```{r logit-influence, fig.width=10, fig.height=8}
+```{r logit-influence, fig.width=10, fig.height=8, cache=TRUE}
 car::influenceIndexPlot(
   mod_logit_best,
   vars  = c("Cook", "hat", "Studentized"),
