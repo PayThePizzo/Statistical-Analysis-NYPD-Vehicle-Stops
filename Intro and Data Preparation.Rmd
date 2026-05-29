@@ -30,13 +30,13 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 As the title of the project suggests, the goal of the project is to assess **whether** we can affirm that the **police behavior shows excessive enforcement patterns**, after a vehicle stop has been conducted.
 
-In particular, we focus on studying if there exist **relationships between** **vehicle checkpoints** or **arrests**, and **specific groups of people**, time frames, or areas. This should help to shed some light on the alleged "systemic nature" of the stops.
+In particular, we focus on studying if there exist **relationships between arrests specific groups of people**, time frames, or areas. This should help to shed some light on the alleged "systemic nature" of the stops.
 
 However, some of the limiting factors for our study include:
 
--   The small window of time used to gather the data (around 3ys);
--   The absence of information about the reason behind the halt;
--   The self-report nature of some variables and the partial anonymization of the values.
+- The small window of time used to gather the data (around 3ys and 3 months);
+- The absence of information about the reason behind the halt;
+- The self-report nature of some variables and the partial anonymization of the values.
 
 Thus, this analysis will not be limited to performing basic univariate, bivariate or multivariate exploratory analysis. Instead, we first **start from formatting/converting the data** in a way we can understand the meaning of each variable, and the issues that come with it.
 
@@ -64,20 +64,20 @@ We hope this analysis dissipates or pinpoints the police bias clearly, even with
 
 Obviously, we could not proceed forward if we did not have some designated questions for our data.
 
-**Is it more likely to be the subject of an arrest or a vehicle checkpoint**...
+**Is it more likely to be the subject of an arrest **...
 
--   When stopped in a specific area (or borough)?
--   When stopped during a specific time bracket (ex: 0am-3am)?
--   When stopped during a specific day of the week or weekend (ex: Saturday/Sunday)?
--   If the driver is under 35 years old or if they belong to a specific age bracket (ex: 18-24)?
--   If the driver belongs to a specific reported ethnicity?
--   If the driver identifies with a specific reported sex?
--   If the vehicles used belongs to a specific category (ex: 2-Wheels vs 4-Wheels)?
+- When stopped in a specific area (or borough)?
+- When stopped during a specific time bracket (ex: 0am-3am)?
+- When stopped during a specific day of the week or weekend (ex: Saturday/Sunday)?
+- If the driver is under 35 years old or if they belong to a specific age bracket (ex: 18-24)?
+- If the driver belongs to a specific reported ethnicity?
+- If the driver identifies with a specific reported sex?
+- If the vehicles used belongs to a specific category (ex: 2-Wheels vs 4-Wheels)?
 
 Furthermore, we may also formulate questions of the kind:
 
--   Is there a specific sub-category of drivers (grouped by reported sex and/or reported ethnicity and/or reported age) that is subject of most of these episodes?
--   Is there a specific reported ethnicity targeted by excessive enforcement behavior in a particular area/borough?
+- Is there a specific sub-category of drivers (grouped by reported sex and/or reported ethnicity and/or reported age) that is subject of most of these episodes?
+- Is there a specific reported ethnicity targeted by excessive enforcement behavior in a particular area/borough?
 
 Finally, these questions will be refined as we proceed with exploration and analysis.
 
@@ -87,21 +87,21 @@ The ultimate goal of this file is to build a dataset ready for EDA (Exploratory 
 
 This includes
 
--   Environment Creation, to prepare the dependencies for the R packages used;
+- Environment Creation, to prepare the dependencies for the R packages used;
 
--   Data Overview, to show how the original data looks like;
+- Data Overview, to show how the original data looks like;
 
--   Type Conversion, to match the original purpose (and format) of the predictors with the R environment (without loss of consistency);
+- Type Conversion, to match the original purpose (and format) of the predictors with the R environment (without loss of consistency);
 
--   Initial Feature Engineering, to create new predictors that may be better suited for our analysis and to modify their value range when possible (ex: merging very rare categories);
+- Initial Feature Engineering, to create new predictors that may be better suited for our analysis and to modify their value range when possible (ex: merging very rare categories);
 
--   Feature Removal, to drop predictors that may negatively affect our models or that are known to lead to over-fitting/under-fitting;
+- Feature Removal, to drop predictors that may negatively affect our models or that are known to lead to over-fitting/under-fitting;
 
--   Data Coherency Check, to ensure that the actual range of values matches what we expect;
+- Initial Data Coherency Check, to ensure that the actual range of values matches what we expect;
 
--   Data Cleaning, to remove rows that show obvious outliers and extremely rare categories/values;
+- Initial Data Cleaning, to remove rows that show obvious outliers and extremely rare categories/values;
 
--   Data Correction, to impute missing values and to modify inconsistent ones, by exploiting the correct portion of the data or using other predictors (which may contain similar info).
+- Initial Data Correction, to impute missing values and to modify inconsistent ones, by exploiting the correct portion of the data or using other predictors (which may contain similar info).
 
 Note that, from now on, I will shift to a more **formal or inclusive tone** (e.g., the "editorial we").
 
@@ -151,15 +151,15 @@ Here we try to introduce the data, elaborate on its nature and make hypothesis a
 
 ## Data Description
 
-The dataset was published during February 27th 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in February 6th 2026 and downloaded less than 8000 times at the time of download (Mid March 2026).
+The dataset was published during February 27th 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in April 28th 2026 and downloaded less than 13000 times at the time of download (End of May 2026).
 
 Let us load the data now.
 
 ```{r load-data}
-vehiclestops = read.csv("data/NYPD_Vehicle_Stop_Reports_20260319.csv")
+vehiclestops = read.csv("data/NYPD_Vehicle_Stop_Reports_20260529.csv")
 ```
 
-The [data overview landing page](https://data.cityofnewyork.us/Public-Safety/NYPD-Vehicle-Stop-Reports/hn9i-dwpr/about_data) confirms that the number of rows are 2.48M+ rows and has 19 columns
+The [data overview landing page](https://data.cityofnewyork.us/Public-Safety/NYPD-Vehicle-Stop-Reports/hn9i-dwpr/about_data) confirms that the number of rows are 2.7M+ rows and has 19 columns
 
 ```{r dim-data}
 dim(vehiclestops)
@@ -215,7 +215,7 @@ We can make an exception for `EVNT_KEY`, as it is a row identifier, not a predic
 vehiclestops <- vehiclestops %>% select(-EVNT_KEY)
 ```
 
-Since we **are focusing on arrests and checkpoints**, we took the decision to remove predictors that really represent other possible targets and may affect the interpretation. To justify this, we must consider that it is not possible to deliver a coherent analysis that also takes into account all the possible escalation interpretations. Further motivations will be later introduced.
+Since we **are focusing on arrests**, we took the decision to remove predictors that really represent other possible targets and may affect the interpretation. To justify this, we must consider that it is not possible to deliver a coherent analysis that also takes into account all the possible escalation interpretations. Further motivations will be later introduced.
 
 ```{r remove-extra-targets}
 # Remove SUMMON_ISSUED_FLG
@@ -232,6 +232,9 @@ vehiclestops <- vehiclestops %>% select(-VEH_SEIZED_FLG)
 
 # Remove FORCE_USED_FLG
 vehiclestops <- vehiclestops %>% select(-FORCE_USED_FLG)
+
+# Remove VEH_CHECKPOINT_FLG
+vehiclestops <- vehiclestops %>% select(-VEH_CHECKPOINT_FLG)
 ```
 
 ### Feature Renaming
@@ -247,9 +250,6 @@ vehiclestops <- rename(vehiclestops, time = OCCUR_TM)
 
 # CMD_CD -> command
 vehiclestops <- rename(vehiclestops, command = CMD_CD)
-
-# VEH_CHECKPOINT_FLG -> checkpoint
-vehiclestops <- rename(vehiclestops, veh_checkpoint = VEH_CHECKPOINT_FLG)
 
 # ARREST_MADE_FLG -> arrested
 vehiclestops <- rename(vehiclestops, arrested = ARREST_MADE_FLG)
@@ -297,15 +297,15 @@ Although the first step, regarding `date` and `time`, should be to split the val
 
 In fact, by extracting the hour predictor (from the date) it is possible to create a new categorical predictor that **groups different time frames of the day with a label** (ex: assigning "early-morning" to time between and 5 AM and 7 AM). The main motivation behind this, is fact that hours, minutes or seconds alone may be good for visualization but they could be too fine-grained. This kind of feature engineering may prove more meaningful than representing time as a numerical predictor, as its behavior is circular, but we will have to assess this later.
 
-However, there is a caveat: the data spans throughout 3 years. This is one of the constraints that we cannot remove, but the volume of the data will still help us back up our claims in the end.
+However, there is a caveat: the data spans throughout 3 years and three months (from beginning of 2023, to end of March 2026). This is one of the constraints that we cannot remove, but the volume of the data will still help us back up our claims in the end.
 
 For future analysis, we should also dig into the NY community life and reveal the presence of manifestations, construction works and other aspects that can help us explain the patterns we are going to see.
 
-### Geospatial Predictors and `veh_checkpoint`
+### Geospatial Predictors
 
-Geospatial predictors like `latitude`, `longitude`, suffer from some **lack of information**. In fact, without checking null or 0 values, there is already 8% of missing data. Also, there is evidence of errors in the range of `x_coord` and `y_coord`, which should not have values like `-74` or `40`. This indicates a mix-up with the previously mentioned columns. Fortunately, it is possible to convert one into the other and viceversa.
+Geospatial predictors like `latitude`, `longitude`, suffer from some **lack of information**. In fact, without checking null or 0 values, there is already around 7.4% of missing data. Also, there is evidence of errors in the range of `x_coord` and `y_coord`, which should not have values like `-74` or `40`. This indicates a mix-up with the previously mentioned columns. Fortunately, it is possible to convert one into the other and viceversa.
 
-For what concerns the presence of 0 values in `latitude` and `longitude`, we guessed that it might depend on **whether the stop occurred at a fixed location (checkpoint) or not** (like a patrol stop or traffic violation observed in motion). As stated before, this is represented by the `veh_checkpoint`, one of the two targets we are considering.
+For what concerns the presence of 0 values in `latitude` and `longitude`, we guessed that it might depend on **whether the stop occurred at a fixed location (checkpoint) or not** (like a patrol stop or traffic violation observed in motion). In our case, we have to discard this other target because the analysis becomes extremely long.
 
 Thus, some could argue that it was the result of an anonymization of the location, as we are dealing with sensitive or standardized information. On the other hand it could be due to how the data is managed by the system: officers (on the checkpoint location), or an automatic system, might just fill the data for one stop, while the remaining ones are simply set to 0.
 
@@ -341,9 +341,9 @@ When working with *self-reported demographic* predictors (age, sex, and ethnicit
 
 The `age` field, for instance, allows us to **segment drivers into age brackets** (like we would do for the time of the day). This idea comes from the fact, the preview highlights a good amount of stops involved people under 30 years of age. Thus (with a new representation) we might be able to confirm whether younger drivers are treated differently, such as being more likely to get arrested. More interesting aspects will emerge later on.
 
-For `sex`, we usually treat it as a binary or categorical variable, but the presence of `unknown` as a possibility may suggest that the form used by police officers is not "inclusive". By not being able to represent people that do not identify themselves with traditional labels "Male" or "Female", `15092` records are left with this ambiguous value. Unlike other numerical data, we have no means to impute this information, although our first thought would be assuming these persons are part of the LGBT+ community. On the other hand, the self-reported nature of the variable does not help us understand if the data was exploited by the motorist to take advantage of the line of defense that involve minorities, so we must take a faith leap on that. Anyway, we cannot just assume people belong to the LGBT+ community (even if we could check the statistics regarding the month of July, the international pride month), nor that they are always honest (especially with the police).
+For `sex`, we usually treat it as a binary or categorical variable, but the presence of `unknown` as a possibility may suggest that the form used by police officers is not "inclusive". By not being able to represent people that do not identify themselves with traditional labels "Male" or "Female", `15680` records are left with this ambiguous value. Unlike other numerical data, we have no means to impute this information, although our first thought would be assuming these persons are part of the LGBT+ community. On the other hand, the self-reported nature of the variable does not help us understand if the data was exploited by the motorist to take advantage of the line of defense that involve minorities, so we must take a faith leap on that. Anyway, we cannot just assume people belong to the LGBT+ community (even if we could check the statistics regarding the month of July, the international pride month), nor that they are always honest (especially with the police).
 
-The `ethnicity` variable is particularly important for identifying possible disparities. However, it is hard to understand how to approach the fact we have `7374` instances of `OTHER` values and `221822` of `UNKNOWN` values. They represent almost `10%` of the total data, and it seems hard even to distinguish between the meaning of other and unknown as labels. Again, this might be an attempt of forgery as a response to fear of police enforcement, but we can only make a weak assumption about this. We could pair the `UNKNOWN` and `OTHER` values for sex, age and ethnicity, to infer that this was an attempt to confound the stop agent, but it is hard to assess with certainty. Alternatively we can just merge rare categories in all predictors and discard extremely rare ones. We will see more about this later on.
+The `ethnicity` variable is particularly important for identifying possible disparities. However, it is hard to understand how to approach the fact we have `8116` instances of `OTHER` values and `225975` of `UNKNOWN` values. They represent almost `10%` of the total data, and it seems hard even to distinguish between the meaning of other and unknown as labels. Again, this might be an attempt of forgery as a response to fear of police enforcement, but we can only make a weak assumption about this. We could pair the `UNKNOWN` and `OTHER` values for sex, age and ethnicity, to infer that this was an attempt to confound the stop agent, but it is hard to assess with certainty. Alternatively we can just merge rare categories in all predictors and discard extremely rare ones. We will see more about this later on.
 
 Even if it is not counted as motorist-related, `veh_category` can be associated with the reasons behind a stop. For example, some officers may perceive young adults driving high-performance or "flashy" cars as reckless, or may hold biased views toward Black or Hispanic drivers behind the wheel of certain vehicles.
 
@@ -408,8 +408,8 @@ vehiclestops$minute <- as.numeric(sapply(strsplit(vehiclestops$time, ":"), `[`, 
 
 Now let us add
 
--   A categorical variable that indicates the name of the day as `weekday`,
--   The `dow` or "day of the week" which is the related integer number(1-7),
+- A categorical variable that indicates the name of the day as `weekday`,
+- The `dow` or "day of the week" which is the related integer number(1-7),
 
 ```{r add-weekday-dow-weekend}
 # Get days in american format
@@ -445,12 +445,12 @@ vehiclestops <- vehiclestops %>%
 
 Last but not least, we now try to use the time to build the time bracket (we talked about earlier) for the time of the day:
 
--   **Late night**: 0–3
--   **Early morning**: 4–7
--   **Morning commute**: 8–11
--   **Midday**: 12–15
--   **Afternoon / early evening**: 16–19
--   **Night**: 20–23
+- **Late night**: 0–3
+- **Early morning**: 4–7
+- **Morning commute**: 8–11
+- **Midday**: 12–15
+- **Afternoon / early evening**: 16–19
+- **Night**: 20–23
 
 This should capture the night life, rush hour and the 9-5 window well.
 
@@ -494,13 +494,13 @@ In case we find out about a better way to group them, we will modify this featur
 
 Although, age bracketing is a bit subjective, in criminology and traffic safety research there are some conventions we can borrow to add more meaning to the age:
 
--   **\<18**, *Underage drivers* (possible in the USA).
--   **18–24**, *Young adults* (usually perceived as the highest risk-taking).
--   **25–34**, *Early adults* (still younger drivers).
--   **35–44**, *Mid adults*.
--   **45–54**, *Older mid adults*.
--   **55–64**, *Pre-retirement group*.
--   **65+**, *Seniors* (sometimes higher stop rates due to cautiousness or strange behavior).
+- **\<18**, *Underage drivers* (possible in the USA).
+- **18–24**, *Young adults* (usually perceived as the highest risk-taking).
+- **25–34**, *Early adults* (still younger drivers).
+- **35–44**, *Mid adults*.
+- **45–54**, *Older mid adults*.
+- **55–64**, *Pre-retirement group*.
+- **65+**, *Seniors* (sometimes higher stop rates due to cautiousness or strange behavior).
 
 For what concerns missing values we are going to dedicate an `Unknown` label. We are not going to start removing instances of drivers over 100 years old even if they are to be considered very rare cases or attempts of forgery. This will be done later.
 
@@ -559,18 +559,7 @@ vehiclestops %>%
   count()
 ```
 
-`2279` arrests were made. What about the vehicle checkpoints?
-
-```{r count-veh-checkpoints-ethnicity-unknown}
-vehiclestops %>%
-  filter(
-   ethnicity == "UNKNOWN" &
-   veh_checkpoint == "true"
-  ) %>%
-  count()
-```
-
-`13131` of these stops were vehicle checkpoints.
+`2337` arrests were made. 
 
 So both numbers seem really important to us, and when considering the merged labels we would get the following
 
@@ -583,18 +572,7 @@ vehiclestops %>%
   count()
 ```
 
-We barely reach `2731` arrests, which seems a small number but not if we consider the proportion. What about the vehicle checkpoints?
-
-```{r count-veh-checkpoints-rare-ethnicities}
-vehiclestops %>%
-  filter(
-   ethnicity %in% c("AMERICAN INDIAN/ALASKAN NATIVE", "UNKNOWN", "OTHER") &
-   veh_checkpoint == "true"
-  ) %>%
-  count()
-```
-
-The same consideration can be made of the `17096` checkpoints!
+We barely reach `2832` arrests, which seems a small number but not if we consider the proportion.
 
 For the time being, we can decide to leave the label `UNKNOWN` as a separated category, and wait for the EDA to decide whether it is best for us to merge it with the `Other` category.
 
@@ -617,15 +595,15 @@ vehiclestops <- vehiclestops %>%
 
 Based on what the NYPD documentation describes these means of transports, we believe they mean the following:
 
--   `CAR/SUV` are the standard passenger vehicles.
--   `MCL` stands for *motorcycle*.
--   `BIKE` stands for *bicycle* (non-motorized).
--   `TLC` stands for *Taxi & Limousine Commission* licensed vehicles (yellow cabs, green cabs or Uber/Lyft registered under TLC).
--   `TRUCK/BUS` stands for commercial trucks and buses (delivery trucks and private buses).
--   `OTHER` is the category used for any vehicle that does not fit the listed categories.
--   `(null)` is used for missing entries.
--   `MOPED` should be referring to small motorized scooter (with a smaller engine than motorcycles).
--   `DBIKE` probably is used for *dirt bike* (typically used for off-road rides, and we do not know whether it is street-legal).
+- `CAR/SUV` are the standard passenger vehicles.
+- `MCL` stands for *motorcycle*.
+- `BIKE` stands for *bicycle* (non-motorized).
+- `TLC` stands for *Taxi & Limousine Commission* licensed vehicles (yellow cabs, green cabs or Uber/Lyft registered under TLC).
+- `TRUCK/BUS` stands for commercial trucks and buses (delivery trucks and private buses).
+- `OTHER` is the category used for any vehicle that does not fit the listed categories.
+- `(null)` is used for missing entries.
+- `MOPED` should be referring to small motorized scooter (with a smaller engine than motorcycles).
+- `DBIKE` probably is used for *dirt bike* (typically used for off-road rides, and we do not know whether it is street-legal).
 
 From this, we gather that we generally can distinguish between 4 wheels and 2 wheels, and between private and commercial vehicles. We **decide to focus exclusively on private vehicles**, which bring us to exclude the `TLC` and `TRUCK/BUS` categories. This includes removing `(null)` entries.
 
@@ -712,7 +690,7 @@ vehiclestops <- vehiclestops %>%
   )
 ```
 
-Even though there are 2 areas with the 114 command unit, we are going to aggregate it to queens. Obviously, not all the command units are there but this is good enough.
+Even though there are 2 areas with the 114 command unit, we are going to aggregate it to queens. Evidently, not all the command units are there but this is good enough.
 
 ### Adding borough feature from command units
 
@@ -754,21 +732,9 @@ rm(
   )
 ```
 
-## Targets type conversion
+## Target type conversion
 
 Obviously, we cannot leave the features as the check boxes they represent, we must use a different approach. Since it is easier to use numerical variables initially, we will turn the categorical labels `"true/false"` to numerical ones `1/0`.
-
-First goes the `veh_checkpoint`
-
-```{r numerical-veh-checkpoint}
-# Make numerical
-vehiclestops$veh_checkpoint <- case_when(
-  vehiclestops$veh_checkpoint == "true" ~ 1,
-  vehiclestops$veh_checkpoint == "false" ~ 0,
-  vehiclestops$veh_checkpoint == "(null)" ~ NA_real_,
-  TRUE ~ NA_real_
-)
-```
 
 ```{r numerical-arrested}
 # Make numerical
@@ -866,7 +832,7 @@ vehiclestops %>%
   count()
 ```
 
-There might be hope for those `35` rows if we can use x and y.
+There might be hope for those `48` rows if we can use x and y.
 
 Now let us check the same problem for x and y coordinates.
 
@@ -884,8 +850,8 @@ However, we have only have `2503` NA values, way less problematic with respect t
 
 Now, we still need to address the possible wrong values in the respective coordinates, in order to correct default behavior and wrong entries. We want verify that:
 
--   For the x coordinate, the minimum value must be strictly above 0, as in the worst case the wrong values would range from -74 to 0.
--   For the y coordinate, we just need to filter the values to be above 40 (following the same line of thought).
+- For the x coordinate, the minimum value must be strictly above 0, as in the worst case the wrong values would range from -74 to 0.
+- For the y coordinate, we just need to filter the values to be above 40 (following the same line of thought).
 
 ```{r x-coord-range}
 vehiclestops %>%
@@ -912,7 +878,7 @@ vehiclestops %>%
   count()
 ```
 
-Well, `2535` total rows means that we should have only `32` rows with wrong entries (considering that we had `2503` rows with missing values).
+Well, `2548` total rows means that we should have only `32` rows with wrong entries (considering that we had `2503` rows with missing values).
 
 ```{r verify-rows}
 vehiclestops %>%
@@ -924,8 +890,8 @@ This confirms the hypothesis.
 
 As of now, unless the information related latitude and longitude (of the corresponding rows) is missing or wrong, we can use it to infer the correct values for these entries. Let us see
 
--   How many rows have both correct latitude and longitude coordinates, but wrong or missing x,y coordinates;
--   How many rows have correct latitude but wrong or missing x, and correct longitude but wrong or missing y.
+- How many rows have both correct latitude and longitude coordinates, but wrong or missing x,y coordinates;
+- How many rows have correct latitude but wrong or missing x, and correct longitude but wrong or missing y.
 
 ```{r rows-w-correct-lat-long-and-wrong-x-y}
 vehiclestops %>%
@@ -961,7 +927,7 @@ vehiclestops %>%
   count()
 ```
 
-For these `2500` rows, we probably have no hope to update their values. Although they represent only a small proportion of the data, we should still keep them to look for possible patterns (also because there is no missing value for command).
+For these `2513` rows, we probably have no hope to update their values. Although they represent only a small proportion of the data, we should still keep them to look for possible patterns (also because there is no missing value for command).
 
 Therefore, we want to replace NAs (in the respective columns) with `0.0` in order to later identify these problematic rows, because it is outside any possible geospatial range.
 
@@ -1042,9 +1008,9 @@ vehiclestops <- vehiclestops %>%
 
 For what concerns `command`, we can say that
 
--   Interpretation: This granularity level is likely prohibitive for both exploration and inference.
--   Comment: Retaining this level of granularity creates a high risk of overfitting.
--   Proposed Action: We will remove the feature, since there is no easy way to evaluate its role inside a parsimonious model.
+- Interpretation: This granularity level is likely prohibitive for both exploration and inference.
+- Comment: Retaining this level of granularity creates a high risk of overfitting.
+- Proposed Action: We will remove the feature, since there is no easy way to evaluate its role inside a parsimonious model.
 
 ```{r drop-command}
 vehiclestops <- vehiclestops %>%
@@ -1083,28 +1049,7 @@ upset(
 )
 ```
 
-If we count the arrests, by adding the values related to `arrested` and its intersections, we have `81160` total instances. In case we exclude any possible intersection with the "unknown value", we are left with `76147` rows which do not present any `Unknown` value for those 3 predictors. Thus, we have `5013` stops (around 6%) that resulted in arrests where we miss an at least one entry and removing them for possible forgery, could affect negatively our analysis.
-
-What about the checkpoints?
-
-```{r unknown-intersect-veh-checkpoints}
-# Select the relevant columns (must be 0/1 or logical)
-stops_bin <- vehiclestops %>%
-  dplyr::select(age_unknown, ethnicity_unknown, sex_unknown, veh_checkpoint)
-
-# Make sure values are 0/1 (not NA/strings)
-stops_bin[is.na(stops_bin)] <- 0
-
-# Plot intersections
-upset(
-  stops_bin, 
-  sets = c("age_unknown","ethnicity_unknown","sex_unknown", "veh_checkpoint"),
-  sets.bar.color = "firebrick", 
-  order.by = "freq"
-)
-```
-
-Now, the intersections make up for `14702` instances, which represents 9% if we consider a total of `153108` instances. In fact, the rows which do not have any "unknown" value are `138406`.
+If we count the arrests, by adding the values related to `arrested` and its intersections, we have around 90k total instances. In case we exclude any possible intersection with the "unknown value", we are left with less than 85k rows which do not present any `Unknown` value for those 3 predictors. Thus, we have around 5k stops that resulted in arrests where we miss an at least one entry and removing them for possible forgery, could affect negatively our analysis.
 
 At this point, as a change of strategy, we postpone any action related to this discussion after the EDA.
 
@@ -1129,8 +1074,7 @@ vehiclestops_ord <- vehiclestops %>%
     hour, time_bracket, 
     latitude, longitude, area, boro,
     sex, ethnicity, age, age_bracket,
-    veh_categ,
-    veh_checkpoint, arrested,
+    veh_categ, arrested,
   )
 ```
 
