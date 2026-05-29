@@ -19,45 +19,41 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 These `.Rmd` files represent the project submission for the course [Statistical Inference and Learning](https://www.unive.it/data/course/521944) by Professor [Cristiano Varin](https://www.unive.it/data/people/5592728) at [Ca' Foscari University of Venice](https://www.unive.it/) for the year 2025/2026.
 
 # Problem Statement
 
-## Goal of this rmarkdown file - TODO
+## Goal of this rmarkdown file
 
-This notebook serves as the primary Exploratory Data Analysis (EDA) and (final) Feature Engineering phase for the project.
+This notebook serves as the primary Exploratory Data Analysis (EDA) and (final) Feature Engineering phase for the project. In particular, we focus solely on **2-Wheeled Vehicles** (including e-bikes, motorcycles, and mopeds).
 
-Our specific focus is narrowed to **2-Wheeled Vehicles** (including e-bikes, motorcycles, and mopeds), a segment of NYC traffic that has seen a 2.5-fold increase in stop volume between 2023 and 2025 (which will be later shown). The goal is to identify the latent features that characterize two rare but critical police actions: **Arrests** and **Vehicle Checkpoints**.
+The reason for this is the fact that, these vehicles, have been the subject a of 2.5x increase in stop volume in NYC between 2023 and 2025 (which will be later shown). Furthermore, they show a completely separate behavior with respect to vehicles with four wheels (due to environmental factors like temperature and weather).
+
+The goal is to identify the features that characterize **arrests**.
 
 We approach the dataset through three methodological phases to ensure a robust base for modeling:
 
-1.  **Univariate Analysis: Feature Integrity and Outlier Detection**. We begin by scrutinizing individual predictors to understand their distributions and handle data quality issues. This includes addressing the extreme class imbalance and filtering outliers.
+1.  **Univariate Analysis**. We begin by analyzing the distributions of individual predictors to understand whether the data shows quality issues, outliers, rare categories, etc...
 
-2.  **Bivariate Analysis: Predictive Signal and Initial Associations**. We evaluate the relationship between potential predictors and our binary targets (`arrested` and `veh_checkpoint`). Given the categorical nature of our data, we utilize **Cramer’s V** as a measure of effect size to rank feature importance, moving beyond the hypersensitivity of p-values in a large-sample environment.
+2.  **Bivariate Analysis**. We evaluate the relationship between potential predictors and our binary target (`arrested`). Given the categorical nature of our data, we will mainly uses **Cramer’s V** as a starting point to measure of effect size. This stage should also point out if predictors have some kind of relation.
 
-3.  **Multivariate Analysis: Interaction and Collinearity Resolution**. Finally, we explore complex interactions. This stage is critical for addressing multicollinearity early on, ensuring that redundant predictors do not inflate the estimates of our final models.
+3.  **Multivariate Analysis**. Finally, we explore some complex interactions. This stage is needed to address multicollinearity early on. In fact, we try to ensure that redundant predictors do not inflate the estimates of our final models.
 
-The way we decided to guide the reader through the Exploratory Data Analysis, is based on four key points that we try to include for any plot:
+
+Under these premises, we will plot many aspects of the data. Therefore, the way we decided to guide the reader through the Exploratory Data Analysis, is based on four key points that we try to include for any plot:
 
 - **Key finding**: This paragraph describes the main takeaway of the means of visualization employed. This should be a concise description of what we can gather from the plots.
 - **Interpretation**: Here we deal with an objective interpretation of our finding, such as understanding how our EDA is affected by . We also detail about how this affects our current framework and
 - **Comment**: After a formal description, we deal with a more informal discussion that should highlight the qualitative aspects of the analysis. This paragraph is a fusion of previous considerations that we want the reader to be aware of, and a space for us to reason.
 - **Proposed Action**: Finally, we switch to a more pragmatic discussion to understand "what to do next", on the basis of what was previously presented. Without claim of completeness, we will name some best-practices, guidelines or ideas about what is best for our goal. We may also limit ourselves to inform the reader that we decided to take no action at all or post-pone it after further investigation.
 
-## Key Objectives - TODO
-
-Throughout this exploration, we remain vigilant for: \* **Spatial Drift:** Understanding if enforcement intensity follows traffic volume or neighborhood-specific mandates. \* **Seasonal Amplification:** Analyzing how the "Hot Season" (April–October) structurally alters the enforcement landscape. \* **Informative Missingness:** Investigating whether "Unknown" labels in demographics like age or ethnicity correlate with higher arrest probabilities.
-
-By the conclusion of this notebook, we will have transformed raw observational data into a refined, engineered feature set.
 
 ## Important Note
 
 We previously stated that we restricted the data to private vehicles. However, it is not possible for us to evaluate whether some of the vehicles aggregated here are used for delivery businesses, even though they are privately owned. In fact, the dataset does not take into account this aspect and we do not have enough info to provide a distinction. Therefore, the only comment we can make about this is that, they mostly operate during 17-22pm, and could contribute to an increased total volume of stops.
-
-TODO: Sistema i plot per renderli visualizzabili
 
 ------------------------------------------------------------------------
 
@@ -828,7 +824,7 @@ plot_temporal_split <- function(
   DF, X_VAR, Z_VAR, TARGET = NULL, 
   metric = c("rate", "freq"), 
   style = c("overlay", "facet"),
-  x_title = "Tempo", y_title = NULL, title = "Trend Temporale"
+  x_title = "Time Feature", y_title = NULL, title = "Time Trend"
 ) {
   
   metric <- match.arg(metric)
@@ -837,7 +833,7 @@ plot_temporal_split <- function(
   # Step 1: Sicurezza per il Target
   target_quo <- rlang::enquo(TARGET)
   if (metric == "rate" && rlang::quo_is_null(target_quo)) {
-    stop("Errore: Devi specificare la colonna TARGET se usi metric = 'rate'.")
+    stop("Error: You must specify TARGET col if you use metric = 'rate'.")
   }
   
   # Step 2: Estrazione variabili principali
@@ -865,14 +861,14 @@ plot_temporal_split <- function(
       group_by(.z, .x) %>%
       summarise(y_val = mean(.t_bin == 1), n = n(), .groups = "drop")
     
-    if (is.null(y_title)) y_title <- "Tasso (%)"
+    if (is.null(y_title)) y_title <- "Rate (%)"
     
   } else { # metric == "freq"
     plot_df <- dat %>%
       group_by(.z, .x) %>%
       summarise(y_val = n(), n = n(), .groups = "drop")
     
-    if (is.null(y_title)) y_title <- "Numero di Stop"
+    if (is.null(y_title)) y_title <- "Stop Count"
   }
   
   # Assicuriamoci che l'asse X sia trattato correttamente nel disegno delle linee
@@ -948,54 +944,32 @@ This preview is already interesting.
 
 # Univariate EDA
 
-In this phase of the analysis, we perform a rigorous univariate examination of our target variables and key predictors identified through prior domain knowledge. Our objective is to establish a high-integrity baseline for modeling by "polishing" the raw data, by:
-
-- **Bias Mitigation:** We identify and isolate outliers that could introduce systematic bias into our predictions.
-- **Distributional Integrity:** We analyze the frequency and spread of each feature.
-- **Feature Engineering:** We derive new, high-signal variables through transformations and combinations of existing data.
-
 ## Targets
 
 ```{r enforcement-dist}
 p1 <- plot_binary_bar(
-  vehstops, veh_checkpoint, 
-  "No", "Yes",
-  "", "Count", "Was it a vehicle checkpoint?"
-)
-
-p2 <- plot_binary_bar(
   vehstops, arrested, 
   "No", "Yes",
-  "", "", "Was the motorist arrested?"
+  "Was the motorist arrested?", "Count (Rate %)", ""
 )
 
-row1 <- p1 | p2
+row1 <- p1
 
-row1 +
-plot_layout(heights = c(1, 0.080, 1), guides = "collect") + 
+row1 + 
 plot_annotation(title = "Distribution of 2-Wheels Vehicles Stops by Target") &
 theme(legend.position = "bottom") 
 ```
 
-```{r fig.height = 12, fig.width = 8}
-plot_temporal_split(
-  vehstops, X_VAR = hour, Z_VAR = area, TARGET = arrested, 
-  metric = "rate", 
-  style = "facet",
-  x_title = "Tempo", y_title = NULL, title = "Trend Temporale"
-)
-```
-
 ```{r, include=FALSE}
-rm(p1, p2, row1)
+rm(p1, row1)
 ```
 
 What can we say?
 
-- **Key finding**: The dataset, for 2 wheels-vehicles, **exhibits extreme class imbalance**. Vehicle checkpoints are highly sparse, representing only approximately 1.4% of the total stops (2,691 "Yes" out of 189,610 total records). The same goes for arrests which happen approximately 5.6% of the times (10,560 "Yes" out of 189,610 total records).
-- **Interpretation**: Both targets constitute "rare events" when we contemplate the stops of 2-wheels vehicles. The distribution of `veh_checkpoint` indicates that the vast majority of stops are tied to standard patrol or traffic-related events. In fact, checkpoint operations are infrequent activities. On the other hand, arrests are more frequent than checkpoint stops by a factor of nearly 4:1, but they still remain an infrequent occurrence with respect to the total volume of police interactions.
-- **Comment**: The high class disparity *renders global accuracy a limiting metric* for our models' evaluation. This is due to the fact a predictive model optimizing for accuracy could attain an score of \~98.6% by simply classifying every stop as "No". Therefore, it completely fails to capture the latent features that characterize a checkpoint stop. This is also sub-optimal for our research, as capturing true arrest patterns is central to our investigation into enforcement bias.
-- **Proposed Action**: Although we could employ cost-sensitive learning models, this is outside the scope of the course. Given the limitations of our available model suite, we will **employ stratified down-sampling of the majority class** ("No") to create a balanced training set, ensuring compatibility across all models (LDA, QDA, KNN, etc...). For the **GLM-based models** (Logistic, Lasso, Ridge), we will specifically **utilize observation weighting within the likelihood function** to account for the class disparity. Finally, we will move away from the default 0.5 classification threshold, **optimizing the decision boundary based on the Precision-Recall curve** to ensure our model maintains sensitivity to the minority class ("Yes").
+- **Key finding**: The dataset, for 2 wheels-vehicles, **exhibits extreme class imbalance**. Arrests are highly sparse, representing only approximately 5.6% of the times (10,560 "Yes" out of 189,610 total records).
+- **Interpretation**: The target constitutes "rare event" when we contemplate the stops of 2-wheels vehicles. In fact, they remain an infrequent occurrence with respect to the total volume of police stops.
+- **Comment**: The high class disparity *makes accuracy a limiting metric* for our models' evaluation. This is due to the fact a predictive model aiming for accuracy could achieve a high score by simply classifying every stop as "No". Therefore, it completely fails to capture the what characterizes an arrest after a stop. This is also sub-optimal for our research, as capturing the true patterns is what drives our investigation towards enforcement bias.
+- **Proposed Action**: Although we could employ cost-sensitive learning models, this is outside the scope of the course. As an alternative, we will **employ stratified down-sampling of the majority class** ("No") to create a balanced training set, ensuring compatibility across all models (LDA, QDA, KNN, etc...). For the **GLM-based models** (Logistic, Lasso, Ridge), we will specifically **utilize observation weighting within the likelihood function** to account for the class disparity. Finally, we will move away from the default 0.5 classification threshold, **optimizing the decision boundary based on the Precision-Recall curve** to ensure our model maintains sensitivity to the minority class ("Yes").
 
 ## Command Unit, Geospatial and Area-related predictors
 
@@ -1754,6 +1728,34 @@ What can we say?
 - Comment: The steep drop-off after age 40 creates high-leverage conditions for older age bins in any model using continuous `age`. A single linear coefficient cannot capture the sharp non-linearity; the bracket encoding is therefore superior to the raw numeric predictor.
 - Proposed Action: Filter your dataset to exclude drivers over age 75. This clarifies the "true" shape of your enforcement curve without losing actionable predictive signal. Collapse Sparse Brackets: Since the 55–64 and 65+ buckets have significantly lower counts than the 25–34 bucket, consider collapsing all drivers aged 55+ into a single "55+" category. This increases the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic. After checking ratio. This clarifies the "true" shape of your enforcement curve without losing actionable predictive signal. Collapse Sparse Brackets: Since the 55–64 and 65+ buckets have significantly lower counts than the 25–34 bucket, consider collapsing all drivers aged 55+ into a single "55+" category. This increases the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic. After checking ratio.
 
+
+```{r age-outlier-boxplot-before}
+vehstops %>%
+  filter(!is.na(age)) %>%
+  ggplot(aes(y = age)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6, width = 0.4,
+               outlier.size = 1.5, outlier.alpha = 0.4) +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    plot.title         = element_text(size = 14),
+    plot.subtitle      = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title    = "Age Distribution after Outlier Removal (76+ excluded)",
+    subtitle = "Remaining values span the plausible 16–75 enforcement range",
+    y = "Reported Age", x = NULL
+  )
+```
+
+What can we say?
+
+- Key finding: 
+- Interpretation: 
+- Comment:
+- Proposed Action:
+
 TODO: Boxplot to justfy this removal TODO: In 4-wheels, change this accordingly
 
 ```{r remove-age-outliers}
@@ -1762,6 +1764,34 @@ vehstops <- vehstops %>%
 ```
 
 From now on we will consider drivers of age in the range 16-75.
+
+
+```{r age-outlier-boxplot-after}
+vehstops %>%
+  filter(!is.na(age)) %>%
+  ggplot(aes(y = age)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6, width = 0.4,
+               outlier.size = 1.5, outlier.alpha = 0.4) +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    plot.title         = element_text(size = 14),
+    plot.subtitle      = element_text(color = "grey50", size = 10)
+  ) +
+  labs(
+    title    = "Age Distribution after Outlier Removal (76+ excluded)",
+    subtitle = "Remaining values span the plausible 16–75 enforcement range",
+    y = "Reported Age", x = NULL
+  )
+```
+
+What can we say?
+
+- Key finding: After removing riders aged 76+, the remaining distribution is right-skewed with the median around 28–32 and the IQR roughly 22–40. The residual "outliers" shown by the boxplot (ages \~65–75) are plausible and are retained.
+- Interpretation: The right skew confirms the gig-economy delivery worker demographic profile. The sparse upper tail (55–75) consists of recreational riders and retirees whose low volume reduces their enforcement exposure.
+- Comment: The steep drop-off after age 40 means older ages have high statistical leverage if continuous `age` is used — a small number of observations at unusual predictor values can pull coefficients. The bracket encoding mitigates this by pooling sparse ages into wider bins.
+- Proposed Action: Use `age_bracket` as the primary age predictor. Retain continuous `age` for non-parametric diagnostics only.
 
 ### Reported Sex
 
@@ -1839,7 +1869,7 @@ columns <- c(
   "hour", "time_bracket",
   "area", "boro", 
   "sex", "ethnicity", "age", "age_bracket",
-  "veh_checkpoint", "arrested"
+  "arrested"
   )
 
 plot_categorical_correlation(
@@ -1851,19 +1881,19 @@ plot_categorical_correlation(
 
 What can we say? Arrested and Veh Checkpoint is mostly associated with (sex?), age/age_bracket, ethnicity, area/boro, year, month/hot_seson, and hour/time_bracket
 
-- Key finding: No single categorical predictor achieves a strong Cramer's V (\> 0.30) with either `arrested` or `veh_checkpoint`. The highest individual associations with the targets are modest, suggesting that predictive signal is distributed across many weakly informative features. The strongest associations in the matrix are between pairs of redundant predictors: `month` ↔ `hot_season` (definitional overlap), `age` ↔ `age_bracket` (re-encoding), and `area` ↔ `boro` (hierarchical geography).
+- Key finding: No single categorical predictor achieves a strong Cramer's V (\> 0.30) with `arrested`. The highest individual associations with the targets are modest, suggesting that predictive signal is distributed across many weakly informative features. The strongest associations in the matrix are between pairs of redundant predictors: `month` ↔ `hot_season` (definitional overlap), `age` ↔ `age_bracket` (re-encoding), and `area` ↔ `boro` (hierarchical geography).
 - Interpretation: The low values across the arrested row suggest that no single categorical feature is a "smoking gun" for predicting an arrest on its own. The classification problem is inherently multivariate — no variable alone differentiates arrested from non-arrested stops. This is consistent with enforcement being a complex interaction of time, location, and demographic factors simultaneously.
 - Comment: With \~185k observations, Cramer's V is the right measure here — chi-squared p-values are essentially meaningless at this sample size since nearly any association achieves p \< 0.001. Cramer's V between 0.10–0.20 represents a weak-to-moderate practical effect; above 0.30 is strong. The matrix also flags potential collinearity pairs: including both `month` and `hot_season`, or both `area` and `boro`, in the same model would be redundant.
 - Proposed Action: Do not use this matrix to rank-order individual predictors for inclusion. Instead, use LASSO with cross-validation to identify the optimal combination of features. Remove one member of each high-V pair (`hot_season` over `month` for parsimony; `boro` over `area` if CV supports it). The pair `age` ↔ `age_bracket` is a re-encoding choice — use only one.
 
-For bikers we have association: - arrested: sex, ethnicity, age/age_bracket, area/boro, year, month/hot_season, hour/time_bracket (same veh_checkpoint). - sex: ethnicity, age/age_bracket, area/boro,
+For bikers we have association: - arrested: sex, ethnicity, age/age_bracket, area/boro, year, month/hot_season, hour/time_bracket. - sex: ethnicity, age/age_bracket, area/boro,
 
 We replot
 
 ```{r categorical-correlation-heatmap2}
 # TODO
 columns <- c(
-  "arrested", "veh_checkpoint","sex", "ethnicity", "age", "boro", 
+  "arrested", "sex", "ethnicity", "age", "boro", 
   "year" , "month", "hot_season", "weekday",
   "hour")
 
@@ -1880,7 +1910,7 @@ TODO: Comment that we can still check pearson's correlation of numerical columns
 
 ```{r}
 numerical_cols <- c(
-  "arrested", "veh_checkpoint",
+  "arrested",
   "year", "month", "day", "hour", 
   "latitude", "longitude", 
   "age"
@@ -1908,30 +1938,6 @@ We proceed now to bivariate analysis after completing coherency and quality chec
 ## Coherency and Quality Checks
 
 Before bivariate analysis we verify data integrity: impossible flag combinations, coordinate validity, residual age outliers, and whether any predictor–outcome cell combinations are so sparse they will destabilize model coefficients.
-
-### Target Co-occurrence
-
-A stop can logically be both a checkpoint stop and result in arrest. We verify this cell is populated and contains no impossible values.
-
-```{r target-cooccurrence}
-vehstops %>%
-  count(veh_checkpoint, arrested) %>%
-  mutate(
-    veh_checkpoint = factor(veh_checkpoint, levels = c(0, 1),
-                            labels = c("No Checkpoint", "Checkpoint")),
-    arrested       = factor(arrested,       levels = c(0, 1),
-                            labels = c("Not Arrested",  "Arrested")),
-    pct = scales::percent(n / sum(n), accuracy = 0.01)
-  ) %>%
-  arrange(desc(n))
-```
-
-What can we say?
-
-- Key finding: All four combinations of `veh_checkpoint` × `arrested` are populated. The dominant cell is No Checkpoint × Not Arrested, as expected given the rarity of both outcomes (\~94% of stops). The checkpoint-and-arrested cell exists, confirming the two flags are not mutually exclusive.
-- Interpretation: A checkpoint stop that escalates to an arrest is operationally coherent — officers at a checkpoint may discover grounds for arrest (outstanding warrant, illegal vehicle modification, etc.). The co-occurrence means we cannot treat the two targets as strictly hierarchical.
-- Comment: The joint probability of both outcomes is very small, so collinearity between the two binary targets is negligible. They can be modeled independently without risk of perfect separation from this co-occurrence alone.
-- Proposed Action: Use `any_escalation = (veh_checkpoint | arrested)` as a combined flag for exploratory analysis, but train separate models for each binary outcome in the modeling notebook.
 
 ### Coordinate Validity
 
@@ -1962,120 +1968,9 @@ What can we say?
 - Comment: For non-spatial modeling (`boro`, `area` are available for all records), coordinate missingness is not a problem. Latitude and longitude are excluded from the final feature set to prevent data leakage.
 - Proposed Action: Exclude coordinates from all models. Annotate the missing-data fraction in every spatial visualization.
 
-### Age Distribution after Filtering
-
-```{r age-outlier-boxplot}
-vehstops %>%
-  filter(!is.na(age)) %>%
-  ggplot(aes(y = age)) +
-  geom_boxplot(fill = "steelblue", alpha = 0.6, width = 0.4,
-               outlier.size = 1.5, outlier.alpha = 0.4) +
-  coord_flip() +
-  theme_minimal() +
-  theme(
-    panel.grid.major.y = element_blank(),
-    plot.title         = element_text(size = 14),
-    plot.subtitle      = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title    = "Age Distribution after Outlier Removal (76+ excluded)",
-    subtitle = "Remaining values span the plausible 16–75 enforcement range",
-    y = "Reported Age", x = NULL
-  )
-```
-
-What can we say?
-
-- Key finding: After removing riders aged 76+, the remaining distribution is right-skewed with the median around 28–32 and the IQR roughly 22–40. The residual "outliers" shown by the boxplot (ages \~65–75) are plausible and are retained.
-- Interpretation: The right skew confirms the gig-economy delivery worker demographic profile. The sparse upper tail (55–75) consists of recreational riders and retirees whose low volume reduces their enforcement exposure.
-- Comment: The steep drop-off after age 40 means older ages have high statistical leverage if continuous `age` is used — a small number of observations at unusual predictor values can pull coefficients. The bracket encoding mitigates this by pooling sparse ages into wider bins.
-- Proposed Action: Use `age_bracket` as the primary age predictor. Retain continuous `age` for non-parametric diagnostics only.
-
-### Cell Leverage — Sparse Predictor × Outcome Cells
-
-Low-count cells with extreme event rates are statistically unreliable and can exert disproportionate influence on model coefficients. We visualize this for the two most critical bivariate pairs.
-
-```{r cell-leverage-boro-hour}
-vehstops %>%
-  filter(!is.na(boro), !is.na(hour)) %>%
-  group_by(boro, hour) %>%
-  summarize(
-    n    = n(),
-    rate = mean(arrested == 1, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    se            = sqrt(rate * (1 - rate) / pmax(n, 1)),
-    ci_width      = 2 * 1.96 * se,
-    high_leverage = n < 50 & (rate > 0.15 | rate < 0.005)
-  ) %>%
-  ggplot(aes(x = n, y = rate, color = high_leverage, size = ci_width)) +
-  geom_point(alpha = 0.65) +
-  scale_x_log10(labels = scales::comma) +
-  scale_y_continuous(labels = scales::percent) +
-  scale_color_manual(
-    values = c("FALSE" = "steelblue", "TRUE" = "firebrick"),
-    labels = c("Stable", "High leverage"),
-    name   = NULL
-  ) +
-  scale_size_continuous(range = c(1, 5), name = "95% CI width") +
-  geom_vline(xintercept = 50, linetype = "dashed", color = "grey60") +
-  labs(
-    x        = "Cell Count (log scale)", y = "Arrest Rate",
-    title    = "Cell Leverage: Borough × Hour Combinations",
-    subtitle = "Red = sparse cells (n < 50) with extreme rates. Dashed line at n = 50."
-  ) +
-  theme_minimal() +
-  theme(
-    panel.grid.minor = element_blank(),
-    plot.title    = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  )
-```
-
-```{r cell-leverage-ethnicity-boro}
-vehstops %>%
-  filter(!is.na(ethnicity), !is.na(boro)) %>%
-  group_by(ethnicity, boro) %>%
-  summarize(
-    n    = n(),
-    rate = mean(arrested == 1, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(high_leverage = n < 50) %>%
-  ggplot(aes(x = n, y = rate, color = high_leverage)) +
-  geom_point(alpha = 0.7, size = 2.5) +
-  scale_x_log10(labels = scales::comma) +
-  scale_y_continuous(labels = scales::percent) +
-  scale_color_manual(
-    values = c("FALSE" = "steelblue", "TRUE" = "firebrick"),
-    labels = c("Stable (n ≥ 50)", "High leverage (n < 50)"),
-    name   = NULL
-  ) +
-  geom_vline(xintercept = 50, linetype = "dashed", color = "grey60") +
-  labs(
-    x        = "Cell Count (log scale)", y = "Arrest Rate",
-    title    = "Cell Leverage: Ethnicity × Borough Combinations",
-    subtitle = "Sparse ethnicity–borough cells may produce unstable model coefficients"
-  ) +
-  theme_minimal() +
-  theme(
-    panel.grid.minor = element_blank(),
-    plot.title    = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  )
-```
-
-What can we say?
-
-- Key finding: Several boro × hour and ethnicity × boro cells fall in the high-leverage zone (n \< 50 with extreme rates). These cluster in low-volume boroughs (Staten Island sub-districts) at unusual hours, and in rare ethnicity–borough pairings. Point size encodes 95% CI width — the widest CIs belong precisely to the red high-leverage points.
-- Interpretation: High-leverage cells arise when a predictor combination is so rare that statistical estimates are driven by a handful of observations. Logistic regression assigns large coefficients to fit these extreme observed rates, but those coefficients will not generalize to new data.
-- Comment: This is the core motivation for regularization. Standard maximum-likelihood logistic regression can diverge (complete separation) when a cell contains only one outcome class. Ridge or LASSO regularization shrinks those coefficients toward zero, producing more stable and generalizable models.
-- Proposed Action: Apply L1 (LASSO) or L2 (Ridge) regularization in all logistic regression models. Before modeling, optionally merge sparse boro levels (fewer than 100 total stops) into an "Other" category to reduce the number of problematic cells.
-
 ## Geospatial Features
 
-### Area vs Arrested
+### Area
 
 ```{r area-vs-arrested-ratio}
 ratio_by_cat(
@@ -2104,37 +1999,7 @@ What can we say? Remember that Staten Island and Bronx are the areas with the le
 - Comment: The apparent higher arrest rate in low-volume areas may partly reflect geographic heterogeneity within each area category rather than genuinely more aggressive policing — the area aggregation compresses large within-group variance. Small denominators also inflate uncertainty; confidence intervals around Staten Island and Bronx estimates are substantially wider.
 - Proposed Action: Include `area` as a candidate predictor in both models, but also test `boro` as a finer-grained alternative. Do not discard `area` prematurely; the aggregate signal is real even if the mechanism is partially compositional.
 
-### Area vs Vehicle Checkpoint
-
-What about checkpoints? For ease of display we are not going to stack the bars, but just displaying the rate percentages of vehicle checkpoints.
-
-```{r area-vs-checkpoint-ratio}
-ratio_by_cat(
-  vehstops, veh_checkpoint, area,
-  "Area", "Vehichle Checkpoint Rate (%)", "Vehichle Checkpoint Rate by Area",
-  style = "rate", legend_title = "Stop was done by a checkpoint?",
-  target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it shows Low Checkpoint Ratio in Low Volume Areas"
-)
-```
-
-Let us look at the numbers too
-
-```{r confirm-area-vs-checkpoint-ratio}
-vehstops %>%
-  group_by(area, veh_checkpoint) %>%
-  summarise(count = n(), .groups = "drop_last") %>%
-  mutate(percentage = count / sum(count))
-```
-
-What can we say? Low volume areas have less checkpoints, but get proportionally more arrests
-
-- Key finding: Vehicle checkpoint operations are heavily concentrated in Brooklyn and Manhattan, which together account for the vast majority of checkpoint-derived stops. Staten Island and the Bronx show checkpoint rates well below the citywide average of \~1.4%, confirming that checkpoint deployment is far from uniform across the city.
-- Interpretation: Checkpoint operations require coordinated multi-officer deployments and are typically placed on high-traffic commercial corridors — exactly the environments that dominate Brooklyn and Manhattan. The logistical overhead means that low-volume boroughs rarely have the patrol density to sustain a checkpoint, producing a structural concentration effect driven by resource availability rather than enforcement intensity per se.
-- Comment: This distribution pattern is the mirror image of the arrest-rate pattern: the areas most likely to generate arrests from individual stops (low-volume areas) are least likely to have checkpoints, and vice versa. The two outcomes therefore likely have different geographic predictors and should not be conflated in a combined model without an interaction term.
-- Proposed Action: Retain `area` as a predictor for `veh_checkpoint`, expecting a positive coefficient for Brooklyn/Manhattan categories. Investigate whether the area effect survives after controlling for hour and month, which may partially confound geographic concentration.
-
-### Borough vs Arrested
+### Borough
 
 ```{r boro-vs-arrested-ratio}
 ratio_by_cat(
@@ -2153,28 +2018,6 @@ What can we say?
 - Interpretation: Borough-level differences likely reflect a combination of patrol allocation decisions, local enforcement priorities, and the composition of riders (e.g., delivery-worker density varies considerably across sub-boroughs). Where a single borough dominates stop volume within its area category, it can pull the area average toward its own rate, masking outlier boroughs in the same category.
 - Comment: With around 70+ distinct boroughs, the per-borough sample sizes vary enormously and some boroughs carry wide uncertainty. Boroughs with fewer than a few hundred stops should be interpreted with caution; their extreme rates may be sampling artifacts rather than structural enforcement differences.
 - Proposed Action: Prefer `boro` over `area` as the geographic predictor in the arrest model given its higher discriminative power. If collinearity or sparsity is a concern, consider grouping the lowest-volume boroughs into an "Other" category or using a hierarchical random-effect specification.
-
-### Boro vs Vehicle Checkpoint
-
-What about the checkpoint?
-
-```{r boro-vs-checkpoint-ratio}
-ratio_by_cat(
-  vehstops, veh_checkpoint, boro,
-  "Borough", "Vehicle Checkpoint Rate (%)", "Vehicle Checkpoint by Borough",
-  style = "rate", legend_title = "Stop was done by a checkpoint?",
-  target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it confirms the Low Checkpoint Ratio in Low Volume Areas",
-  label_vjust = 0.5
-)
-```
-
-What can we say?
-
-- Key finding: Checkpoint concentration is even more skewed at the borough level than at the area level. A small number of high-density sub-boroughs — primarily in Brooklyn and Manhattan — account for a disproportionate share of all checkpoint-initiated stops, while the majority of boroughs show checkpoint rates at or near zero.
-- Interpretation: The extreme skewness reflects the geography of enforcement corridors: checkpoints target specific high-traffic junctions and commercial strips that are clustered within only a few boroughs. This is an operational constraint, not a reflection of differential risk across boroughs per se — the deployment decision is made at a corridor level, not a borough level.
-- Comment: Because the checkpoint rate is so close to zero in most boroughs, a rate-based comparison can be visually misleading: a borough with 10 checkpoints out of 500 stops looks identical to one with 1 checkpoint out of 50. Raw counts alongside rates are essential context when interpreting these figures.
-- Proposed Action: When modeling `veh_checkpoint`, treat geography as a strong predictor but consider whether the borough fixed effect adds information beyond a simpler "high-corridor borough" binary. If the checkpoint signal is driven by just a handful of boroughs, a sparse indicator may be sufficient and more stable out-of-sample.
 
 We will need to choose between one or the other.
 
@@ -2241,7 +2084,7 @@ ggplot() +
 
 ## Time related features
 
-### Year vs Arrested
+### Year
 
 FIXME: Do by line plot by year
 
@@ -2302,64 +2145,6 @@ What can we say?
 - Interpretation: The most plausible mechanism is regulatory: New York City's expanded e-bike enforcement framework introduced in 2023–2024 reclassified certain violations as arrestable offenses, lowering the threshold for custodial action. If more stops now carry a legal basis for arrest, a rising rate would be expected even without any change in officer behavior. Compositional effects — a larger share of stops involving registered violations — may also contribute.
 - Comment: Because 2025 data covers only part of the year (data collected through March 2026 but stops may be distributed unevenly), the 2025 rate should be interpreted cautiously. Partial-year data can distort seasonal averages if the covered months differ systematically in their arrest propensity. This is an observational dataset; a rising arrest rate does not by itself indicate escalating enforcement aggressiveness.
 - Proposed Action: Include `year` as a linear or categorical predictor in both models to absorb the secular trend. Test whether the year effect interacts with `hot_season` before deciding on a specification. If only three year values are available, treat year as a categorical rather than continuous variable to avoid imposing linearity.
-
-```{r year-vs-checkpoint-ratio}
-# 1. Calculate Arrest Rate per year
-arrest_trends <- vehstops %>%
-  filter(!is.na(year), !is.na(veh_checkpoint)) %>%
-  group_by(year) %>%
-  summarise(
-    total_stops = n(),
-    arrests = sum(veh_checkpoint == 1),
-    rate = arrests / total_stops, 
-    .groups = 'drop'
-  ) %>%
-  arrange(year) %>%
-  # 2. Calculate the year-over-year change in percentage points
-  mutate(
-    prev_rate = lag(rate),
-    delta = (rate - prev_rate) * 100, # Convert to percentage points
-    # 3. Create labels: Rate + Delta
-    label_text = ifelse(
-      is.na(prev_rate), 
-      scales::percent(rate, accuracy = 0.1), 
-      paste0(scales::percent(rate, accuracy = 0.1), 
-             "\n(", ifelse(delta > 0, "+", ""), round(delta, 1), " pts)")
-    )
-  )
-
-# 4. Plotting
-ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
-  # Draw the trend line
-  geom_line(color = "steelblue", linewidth = 1) +
-  geom_point(color = "steelblue", size = 3) +
-  # Add the labels
-  geom_text(aes(label = label_text), vjust = -0.8, size = 3.5, lineheight = 0.8) +
-  # Scale y-axis as percentage
-  scale_y_continuous(
-    labels = scales::percent, 
-    limits = c(0, max(arrest_trends$rate) * 1.3), # Extra room for labels
-    expand = expansion(mult = c(0, 0.1))
-  ) +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(size = 10, color = "grey50")
-  ) +
-  labs(
-    title = "Annual Vehicle Checkpoint Rate has been barely decreasing in the last 3 years",
-    subtitle = "Calculated as the percentage of stops from vehicle checkpoints",
-    x = "Year", y = "Vehicle Checkpoint Rate (%)"
-  )
-```
-
-What can we say?
-
-- Key finding: The vehicle checkpoint rate has declined slightly over the observation window, from roughly 1.6–1.8% in 2023 to approximately 1.2–1.4% in 2024–2025. In absolute terms, however, checkpoint volumes may have remained stable or even grown given the large overall stop surge in 2024.
-- Interpretation: The most straightforward explanation is a volume dilution effect: checkpoint operations did not scale proportionally with the explosion of patrol-initiated stops in 2024. The denominator grew much faster than the number of checkpoint events, mechanically depressing the rate. This is distinct from a policy decision to reduce checkpoints; it reflects the operational reality that checkpoints require coordinated resources that are fixed in short-run supply.
-- Comment: The near-flat absolute trend in checkpoint volumes, paired with a falling rate, suggests that `year` will have a small or negligible coefficient in the checkpoint model once volume composition is accounted for. The contrast with the rising arrest rate underlines that the two targets respond to different drivers and should be modeled separately.
-- Proposed Action: Include `year` as a predictor for completeness and to soak up any residual trend, but do not expect it to carry strong predictive weight for `veh_checkpoint`. Monitor whether the 2025 partial-year data creates any artificial endpoint effects in trend visualizations.
 
 ### Month and Hot Season
 
@@ -2423,66 +2208,6 @@ What can we say?
 - Comment: The counter-seasonal pattern contrasts sharply with the pro-seasonal checkpoint rate (see below) and is a key analytical finding: the two targets respond in opposite directions to the same seasonal driver. Any model that pools them without accounting for this divergence will produce misleading seasonal coefficients. Note that month aggregates across years; year-specific variation is examined in the faceted chart.
 - Proposed Action: Encode seasonality using the `hot_season` binary as the primary seasonal signal. Additionally, test `month` as a factor or a circular spline to capture finer within-season variation. Expect a negative coefficient on `hot_season` for the arrest model.
 
-```{r month-vs-checkpoint-ratio}
-# 1. Aggregate and calculate monthly arrest rate
-monthly_arrest_data <- vehstops %>%
-  filter(!is.na(month), !is.na(veh_checkpoint)) %>%
-  group_by(month) %>%
-  summarise(
-    total_stops = n(),
-    arrests = sum(veh_checkpoint == 1),
-    rate = arrests / total_stops,
-    .groups = "drop"
-  ) %>%
-  mutate(month = factor(month, levels = 1:12)) %>%
-  arrange(month) %>%
-  # 2. Calculate point difference (delta)
-  mutate(
-    prev_rate = lag(rate),
-    delta = (rate - prev_rate) * 100,
-    # Create the label: Rate on top, Point change on bottom
-    label_text = ifelse(
-      is.na(prev_rate), 
-      scales::percent(rate, accuracy = 0.1), 
-      paste0(scales::percent(rate, accuracy = 0.1), 
-             "\n(", ifelse(delta > 0, "+", ""), round(delta, 1), " pts)")
-    )
-  )
-
-# 3. Plot
-monthly_arrest_data %>%
-  ggplot(aes(x = month, y = rate, group = 1)) +
-  geom_line(color = "steelblue", linewidth = 1) +
-  geom_point(color = "steelblue", size = 3) +
-  # Use nudge_y if labels overlap the line, vjust handles the vertical position
-  geom_text(aes(label = label_text), vjust = -1.2, size = 3, lineheight = 0.8) +
-  scale_x_discrete(labels = month.abb) +
-  scale_y_continuous(
-    labels = scales::percent, 
-    limits = c(0, max(monthly_arrest_data$rate) * 1.3), 
-    expand = expansion(mult = c(0, 0.1))
-  ) +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title = "Monthly Vehicle Checkpoint Rate Trend",
-    subtitle = "Aggregated monthly vehicle checkpoint rate; variation shown in percentage points",
-    x = "Month",
-    y = "Vehicle Checkpoint Rate (%)"
-  )
-```
-
-What can we say?
-
-- Key finding: Checkpoint rates display a pro-seasonal pattern, peaking in the warmer months (approximately April–September) and declining in winter. The summer peak is roughly 1.5–2× the winter trough at the monthly level, a directionally opposite pattern from the arrest rate trend.
-- Interpretation: Vehicle checkpoints are logistically dependent on weather and daylight: officers can staff outdoor fixed checkpoints more safely and effectively in mild, well-lit conditions. Furthermore, higher rider volume in summer provides more vehicles to intercept at a given corridor, making checkpoint deployment more operationally efficient. Cold, dark winter months suppress both rider activity and the willingness to staff outdoor checkpoints.
-- Comment: The pro-seasonal shape confirms that `hot_season` should carry a positive coefficient in the checkpoint model, which is the opposite sign from the arrest model. This directional divergence is an important signal that the two outcomes are driven by partially distinct processes. The monthly granularity here may be overfitting to year-specific events; the faceted view by year helps assess stability.
-- Proposed Action: Use `hot_season` as a primary seasonal predictor for `veh_checkpoint`, expecting a positive and statistically meaningful coefficient. Consider whether `month` adds incremental fit beyond `hot_season` after accounting for other predictors; if not, the simpler binary is preferable for parsimony.
-
 What about `hot_season`?
 
 FIXME: Correct it
@@ -2504,24 +2229,6 @@ What can we say?
 - Interpretation: During the hot season (April–October), rider volume surges and enforcement campaigns target a broader, more diverse pool of 2-wheel vehicles; many stopped riders have minor or no violations, diluting the arrest rate. In the off-season, activity is lower but residual riders tend to be more habitual users or those with outstanding violations, concentrating higher-risk encounters in fewer stops.
 - Comment: The `hot_season` binary collapses seven months into a single category, which will average over within-season heterogeneity — for example, April and October may behave more like the off-season than June or August. Nevertheless, the binary is a pragmatic choice that balances interpretability with predictive utility. If finer resolution is needed, the monthly analysis provides the additional granularity.
 - Proposed Action: Include `hot_season` in the arrest model as a main-effect predictor with an expected negative coefficient. Confirm that the effect persists after controlling for geography and hour, which may partially confound the seasonal signal (e.g., summer brings more stops in high-volume areas, which already have lower arrest rates).
-
-```{r hot-season-vs-checkpoint-ratio}
-ratio_by_cat(
-  vehstops, veh_checkpoint, hot_season,
-  "Hot Season", "Vehicle Checkpoint Rate (%)", "  Ratio by Season",
-  style = "stack", legend_title = " ",
-  target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it shows  ",
-  label_vjust = 0.5
-)
-```
-
-What can we say?
-
-- Key finding: Hot-season checkpoint rates are substantially higher than off-season rates — approximately 2 to 2.5 times higher in relative terms. Given the overall low base rate of \~1.4%, this translates to a meaningful absolute difference of roughly 1–1.5 percentage points between the two season categories.
-- Interpretation: Checkpoint operations are heavily weather- and logistics-dependent: warmer months provide the conditions (daylight, rider volume, officer willingness) needed for sustained outdoor corridor checkpoints. In the off-season, the deployment calculus shifts against checkpoints, leaving the residual enforcement concentrated in patrol-initiated individual stops.
-- Comment: The directional contrast with the arrest rate — hot season elevates checkpoint rate while depressing arrest rate — is the single most important finding from the bivariate seasonal analysis. Both outcomes use the same `hot_season` binary but respond in opposite directions; a combined `any_escalation` model would produce a near-zero net seasonal coefficient, masking both effects entirely.
-- Proposed Action: Retain `hot_season` as a main-effect predictor in the checkpoint model with an expected positive coefficient. This sign contrast with the arrest model should be documented clearly in the final reporting and justifies maintaining separate models for the two targets rather than collapsing them.
 
 #### Faceted
 
@@ -2594,73 +2301,6 @@ What can we say?
 - Comment: With only three years of data, assessing whether amplitude widening is a genuine trend or sampling variability is difficult. The 2025 panel covers partial months and may show an artificially elevated rate if only the high-enforcement months are represented. Caution is warranted before interpreting this as a confirmed structural acceleration.
 - Proposed Action: Test a `year × hot_season` interaction term in the arrest model. If the interaction is statistically meaningful, it implies that the off-season premium has grown over time — a finding worth highlighting. If not, retain main effects only for parsimony.
 
-```{r month-faceted-vs-checkpoint-ratio}
-# Data prep: Calculate arrest rates and labeling logic
-plot_data <- vehstops %>%
-  filter(!is.na(year), !is.na(month), !is.na(veh_checkpoint)) %>%
-  group_by(year, month) %>%
-  summarise(
-    arrest_rate = mean(veh_checkpoint == 1), 
-    .groups = "drop"
-  ) %>%
-  mutate(month = factor(month, levels = 1:12)) %>%
-  group_by(year) %>%
-  mutate(
-    rate_jan = arrest_rate[month == 1],
-    rate_max = max(arrest_rate),
-    is_max = arrest_rate == rate_max,
-    
-    # Calculate percentage point differences
-    # Jan vs current, Max vs current
-    diff_jan = (arrest_rate - rate_jan) * 100,
-    diff_dec = (arrest_rate - rate_max) * 100, 
-    
-    # Custom Label Logic
-    label_text = case_when(
-      month == 1 ~ scales::percent(arrest_rate, accuracy = 0.1), 
-      is_max ~ paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", ifelse(diff_jan > 0, "+", ""), round(diff_jan, 1), " pts)"),
-      month == 12 ~ paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", round(diff_dec, 1), " pts)"),
-      TRUE ~ ""
-    )
-  )
-
-# Faceted plot for Arrest Rate
-plot_data %>%
-  ggplot(aes(x = month, y = arrest_rate, group = 1)) +
-  geom_line(color = "steelblue", linewidth = 1) +
-  geom_point(color = "steelblue", size = 2) +
-  geom_text(aes(label = label_text), vjust = -1, hjust = 0.2, size = 2.5, lineheight = 0.8) +
-  facet_wrap(~year, nrow = 1) +
-  scale_x_discrete(
-    labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), 
-    expand = expansion(mult = c(0.1, 0.1))
-  ) +
-  # Using percentage scale for Y
-  scale_y_continuous(labels = scales::percent, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
-  coord_cartesian(clip = "off") +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10),
-    strip.text = element_text(size = 11)
-  ) +
-  labs(
-    title = "Monthly Vehicle Checkpoint Rate, by Year, for 2-Wheels Vehicles in NYC",
-    subtitle = "Variation shown in percentage points (pts) relative to January and the Annual Peak",
-    x = "Month",
-    y = "Vehicle Checkpoint Rate"
-  )
-```
-
-What can we say?
-
-- Key finding: The monthly checkpoint rate profile is broadly similar across all three years — a summer peak and winter trough — with the shape of the seasonal curve remaining relatively stable. Unlike the arrest rate, which shows an expanding amplitude over time, the checkpoint seasonal pattern does not appear to be systematically changing year-over-year.
-- Interpretation: Checkpoint deployment follows institutionalized enforcement calendars and is less sensitive to the regulatory changes that are driving the rising arrest rate trend. Because checkpoint operations require advance planning and fixed-resource allocation, their seasonal rhythm is determined largely by operational conventions that change slowly, producing a stable year-over-year pattern.
-- Comment: The lower year-to-year variability in the checkpoint seasonal profile suggests that a `year × month` or `year × hot_season` interaction is less important for the checkpoint model than for the arrest model. Including such an interaction would add parameters without a commensurate reduction in deviance, risking overfitting on only three years of data.
-- Proposed Action: For the checkpoint model, use `hot_season` as a main effect without a year interaction. This maintains parsimony and aligns with the observed stability. Confirm this choice via cross-validated model comparison (AIC or log-loss) before finalizing the specification.
-
 ```{r faceted-hot-season-vs-arrested-ratio}
 # 1. Create the indicator, calculate rate and raw arrests
 plot_data <- vehstops %>%
@@ -2713,58 +2353,6 @@ What can we say?
 - Comment: The `hot_season` binary collapses the April–October window uniformly, but the monthly chart suggests the transition is gradual rather than sharp. Months at the edge of the definition (April, October) may behave more like the off-season, which could attenuate the binary's effect size. Despite this limitation, the aggregated signal is clear enough to justify keeping the variable.
 - Proposed Action: Retain `hot_season` as a binary predictor for `arrested` with an expected negative coefficient. The faceted view (below) will indicate whether the effect has grown, shrunk, or remained stable across years — an interaction with `year` should be tested before finalizing the model specification.
 
-```{r faceted-hot-season-vs-checkpoint-ratio}
-# 1. Create the indicator, calculate rate and raw arrests
-plot_data <- vehstops %>%
-  filter(!is.na(year), !is.na(month), !is.na(veh_checkpoint)) %>%
-  mutate(
-    is_hot_season = ifelse(month %in% 4:10, "Hot Season", "Off Season"),
-    is_hot_season = factor(is_hot_season, levels = c("Hot Season", "Off Season"))
-  ) %>%
-  group_by(year, is_hot_season) %>%
-  summarise(
-    total_stops = n(),
-    arrests = sum(veh_checkpoint == 1),
-    arrest_rate = arrests / total_stops,
-    .groups = "drop"
-  ) %>%
-  mutate(
-    # Label: Rate (Raw Arrest Count)
-    label_text = paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", comma(arrests), " checkpoints)")
-  )
-
-# 2. Build the faceted barplot
-plot_data %>%
-  ggplot(aes(x = is_hot_season, y = arrest_rate, fill = is_hot_season)) +
-  geom_col(show.legend = FALSE) +
-  # Facet by year
-  facet_wrap(~year, nrow = 1) +
-  # Add labels
-  geom_text(aes(label = label_text), vjust = -0.5, size = 3, lineheight = 0.8) +
-  # Use percent scale for the Y axis
-  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.2))) +
-  scale_fill_brewer(palette = "Paired") +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title = "Vehicle Checkpoint Rate for 2-Wheels Vehicles: Hot Season vs. Off Season",
-    subtitle = "Comparing arrest intensity across seasons by year",
-    x = NULL,
-    y = "Arrest Rate (%)"
-  )
-```
-
-What can we say?
-
-- Key finding: Hot-season checkpoint rates are approximately 2–2.5 times higher than off-season rates, making the seasonal contrast far more pronounced for checkpoints than for arrests. Where the arrest seasonal gap is on the order of 1.5–2 percentage points, the checkpoint gap spans several times that in relative terms, given the overall low base rate of \~1.4%.
-- Interpretation: The amplified seasonality of checkpoints relative to arrests reflects the operational dependency on weather and daylight discussed in the monthly analysis, compounded by the fact that enforcement campaigns tied to the summer cycling season specifically target checkpoint operations. The 2× multiplier between seasons means that `hot_season` should be among the strongest single predictors in the checkpoint model.
-- Comment: The large relative gap must be interpreted in the context of the low absolute rate: even in the hot season the checkpoint rate remains in the low single-digit percentages. The opposite sign of `hot_season` in the two models is the most important modeling implication of this analysis and should be prominently reported. Conflating the two outcomes in a single `any_escalation` model would produce a blended, dampened seasonal coefficient that obscures both signals.
-- Proposed Action: Retain `hot_season` as a predictor for `veh_checkpoint` with an expected positive coefficient of meaningful size. Confirm the 2× ratio is consistent year-over-year in the faceted chart below before deciding whether a `hot_season × year` interaction is warranted.
-
 ### Day, Dow and Weekday
 
 ```{r day-vs-arrested-ratio}
@@ -2808,48 +2396,6 @@ What can we say?
 - Interpretation: The flat pattern across days 1–28 indicates that the day-of-month variable carries no genuine enforcement signal — officers do not target particular calendar days within a month, nor do riders systematically differ by day. The apparent spikes at days 29–31 are purely a denominator artifact: February and other short months never contribute to those bins, and the months that do contribute may have specific seasonal profiles that create spurious rate differences.
 - Comment: The LOESS smoother helps clarify the signal by averaging over the noise of individual day estimates, but the wide day-to-day variation even in the flat regime reflects the relatively small per-day sample sizes once the 185k records are divided across 31 bins and multiple calendar months. Any day-of-month effect visible in the raw line is very likely sampling noise.
 - Proposed Action: Exclude `day` from both models. The flat pattern from days 1–28 confirms it has no predictive value, and including the artifact-inflated days 29–31 would introduce numerical instability. The `month` and `dow` features capture all relevant temporal structure without this variable.
-
-```{r day-vs-checkpoint-ratio}
-# 1. Aggregate and calculate daily arrest rate
-daily_arrest_rate <- vehstops %>%
-  filter(!is.na(day), !is.na(veh_checkpoint)) %>%
-  group_by(day) %>%
-  summarise(
-    total_stops = n(),
-    arrests = sum(veh_checkpoint == 1),
-    rate = arrests / total_stops,
-    .groups = "drop"
-  )
-
-# 2. Plotting
-daily_arrest_rate %>%
-  ggplot(aes(x = day, y = rate)) +
-  # Draw the raw daily variation
-  geom_line(color = "grey60", alpha = 0.5) +
-  # Add a smoothed trend to see if rates rise/fall over the month
-  geom_smooth(method = "loess", color = "steelblue", se = FALSE) +
-  # Format Y axis as percentage
-  scale_y_continuous(labels = scales::percent, limits = c(0, NA)) +
-  theme_minimal() + 
-  theme(
-    panel.grid.major.x = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title = "Vehicle Checkpoint Rate by Day of the Month (1–31)",
-    subtitle = "Aggregated percentage of stops resulting in arrest across all recorded months",
-    x = "Day of the Month",
-    y = "Vehicle Checkpoint Rate (%)"
-  )
-```
-
-What can we say?
-
-- Key finding: The vehicle checkpoint rate exhibits the same pattern as the arrest rate by day of month: essentially flat across days 1–28 with volatile and elevated estimates at days 29–31. No calendar-day-within-month trend is visible in the smoothed line across the valid range of days.
-- Interpretation: Checkpoint deployments are not scheduled around calendar days within the month — they respond to operational decisions driven by staffing, weather, and enforcement campaigns, none of which has a systematic day-of-month structure. The artifact at days 29–31 is identical in origin to the arrest case: denominators shrink because months like February and April do not contribute to those bins.
-- Comment: The near-identical visual pattern for both targets confirms that excluding `day` is the right choice for both models simultaneously. It also increases confidence that the artifact at the end of the month is a data-structure issue rather than anything substantively interesting about late-month enforcement.
-- Proposed Action: Confirm exclusion of `day` from both the `arrested` and `veh_checkpoint` models. This is consistent with analytical conventions established for the 4-wheel vehicle analysis. Document the day-29-31 artifact briefly in the methodology section to pre-empt reviewer questions about the irregular values.
 
 TODO
 
@@ -2907,100 +2453,6 @@ What can we say?
 - Comment: The inversion — high volume on weekdays but high rate on weekends — is a theoretically meaningful finding. It argues against interpreting raw stop counts as a proxy for enforcement aggressiveness; rates and volumes can move in opposite directions depending on which subpopulation is being stopped. The `weekend` binary used in modeling collapses Saturday and Sunday together, which appears appropriate given that both days show similar elevated rates.
 - Proposed Action: Retain the `weekend` binary as a predictor in both models, expecting a positive coefficient for `arrested`. Test whether adding `dow` as a full factor (seven levels) materially improves fit over the binary, and prefer the simpler binary unless the incremental AIC gain is substantial.
 
-```{r dow-vs-checkpoint-ratio}
-daily_checkpoint_rate <- vehstops %>%
-  filter(!is.na(dow), !is.na(veh_checkpoint)) %>%
-  group_by(dow) %>%
-  summarise(
-    total_stops = n(),
-    checkpoints = sum(veh_checkpoint == 1),
-    rate = checkpoints / total_stops,
-    .groups = "drop"
-  ) %>%
-  mutate(
-    dow_label = factor(dow, levels = 1:7,
-                       labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")),
-    prev_rate = lag(rate),
-    delta = (rate - prev_rate) * 100,
-    label_text = ifelse(
-      is.na(prev_rate),
-      scales::percent(rate, accuracy = 0.1),
-      paste0(scales::percent(rate, accuracy = 0.1),
-             "\n(", ifelse(delta > 0, "+", ""), round(delta, 1), " pts)")
-    )
-  )
-
-daily_checkpoint_rate %>%
-  ggplot(aes(x = dow_label, y = rate, group = 1)) +
-  geom_line(color = "steelblue", linewidth = 1) +
-  geom_point(color = "steelblue", size = 3) +
-  geom_text(aes(label = label_text), vjust = -1.0, size = 3, lineheight = 0.8) +
-  scale_y_continuous(
-    labels = scales::percent,
-    limits = c(0, max(daily_checkpoint_rate$rate) * 1.3),
-    expand = expansion(mult = c(0, 0.1))
-  ) +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title = "Vehicle Checkpoint Rate by Day of the Week for 2-Wheels Vehicles",
-    subtitle = "Percentage-point change from previous day shown in parentheses",
-    x = "Day of the Week",
-    y = "Vehicle Checkpoint Rate (%)"
-  )
-```
-
-What can we say?
-
-- Key finding: The checkpoint rate shows a relatively flat day-of-week profile, with only minor variation across the seven days and no clear weekend premium or weekday pattern that mirrors the arrest-rate gradient. The day-to-day swings visible in the line plot are small in absolute terms given the low overall base rate.
-- Interpretation: Unlike arrests, which respond to the composition of the riding population (which varies by day of week), checkpoint deployments are driven by operational scheduling. Checkpoint rosters are typically set in advance based on staffing availability, which is governed by shift rotations rather than by any special targeting of weekends. The absence of a meaningful DOW gradient therefore reflects that checkpoints are schedule-driven rather than rider-mix-driven.
-- Comment: The flat DOW profile for checkpoints contrasts sharply with the pronounced weekend peak for arrests, reinforcing that the two outcomes have different generating processes. Any joint model that constrains their DOW coefficients to be equal would be misspecified. The small rate magnitudes also mean that day-level sampling noise can produce apparent fluctuations that are not structurally meaningful.
-- Proposed Action: Evaluate whether `weekend` or `dow` is worth including in the checkpoint model given the flat DOW profile. If the coefficient is near zero in a candidate model, drop the variable. For parsimony, default to excluding DOW from the checkpoint model unless cross-validation clearly favors its inclusion.
-
-#### Faceted
-
-```{r dow-faceted-vs-checkpoint-ratio}
-vehstops %>%
-  filter(!is.na(dow), !is.na(veh_checkpoint), !is.na(year)) %>%
-  group_by(year, dow) %>%
-  summarise(rate = mean(veh_checkpoint == 1), .groups = "drop") %>%
-  mutate(
-    dow_label = factor(dow, levels = 1:7,
-                       labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))
-  ) %>%
-  ggplot(aes(x = dow_label, y = rate, group = 1)) +
-  geom_line(color = "steelblue", linewidth = 0.8) +
-  geom_point(color = "steelblue", size = 2) +
-  facet_wrap(~year, nrow = 1) +
-  scale_y_continuous(labels = scales::percent, limits = c(0, NA),
-                     expand = expansion(mult = c(0, 0.2))) +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10),
-    strip.text = element_text(size = 11),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  ) +
-  labs(
-    title = "Vehicle Checkpoint Rate by Day of the Week, per Year",
-    subtitle = "Comparing day-of-week patterns across 2023–2025",
-    x = "Day of the Week",
-    y = "Vehicle Checkpoint Rate (%)"
-  )
-```
-
-What can we say?
-
-- Key finding: The day-of-week checkpoint rate profile is broadly stable across all three years — the within-week shape in 2023, 2024, and 2025 panels are broadly similar, with no systematic shift toward particular days in any specific year. Year-to-year differences in the level of the profile (reflecting the volume dilution effect) are visible, but the within-week shape is preserved.
-- Interpretation: The stability of the DOW pattern for checkpoints across years supports the interpretation that checkpoint scheduling follows institutionalized operational conventions that do not change substantially from year to year. If any year-specific enforcement campaigns had targeted a specific day of the week, we would expect to see panel-to-panel shape divergence, which is not apparent here.
-- Comment: With three annual panels, visual stability could reflect either genuine structural stability or insufficient statistical power to detect year-specific DOW changes. The low checkpoint rate magnitudes mean that per-day-per-year cell sizes may be small, inflating sampling noise in the faceted view. Year-over-year shape similarity should therefore be treated as a reassuring but not conclusive finding.
-- Proposed Action: On the basis of both the aggregate DOW flatness and the year-over-year stability, confirm the decision to use `weekend` (or to drop DOW entirely) in the checkpoint model rather than a full seven-level factor. The `weekend` binary from the project conventions is sufficient to represent what little DOW signal exists.
 
 ### Hour and Time Bracket
 
@@ -3044,46 +2496,6 @@ What can we say?
 - Comment: The U-shape is a strong nonlinear signal that cannot be captured by the `working_hour` binary alone — the binary distinguishes 9–17h (low rate) from all other hours, but lumps together the overnight peak (very high rate) and early morning/late evening transitions. A finer `time_bracket` variable or inclusion of hour as a categorical predictor may better represent this nonlinearity. Overnight sample sizes are also smaller, so rate estimates at 1h–4h carry higher uncertainty.
 - Proposed Action: Use the `time_bracket` variable as the primary diurnal predictor to capture the U-shape in a parsimonious way. Confirm that the bracket boundaries align with the natural rate break-points visible in this plot. If `working_hour` is retained instead, note that it will miss the overnight peak, potentially underestimating the diurnal range captured by the model.
 
-```{r hour-vs-checkpoint-ratio}
-hourly_checkpoint_rate <- vehstops %>%
-  filter(!is.na(hour), !is.na(veh_checkpoint)) %>%
-  group_by(hour) %>%
-  summarise(
-    total_stops = n(),
-    checkpoints = sum(veh_checkpoint == 1),
-    rate = checkpoints / total_stops,
-    .groups = "drop"
-  )
-
-hourly_checkpoint_rate %>%
-  ggplot(aes(x = hour, y = rate)) +
-  geom_line(color = "steelblue", linewidth = 1) +
-  geom_point(color = "steelblue", size = 2) +
-  scale_x_continuous(breaks = 0:23) +
-  scale_y_continuous(labels = scales::percent, limits = c(0, NA),
-                     expand = expansion(mult = c(0, 0.15))) +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title = "Vehicle Checkpoint Rate by Hour of Day for 2-Wheels Vehicles",
-    subtitle = "Aggregated percentage of stops from vehicle checkpoints across all hours",
-    x = "Hour of Day (0–23)",
-    y = "Vehicle Checkpoint Rate (%)"
-  )
-```
-
-What can we say?
-
-- Key finding: The checkpoint rate by hour displays a single-peaked profile concentrated in the mid-morning to late afternoon window, roughly 10h through 18h. Checkpoint rates are near zero during overnight hours (0–6h) and decline sharply after 19h. This shape is the near-opposite of the arrest rate's diurnal pattern.
-- Interpretation: Vehicle checkpoints are operationally constrained by daylight and officer safety considerations: outdoor fixed-point operations require adequate visibility, supervisor oversight, and sustained staffing that is only practically feasible during regular business hours. Near-zero overnight checkpoint rates are a direct consequence of these operational constraints, not a deliberate choice to avoid night enforcement.
-- Comment: The diurnal contrast between the two targets — U-shaped for arrests (overnight peak) versus single-peaked for checkpoints (afternoon peak) — is one of the clearest demonstrations in this EDA that the two outcomes should not be modeled jointly with constrained coefficients. The `time_bracket` variable should carry coefficients of opposite sign for the two models in the time dimension.
-- Proposed Action: Include `time_bracket` in the checkpoint model with the expectation that the Night bracket will have a strongly negative coefficient (near-zero checkpoint rate) and Afternoon/Morning brackets will have positive coefficients. This is the mirror image of the expected coefficient direction in the arrest model, and should be highlighted when reporting model results.
-
 ```{r hour-vs-target}
 vehstops |>
   filter(!is.na(arrested), !is.na(hour), !is.na(year)) |>
@@ -3115,21 +2527,6 @@ What can we say?
 - Interpretation: The bracket ordering validates that the time bracket boundaries were defined in a way that meaningfully captures the nonlinear diurnal arrest pattern. The Night bracket correctly captures the high-risk overnight hours (0–6h roughly), while the Afternoon bracket contains the low-arrest daytime hours dominated by legitimate delivery work. The Evening bracket captures the secondary elevation seen in the hourly plot.
 - Comment: The stacked bar chart makes it easier to compare bracket-level arrest shares, but the underlying rates are what matter for modeling. Verifying that the bracket ordering is consistent with the hourly curve (as it appears to be) is important: if brackets were defined differently from the 4-wheel notebook, that could create inconsistencies across the two analyses that should be flagged.
 - Proposed Action: Use `time_bracket` as the primary hour-related predictor in the arrest model. Confirm that the Night bracket coefficient is positive and among the largest predictors. Consider whether merging Morning and Afternoon into a single "business hours" category reduces AIC without meaningful loss of fit, given their relatively similar rates.
-
-```{r time-bracket-vs-checkpoint-ratio}
-ratio_by_cat(
-  vehstops, veh_checkpoint, time_bracket,
-  "Time bracket", "Rate", "Arrest ratio by time bracket",
-  style = "stack"
-)
-```
-
-What can we say?
-
-- Key finding: The Afternoon bracket has the highest checkpoint rate among all time brackets, reversing the pattern seen for arrests where Night was the highest. The Night bracket shows near-zero checkpoint rates, confirming the operational daylight constraint. This directional reversal is fully consistent with the hourly checkpoint analysis.
-- Interpretation: Afternoon is the peak window for organized checkpoint operations because it combines sufficient daylight, high rider volume (especially delivery workers on active routes), and adequate staffing levels. Night checkpoints are logistically infeasible at scale, producing a near-zero rate that is structurally determined rather than a reflection of enforcement priorities. The reversed bracket ordering compared to arrests is not a paradox; it reflects two distinct enforcement mechanisms with different operational constraints.
-- Comment: The reversed bracket ordering between the two target variables provides one of the strongest justifications in the entire EDA for maintaining separate models. A single binary predictor (e.g., `working_hour`) would not fully capture this reversal because it was designed around the arrest pattern; it would be a poor proxy for the checkpoint pattern. The `time_bracket` factor is the appropriate representation for both models, precisely because it allows the coefficients to take different signs.
-- Proposed Action: Include `time_bracket` in the checkpoint model and anticipate that Night will have a large negative coefficient while Afternoon will have the most positive coefficient. When reporting, emphasize the coefficient sign reversal relative to the arrest model as evidence of model-specific feature behavior, not a modeling error.
 
 ## Motorist related features
 
@@ -3203,22 +2600,6 @@ What can we say?
 - Comment: Because \~96% of stops involve males, the marginal predictive value of a sex indicator is extremely low — any model that includes sex will have a near-degenerate dummy with almost no within-level variation. Including a near-constant predictor risks numerical instability in logistic regression and wastes a degree of freedom that could be allocated to more informative features.
 - Proposed Action: Exclude `sex` from both models due to extreme class imbalance and negligible marginal predictive value. Document the demographic composition briefly in the report to provide context for the near-absence of female-rider stops. If the Unknown sex category has a materially different arrest rate, consider flagging it as a binary missingness indicator instead of a sex category.
 
-```{r sex-vs-checkpoint}
-ratio_by_cat(
-  vehstops, veh_checkpoint, sex,
-  "Reported Sex", "Share of Stops", "Vehicle Checkpoint Ratio by Reported Sex",
-  style = "stack", target_labels = c("No", "Yes"),
-  legend_title = "Stop was a checkpoint?"
-)
-```
-
-What can we say?
-
-- Key finding: The sex composition of checkpoint-intercepted stops mirrors the overall stop population (\~96% male), with no meaningful difference between checkpoint and non-checkpoint stops in terms of sex distribution. The checkpoint rate within each sex category is not materially different from the overall checkpoint rate.
-- Interpretation: Vehicle checkpoints are deployed at geographic corridors targeting specific traffic flows, not at individuals selected by demographic characteristics. The sex profile of checkpoint stops therefore simply reflects the sex composition of riders using those corridors, which is itself dominated by male delivery workers. This confirms that checkpoints are targeting geography, not individual-level demographics.
-- Comment: The absence of a sex differential in checkpoint rates strengthens the case that checkpoints are operationally rather than demographically driven. It also means that sex carries even less predictive value for `veh_checkpoint` than for `arrested`, further supporting the decision to exclude it from both models.
-- Proposed Action: Confirm exclusion of `sex` from the checkpoint model. Note in the analysis that both targets show no sex-based differentiation in checkpoint rates, which is consistent with the operational interpretation of checkpoint deployment. This finding is worth stating explicitly in the final report to address potential equity concerns.
-
 ### Reported Ethnicity
 
 ```{r ethnicity-vs-target}
@@ -3235,22 +2616,6 @@ What can we say?
 - Interpretation: The demographic composition of stops is best understood as a reflection of who operates 2-wheel vehicles in NYC rather than evidence of differential enforcement by ethnicity per se. The delivery industry workforce is disproportionately composed of Hispanic and recent immigrant workers, so their plurality in the stop data is consistent with their operational prevalence. The elevated Unknown arrest rate may reflect that officers are less likely to record ethnicity during encounters that escalate into arrests, creating a correlation between missingness and outcome through the mechanics of the enforcement encounter itself.
 - Comment: This is an observational dataset with self-reported ethnicity; any inference about disparate impact must account for the underlying population of riders, which is not directly observable from stops data alone. Ethnicity differences in arrest rates across groups may reflect compositional differences in the types of violations, vehicle registration status, or geographic distribution of stops rather than differential treatment. Causal claims cannot be supported by this analysis alone, and statistical language should be appropriately hedged.
 - Proposed Action: Include `ethnicity` as a candidate predictor to test its marginal contribution to model fit, but do not overinterpret coefficients causally. Treat the Unknown category as a separate level. If ethnicity is correlated with geography (which is likely given neighborhood segregation patterns), test whether its effect is attenuated by including `boro` — collinearity would suggest geography is the proximate predictor.
-
-```{r ethnicity-vs-checkpoint}
-ratio_by_cat(
-  vehstops, veh_checkpoint, ethnicity,
-  "Reported Ethnicity", "Share of Stops", "Vehicle Checkpoint Ratio by Reported Ethnicity",
-  style = "stack", target_labels = c("No", "Yes"),
-  legend_title = "Stop was a checkpoint?"
-)
-```
-
-What can we say?
-
-- Key finding: The ethnicity composition of checkpoint stops closely mirrors the composition of all stops — no ethnicity group shows a dramatically different checkpoint rate from the others after accounting for their share of the overall stop population. The ethnic distribution of checkpoint stops is broadly proportional to the ethnic distribution of all 2-wheel vehicle riders stopped.
-- Interpretation: Because checkpoints target specific geographic corridors rather than individual riders, their ethnicity profile is determined by the ethnicity composition of riders who use those corridors, not by any individual-level demographic selection. If Brooklyn and Manhattan corridors — where checkpoints concentrate — have a specific demographic profile driven by the delivery worker population using those routes, that population composition will be reflected in checkpoint stops without any individual-level demographic targeting.
-- Comment: The proportionality between checkpoint ethnicity composition and overall stop ethnicity is an important finding from an equity perspective: it suggests that the geography of checkpoint deployment, rather than individual demographic characteristics, is the primary driver of who gets stopped at checkpoints. However, the geographic concentration itself can have disparate demographic impacts if the corridors selected for checkpoints run through neighborhoods with specific demographic compositions — this second-order effect cannot be assessed from stop data alone.
-- Proposed Action: Treat `ethnicity` as a low-priority predictor for the checkpoint model. Its inclusion is appropriate for completeness, but the primary geographic predictors (`boro`, `area`) are likely to absorb most of the ethnicity signal through collinearity. If the ethnicity coefficient is near zero after controlling for geography, drop it from the final specification.
 
 ------------------------------------------------------------------------
 
@@ -3341,26 +2706,6 @@ What can we say?
 - **Comment**:
 - **Proposed Action**:
 
-```{r stacked-barplot-checkpoint-vs-age-bracket-x-area}
-```
-
-What can we say?
-
-- **Key finding**:
-- **Interpretation**:
-- **Comment**:
-- **Proposed Action**:
-
-```{r lineplot-checkpoint-vs-age-bracket-x-hour}
-```
-
-What can we say?
-
-- **Key finding**:
-- **Interpretation**:
-- **Comment**:
-- **Proposed Action**:
-
 ### Reported Sex
 
 
@@ -3396,26 +2741,6 @@ What can we say?
 - **Comment**:
 - **Proposed Action**:
 
-```{r heatmap-checkpoint-vs-sex-x-area}
-```
-
-What can we say?
-
-- **Key finding**:
-- **Interpretation**:
-- **Comment**:
-- **Proposed Action**:
-
-```{r lineplot-checkpoint-vs-sex-x-hour}
-```
-
-What can we say?
-
-- **Key finding**:
-- **Interpretation**:
-- **Comment**:
-- **Proposed Action**:
-
 ### Reported Ethnicity
 
 ```{r heatmap-arrested-vs-ethnicity-x-area}
@@ -3439,40 +2764,10 @@ What can we say?
 - **Comment**:
 - **Proposed Action**:
 
-```{r heatmap-checkpoint-vs-ethnicity-x-area}
-```
-
-What can we say?
-
-- **Key finding**:
-- **Interpretation**:
-- **Comment**:
-- **Proposed Action**:
-
-```{r lineplot-checkpoint-vs-ethnicity-x-hour}
-```
-
-What can we say?
-
-- **Key finding**:
-- **Interpretation**:
-- **Comment**:
-- **Proposed Action**:
-
 ### Interactions
 
 
 ```{r heatmap-arrested-vs-ethnicity-x-sex}
-```
-
-What can we say?
-
-- **Key finding**:
-- **Interpretation**:
-- **Comment**:
-- **Proposed Action**:
-
-```{r heatmap-checkpoint-vs-ethnicity-x-age-bracket}
 ```
 
 What can we say?
@@ -3501,19 +2796,13 @@ ratio_by_cat_split(
 
 We have seen that `area` (and `boro`) mainly interact with `year`, `hour`, `sex` and `ethnicity`, so this is what we are going to explore (against the targets' rates). We prefer to use `area` to have a cleaner visualization.
 
-### Vs Year - Arrested Rate
+### Vs Year
 
 ```{r lineplot-arrested-vs-faceted-area-x-year}
 # TODO
 ```
 
-### Vs Year - Checkpoint Rate
-
-```{r lineplot-checkpoint-vs-faceted-area-x-year}
-# TODO
-```
-
-### Vs Hour - Arrested
+### Vs Hour
 
 Since in the bivariate analysis we have seen higher arrests rates for Staten Island and Bronx, we split the heatmaps into two
 
@@ -3601,15 +2890,6 @@ area_hour_data %>%
   )
 ```
 
-### Vs Hour - Checkpoint
-
-TODO: Do like arrested
-
-```{r heatmap-checkpoint-vs-area-x-hour}
-```
-
-```{r lineplot-checkpoint-vs-faceted-area-x-hour}
-```
 
 What can we say?
 
@@ -3646,7 +2926,7 @@ vehstops_ord <- vehstops %>%
     area, boro,
     sex, ethnicity, 
     age, age_bracket,
-    veh_checkpoint, arrested
+    arrested
   )
 ```
 
