@@ -28,9 +28,7 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 ## Goal of this rmarkdown file
 
-This notebook serves as the primary Exploratory Data Analysis (EDA) and (final) Feature Engineering phase for the project. In particular, we focus solely on **2-Wheeled Vehicles** (including e-bikes, motorcycles, and mopeds).
-
-The reason for this is the fact that, these vehicles, have been the subject a of 2.5x increase in stop volume in NYC between 2023 and 2025 (which will be later shown). Furthermore, they show a completely separate behavior with respect to vehicles with four wheels (due to environmental factors like temperature and weather).
+This notebook serves as the primary Exploratory Data Analysis (EDA) and (final) Feature Engineering phase for the project. In particular, we focus solely on **4-Wheeled Vehicles**.
 
 The goal is to identify the features that characterize **arrests**.
 
@@ -528,10 +526,10 @@ ratio_by_cat_split <- function(DF, TARGET, CAT, SPLIT, x_title, y_title, title, 
 
 ------------------------------------------------------------------------
 
-Let us load the data now, and remove the extra feature `veh_category` because we are **exclusively analyzing 2 wheels vehicles now**.
+Let us load the data now, and remove the extra feature `veh_category` because we are **exclusively analyzing 4 wheels vehicles now**.
 
 ```{r load-data-drop-veh-categ}
-vehstops = read.csv("data/vehiclestops_2_wheels.csv")
+vehstops = read.csv("data/vehiclestops_4_wheels.csv")
 
 vehstops <- vehstops %>%
   select(-veh_categ)
