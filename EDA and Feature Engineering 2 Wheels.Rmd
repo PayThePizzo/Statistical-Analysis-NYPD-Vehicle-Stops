@@ -42,7 +42,6 @@ We approach the dataset through three methodological phases to ensure a robust b
 
 3.  **Multivariate Analysis**. Finally, we explore some complex interactions. This stage is needed to address multicollinearity early on. In fact, we try to ensure that redundant predictors do not inflate the estimates of our final models.
 
-
 Under these premises, we will plot many aspects of the data. Therefore, the way we decided to guide the reader through the Exploratory Data Analysis, is based on four key points that we try to include for any plot:
 
 - **Key finding**: This paragraph describes the main takeaway of the means of visualization employed. This should be a concise description of what we can gather from the plots.
@@ -50,6 +49,7 @@ Under these premises, we will plot many aspects of the data. Therefore, the way 
 - **Comment**: After a formal description, we deal with a more informal discussion that should highlight the qualitative aspects of the analysis. This paragraph is a fusion of previous considerations that we want the reader to be aware of, and a space for us to reason.
 - **Proposed Action**: Finally, we switch to a more pragmatic discussion to understand "what to do next", on the basis of what was previously presented. Without claim of completeness, we will name some best-practices, guidelines or ideas about what is best for our goal. We may also limit ourselves to inform the reader that we decided to take no action at all or post-pone it after further investigation.
 
+Note that we do not always include all four points.
 
 ## Important Note
 
@@ -97,10 +97,13 @@ rm(requirements, req)
 
 Here we add the plot functions to make some kinds of visualizations reproducible.
 
+### Univariate Plot Functions
+
 ```{r univariate-plot-helpers}
 # ==============================================================================
 # 1. Plots for Univariate Analysis
 # ==============================================================================
+
 #' @title Plot Binary Bar Chart
 #' 
 #' @description Creates a simple bar chart counting the occurrences of a binary feature, 
@@ -118,7 +121,6 @@ Here we add the plot functions to make some kinds of visualizations reproducible
 #' 
 #' @return A ggplot2 object.
 plot_binary_bar <- function(DF, FEATURE, OPTION_0, OPTION_1, X_LABEL, Y_LABEL, TITLE, pad = 0.15, text_vjust = -0.3) {
-  
   # Standardize the binary feature and calculate percentages
   df_sum <- DF %>%
     mutate(
@@ -133,7 +135,7 @@ plot_binary_bar <- function(DF, FEATURE, OPTION_0, OPTION_1, X_LABEL, Y_LABEL, T
     count(.feat, name = "n") %>%
     mutate(
       .lab = factor(.feat, levels = c(0, 1), labels = c(OPTION_0, OPTION_1)),
-      # NEW: Calculate percentage and create combined label
+      # Calculate percentage and create combined label
       pct = n / sum(n),
       label_text = paste0(scales::comma(n), "\n(", scales::percent(pct, accuracy = 0.1), ")")
     )
@@ -146,21 +148,15 @@ plot_binary_bar <- function(DF, FEATURE, OPTION_0, OPTION_1, X_LABEL, Y_LABEL, T
     geom_col(width = 0.8, show.legend = FALSE) +
     # Updated to use label_text
     geom_text(aes(label = label_text), vjust = text_vjust, lineheight = 0.8) +
-    # Expand the Y axis slightly to accommodate the taller multi-line labels
-    scale_y_continuous(limits = c(0, ymax * (1 + pad)),
-                       expand = expansion(mult = c(0, 0.02))) +
+    # Expand the Y axis slightly for the taller multi-line labels
+    scale_y_continuous(limits = c(0, ymax * (1 + pad)), expand = expansion(mult = c(0, 0.02))) +
     coord_cartesian(clip = "off") +
     theme_minimal() +
-    theme(
-      panel.grid.major.x = element_blank(), 
-      plot.margin = margin(t = 20, r = 5.5, b = 5.5, l = 5.5)
-    ) +
+    theme(panel.grid.major.x = element_blank(), plot.margin = margin(t = 20, r = 5.5, b = 5.5, l = 5.5)) +
     scale_fill_viridis_d(option = "mako", begin = 0.3, end = 0.8) +
     labs(x = X_LABEL, y = Y_LABEL, title = TITLE)
 }
 
-
-# FIXME: Make title and subtitle like {r count-stops-by-year}
 
 #' @title Plot Univariate Bar Chart (Categorical)
 #' 
@@ -226,6 +222,8 @@ plot_univariate_cat <- function(DF, FEATURE, X_LABEL, Y_LABEL = "Count", TITLE, 
 }
 ```
 
+### Bivariate Plot Functions
+
 ```{r biviariate-plot-helpers}
 # ==============================================================================
 # 2. Plots for Bivariate Analysis
@@ -286,8 +284,7 @@ plot_categorical_correlation <- function(DF, FEATURES, TITLE = "Association Matr
   mat <- matrix(1, nrow = n_vars, ncol = n_vars)
   rownames(mat) <- colnames(df_sub)
   colnames(mat) <- colnames(df_sub)
-  
-  # FIXME: Just do upper/lower part of matrix
+
   # Compute Cramer's V for each possible pair
   for(i in 1:(n_vars - 1)) {
     for(j in (i + 1):n_vars) {
@@ -322,8 +319,6 @@ plot_categorical_correlation <- function(DF, FEATURES, TITLE = "Association Matr
 # Plotting of Targets' Rate Against Categorical Predictors
 # ==============================================================================
 
-# FIXME: Percentage shown in the wrong place.
-
 #' @title Plot Target Ratio by Category
 #' 
 #' @description Creates a bivariate bar chart showing the relationship between a binary 
@@ -343,19 +338,15 @@ plot_categorical_correlation <- function(DF, FEATURES, TITLE = "Association Matr
 #' @param colors A character vector of length 2 defining the hex color codes for the 0 and 1 categories respectively.
 #' 
 #' @return A ggplot2 object.
-ratio_by_cat <- function(DF, TARGET, CAT, x_title, y_title, title, 
-                         target_labels = c("Not escalated", "Escalated"), 
-                         style = c("stack", "rate"), 
-                         order_by = c("rate", "freq", "none"), 
-                         percent_accuracy = 0.1, 
-                          palette = "Paired",
-                         colors = c("grey80", "steelblue"),
-                         legend_title = "Legend",
-                         subtitle = NULL,
-                         bar_width = 0.7,
-                         aspect_ratio = 1.0,
-                         label_vjust = 0.5,
-                         text_size = 2) {
+ratio_by_cat <- function(
+    DF, TARGET, CAT, x_title, y_title, title, 
+    target_labels = c("Not escalated", "Escalated"), 
+    style = c("stack", "rate"), order_by = c("rate", "freq", "none"), 
+    percent_accuracy = 0.1, palette = "Paired",
+    colors = c("grey80", "steelblue"), legend_title = "Legend",
+    subtitle = NULL, bar_width = 0.7, aspect_ratio = 1.0, label_vjust = 0.5,
+    text_size = 2
+) {
   
   # Validate arguments
   style    <- match.arg(style)
@@ -401,14 +392,12 @@ ratio_by_cat <- function(DF, TARGET, CAT, x_title, y_title, title,
     
     ggplot(stack, aes(x = .cat_f, y = ratio, fill = .t_f)) +
       geom_col(position = "fill", width = bar_width) +
-      # CHANGED: Showing ONLY the percentage
       geom_text(
         aes(label = scales::percent(ratio, accuracy = percent_accuracy)),
         position = position_fill(vjust = label_vjust), 
         size = text_size
       ) +
       scale_y_continuous(labels = scales::percent) +
-      # scale_fill_brewer(palette = palette, name = rlang::as_name(rlang::enquo(TARGET))) +
       scale_fill_manual(values = setNames(colors, target_labels)) +
       labs(x = x_title, y = y_title, fill = legend_title, title = title, subtitle = subtitle) +
       theme_minimal() +
@@ -443,178 +432,12 @@ ratio_by_cat <- function(DF, TARGET, CAT, x_title, y_title, title,
 }
 ```
 
+### Multivariate Plot Functions
+
 ```{r multivariate-plot-helpers}
 # ==============================================================================
 # 3. Plots for Multivariate Analysis
 # ==============================================================================
-
-#' @title Heatmap of Target Rate (Categorical Y vs Numeric X)
-#' 
-#' @description Plots a heatmap showing the rate of a binary TARGET across a categorical
-#' Y variable and a numeric (or factor) X variable.
-#' 
-#' @param DF The input dataframe.
-#' @param TARGET The binary column to calculate the rate for (unquoted).
-#' @param Y Categorical variable for the Y axis.
-#' @param X Numeric or categorical variable for the X axis.
-#' @param X_TITLE Label for the X axis.
-#' @param Y_TITLE Label for the Y axis.
-#' @param TITLE Main title of the plot.
-#' @param min_n Minimum number of observations required to show a tile.
-#' @param drop_na Boolean; if TRUE, rows with NA in X or Y are removed.
-#' @param x_as_factor Boolean; if TRUE, forces the X variable to be treated as a categorical factor.
-#' 
-#' @return A ggplot2 object.
-heat_target_yx <- function(DF, TARGET, Y, X, X_TITLE, Y_TITLE, TITLE, min_n = 0, drop_na = TRUE, x_as_factor = FALSE) {
-  # Standardize the binary target
-  dat <- DF %>%
-    mutate(
-      .target_raw = {{ TARGET }},
-      .target_bin = dplyr::case_when(
-        as.character(.target_raw) %in% c("1", "TRUE", "true")  ~ 1L,
-        as.character(.target_raw) %in% c("0", "FALSE", "false") ~ 0L,
-        TRUE ~ NA_integer_
-      )
-    )
-
-  # Filter NAs
-  if (drop_na) {
-    dat <- dat %>% filter(!is.na({{Y}}), !is.na({{X}}), !is.na(.target_bin))
-  } else {
-    dat <- dat %>% filter(!is.na(.target_bin))
-  }
-
-  # Incrementally sort Y axis based on the mean ratio of the target
-  y_order <- dat %>%
-    group_by({{Y}}) %>%
-    summarise(rate = mean(.target_bin == 1, na.rm = TRUE), .groups = "drop") %>%
-    arrange(rate) %>%
-    pull({{Y}})
-
-  # Compute the target rate for each combination of Y x X
-  grid <- dat %>%
-    group_by({{Y}}, {{X}}) %>%
-    summarise(
-      rate = mean(.target_bin == 1, na.rm = TRUE),
-      n = n(), .groups = "drop"
-    ) %>%
-    mutate(
-      .y = factor(as.character({{Y}}), levels = as.character(y_order)),
-      .x = if (x_as_factor) factor({{X}}) else {{X}},
-      # Hide cells that do not reach the minimum amount of observations
-      rate_plot = ifelse(n >= min_n, rate, NA_real_)
-    )
-
-  # Build ggplot heatmap
-  ggplot(grid, aes(.x, .y, fill = rate_plot)) +
-    geom_tile(width = 1, height = 0.9) +
-    scale_fill_viridis_c(labels = scales::percent, na.value = "grey90", name = "Rate") +
-    labs(x = X_TITLE, y = Y_TITLE, title = TITLE) +
-    theme_minimal() +
-    theme(panel.grid = element_blank())
-}
-
-
-#' @title Heatmap of Target Rate (Categorical Y vs Categorical X)
-#' 
-#' @description Plots a heatmap showing the rate of a binary TARGET across two categorical
-#' variables (Y and X). Allows dynamic ordering and shading based on sample size.
-#' 
-#' @param DF The input dataframe.
-#' @param TARGET The binary column to calculate the rate for (unquoted).
-#' @param Y Categorical variable for the Y axis.
-#' @param X Categorical variable for the X axis.
-#' @param X_TITLE Label for the X axis.
-#' @param Y_TITLE Label for the Y axis.
-#' @param TITLE Main title of the plot.
-#' @param min_n Minimum number of observations required to show a tile (filters noise).
-#' @param order_y_by Method to order the Y axis: by 'rate', 'freq' (frequency), or 'none'.
-#' @param order_x_by Method to order the X axis: by 'rate', 'freq' (frequency), or 'none'.
-#' @param alpha_by_n Boolean; if TRUE, shades tiles by count using alpha (transparency).
-#' 
-#' @return A ggplot2 object.
-heat_target_catcat <- function(DF, TARGET, Y, X, X_TITLE, Y_TITLE, TITLE, min_n = 0, order_y_by = c("rate","freq","none"), order_x_by = c("rate","freq","none"), alpha_by_n = FALSE ) {
-  order_y_by <- match.arg(order_y_by)
-  order_x_by <- match.arg(order_x_by)
-
-  # Standardize target
-  dat <- DF %>%
-    mutate(
-      .target_raw = {{ TARGET }},
-      .target_bin = dplyr::case_when(
-        as.character(.target_raw) %in% c("1", "TRUE", "true")  ~ 1L,
-        as.character(.target_raw) %in% c("0", "FALSE", "false") ~ 0L,
-        TRUE ~ NA_integer_
-      )
-    ) %>%
-    # Filter NAs
-    filter(!is.na({{Y}}), !is.na({{X}}), !is.na(.target_bin))
-
-  # Compute stats to determine the Y axis order
-  y_stats <- dat %>%
-    group_by({{Y}}) %>%
-    summarise(
-      rate = mean(.target_bin == 1, na.rm = TRUE),
-      n = n(), .groups = "drop"
-    )
-  
-  # Compute stats to determine the X axis order
-  x_stats <- dat %>%
-    group_by({{X}}) %>%
-    summarise(
-      rate = mean(.target_bin == 1, na.rm = TRUE), 
-      n = n(), .groups = "drop"
-    )
-
-  # Apply chosen "order by" to Y
-  y_levels <- switch(
-    order_y_by,
-    rate = y_stats %>% arrange(rate) %>% pull({{Y}}),
-    freq = y_stats %>% arrange(n) %>% pull({{Y}}),
-    none = unique(dat %>% pull({{Y}}))
-  )
-  
-  # Apply chosen "order by" to X
-  x_levels <- switch(
-    order_x_by,
-    rate = x_stats %>% arrange(rate) %>% pull({{X}}),
-    freq = x_stats %>% arrange(n) %>% pull({{X}}),
-    none = unique(dat %>% pull({{X}}))
-  )
-
-  # Compute the cell's target rate and counts for each combination of Y x X
-  grid <- dat %>%
-    group_by({{Y}}, {{X}}) %>%
-    summarise(
-      rate = mean(.target_bin == 1, na.rm = TRUE),
-      n = n(), .groups = "drop"
-    ) %>%
-    mutate(
-      .y = factor(as.character({{Y}}), levels = as.character(y_levels)),
-      .x = factor(as.character({{X}}), levels = as.character(x_levels)),
-      rate_plot = ifelse(n >= min_n, rate, NA_real_)
-    )
-
-  # Build the plot
-  p <- ggplot(grid, aes(.x, .y)) +
-    labs(x = X_TITLE, y = Y_TITLE, title = TITLE) +
-    theme_minimal() +
-    theme(panel.grid = element_blank()) +
-    # Use scales for displaying rates
-    scale_fill_viridis_c(labels = scales::percent, na.value = "grey90", name = "Rate")
-
-  if (alpha_by_n) {
-    p <- p +
-      geom_tile(aes(fill = rate_plot, alpha = n), width = 0.95, height = 0.95) +
-      scale_alpha_continuous(range = c(0.25, 1), name = "Stops")
-  } else {
-    p <- p +
-      geom_tile(aes(fill = rate_plot), width = 0.95, height = 0.95)
-  }
-
-  p
-}
-
 
 #' @title Stacked Ratio Bars Split by a Third Variable
 #' 
@@ -709,224 +532,6 @@ ratio_by_cat_split <- function(DF, TARGET, CAT, SPLIT, x_title, y_title, title, 
 }
 ```
 
-```{r}
-#' @title Plot Temporal Trend of Target Rate
-#' 
-#' @description Creates a scatter plot with a LOESS smoothing curve to visualize 
-#' how the rate of a target event changes over a continuous temporal variable (e.g., date, day of year).
-#' The size of the points represents the volume of stops.
-#' 
-#' @param DF The input dataframe.
-#' @param TARGET The binary column to analyze (unquoted).
-#' @param TIME_VAR The continuous time variable for the X axis (e.g., date, doy).
-#' @param x_title Label for the X axis.
-#' @param y_title Label for the Y axis.
-#' @param title Main title of the plot.
-plot_temporal_trend <- function(DF, TARGET, TIME_VAR, x_title = "Tempo", y_title = "Tasso", title = "Trend Temporale") {
-  
-  # Step 1: Standardizzare il target a 0/1
-  dat <- DF %>%
-    mutate(
-      .target_raw = {{ TARGET }},
-      .target_bin = case_when(
-        as.character(.target_raw) %in% c("1","TRUE","true", "Yes")  ~ 1L,
-        as.character(.target_raw) %in% c("0","FALSE","false", "No") ~ 0L,
-        TRUE ~ NA_integer_
-      ),
-      .time = {{ TIME_VAR }}
-    ) %>%
-    filter(!is.na(.target_bin), !is.na(.time))
-  
-  # Step 2: Calcolare il tasso e il volume per ogni unità di tempo
-  plot_df <- dat %>%
-    group_by(.time) %>%
-    summarise(
-      rate = mean(.target_bin == 1, na.rm = TRUE),
-      n = n(),
-      .groups = "drop"
-    )
-  
-  # Step 3: Costruire il grafico
-  ggplot(plot_df, aes(x = .time, y = rate)) +
-    # Punti proporzionali al numero di stop per capire la robustezza del dato
-    geom_point(aes(size = n), alpha = 0.5, color = "steelblue") +
-    # Linea di tendenza morbida per evidenziare il trend generale ignorando il rumore
-    geom_smooth(se = FALSE, method = "loess", span = 0.3, color = "firebrick", size = 1.2) +
-    scale_y_continuous(labels = scales::percent) +
-    labs(x = x_title, y = y_title, size = "N. di Stop", title = title) +
-    theme_minimal() +
-    theme(panel.grid.minor = element_blank())
-}
-
-#' @title Plot Cyclic Time Heatmap
-#' 
-#' @description Creates a heatmap specifically designed for cyclic time variables 
-#' (like Hour of Day vs Day of Week) to spot temporal hotspots.
-#' 
-#' @param DF The input dataframe.
-#' @param TARGET The binary column to analyze (unquoted).
-#' @param HOUR_VAR The variable representing the hour (0-23).
-#' @param WEEKDAY_VAR The variable representing the day of the week.
-#' @param title Main title of the plot.
-plot_cyclic_time_heatmap <- function(DF, TARGET, HOUR_VAR, WEEKDAY_VAR, title = "Hotspots Temporali") {
-  
-  # Step 1: Standardizzare il target a 0/1
-  dat <- DF %>%
-    mutate(
-      .target_raw = {{ TARGET }},
-      .target_bin = case_when(
-        as.character(.target_raw) %in% c("1","TRUE","true", "Yes")  ~ 1L,
-        as.character(.target_raw) %in% c("0","FALSE","false", "No") ~ 0L,
-        TRUE ~ NA_integer_
-      ),
-      .hour = as.numeric({{ HOUR_VAR }}),
-      .day = {{ WEEKDAY_VAR }}
-    ) %>%
-    filter(!is.na(.target_bin), !is.na(.hour), !is.na(.day))
-  
-  # Step 2: Raggruppare e calcolare il tasso
-  plot_df <- dat %>%
-    group_by(.day, .hour) %>%
-    summarise(
-      rate = mean(.target_bin == 1, na.rm = TRUE),
-      n = n(),
-      .groups = "drop"
-    ) %>%
-    # Mostriamo solo incroci con un minimo di stop per evitare rumore statistico
-    filter(n >= 10) 
-  
-  # Step 3: Costruire la mappa di calore temporale
-  ggplot(plot_df, aes(x = .hour, y = .day, fill = rate)) +
-    geom_tile(color = "white") +
-    scale_fill_viridis_c(option = "magma", labels = scales::percent, name = "Tasso") +
-    # Impostiamo l'asse X per mostrare tutte le 24 ore
-    scale_x_continuous(breaks = 0:23, expand = c(0,0)) +
-    labs(x = "Ora del Giorno", y = "", title = title) +
-    theme_minimal() +
-    theme(
-      panel.grid = element_blank(),
-      axis.text.y = element_text(face = "bold")
-    )
-}
-
-#' @title Plot Temporal Trend Split by a Group (Rate or Frequency)
-#' 
-#' @description Generates a line plot showing how a metric (rate or count) 
-#' changes over a generic time unit (X_VAR), split by another variable (Z_VAR).
-#' Adapts to any time unit and can display data as overlapping lines or faceted grids.
-#' 
-#' @param DF The input dataframe.
-#' @param X_VAR The generic time variable for the X axis (e.g., month, hour).
-#' @param Z_VAR The variable to group/split the plots by (e.g., year, weekend).
-#' @param TARGET The binary target variable. Required only if metric = "rate".
-#' @param metric "rate" (percentage of TARGET) or "freq" (absolute count of stops).
-#' @param style "overlay" (lines superimposed on one plot) or "facet" (separated sub-plots).
-#' @param x_title Label for the X axis.
-#' @param y_title Label for the Y axis. Default adjusts based on metric.
-#' @param title Main title of the plot.
-#' 
-#' @return A ggplot2 object.
-plot_temporal_split <- function(
-  DF, X_VAR, Z_VAR, TARGET = NULL, 
-  metric = c("rate", "freq"), 
-  style = c("overlay", "facet"),
-  x_title = "Time Feature", y_title = NULL, title = "Time Trend"
-) {
-  
-  metric <- match.arg(metric)
-  style  <- match.arg(style)
-  
-  # Step 1: Sicurezza per il Target
-  target_quo <- rlang::enquo(TARGET)
-  if (metric == "rate" && rlang::quo_is_null(target_quo)) {
-    stop("Error: You must specify TARGET col if you use metric = 'rate'.")
-  }
-  
-  # Step 2: Estrazione variabili principali
-  dat <- DF %>%
-    mutate(
-      .x = {{ X_VAR }},
-      .z = {{ Z_VAR }}
-    ) %>%
-    filter(!is.na(.x), !is.na(.z))
-  
-  # Step 3: Calcolo delle Metriche
-  if (metric == "rate") {
-    dat <- dat %>%
-      mutate(
-        .t_raw = !!target_quo,
-        .t_bin = case_when(
-          as.character(.t_raw) %in% c("1","TRUE","true","Yes")  ~ 1L,
-          as.character(.t_raw) %in% c("0","FALSE","false","No") ~ 0L,
-          TRUE ~ NA_integer_
-        )
-      ) %>%
-      filter(!is.na(.t_bin))
-    
-    plot_df <- dat %>%
-      group_by(.z, .x) %>%
-      summarise(y_val = mean(.t_bin == 1), n = n(), .groups = "drop")
-    
-    if (is.null(y_title)) y_title <- "Rate (%)"
-    
-  } else { # metric == "freq"
-    plot_df <- dat %>%
-      group_by(.z, .x) %>%
-      summarise(y_val = n(), n = n(), .groups = "drop")
-    
-    if (is.null(y_title)) y_title <- "Stop Count"
-  }
-  
-  # Assicuriamoci che l'asse X sia trattato correttamente nel disegno delle linee
-  plot_df <- plot_df %>% mutate(.z_f = factor(.z))
-  
-  # Step 4: Costruzione del Grafico base
-  p <- ggplot(plot_df, aes(x = .x, y = y_val))
-  
-  # Logica dello "Stile"
-  if (style == "overlay") {
-    # Tutte le linee nello stesso grafico
-    p <- p +
-      geom_line(aes(color = .z_f, group = .z_f), linewidth = 0.8) +
-      geom_point(aes(color = .z_f, size = n), alpha = 0.7) +
-      labs(color = rlang::as_name(rlang::enquo(Z_VAR)), size = "Stops Count") +
-      scale_color_viridis_d(option = "turbo") # Colori ben distinguibili
-      
-  } else { 
-    # Stile "Facet" (Grafici separati impilati)
-    p <- p +
-      geom_line(linewidth = 0.6, group = 1, color = "steelblue") +
-      geom_point(aes(size = n), alpha = 0.7, color = "steelblue") +
-      # free_x permette ad ogni grafico di avere il suo asse se necessario
-      facet_wrap(~ .z_f, ncol = 1, scales = "free_x") +
-      labs(size = "Stops Count")
-  }
-  
-  # Temi e Asse Y
-  p <- p +
-    labs(x = x_title, y = y_title, title = title) +
-    theme_minimal() +
-    theme(
-      panel.grid.minor = element_blank(),
-      strip.text = element_text(face = "bold", size = 11, margin = margin(b = 10)),
-      # INCREASE FACET HEIGHT: Adjusting panel spacing and aspect ratio
-      panel.spacing.y = unit(1.5, "lines"), # More space between facets
-      # aspect.ratio =  # A lower number makes each individual facet "flatter/longer"
-      # strip.text = element_text(face = "bold", size = 11) # Titoli dei facet in grassetto
-    )
-  
-  
-  # Formattazione dell'Asse Y in base alla metrica scelta
-  if (metric == "rate") {
-    p <- p + scale_y_continuous(labels = scales::percent)
-  } else {
-    p <- p + scale_y_continuous(labels = scales::comma)
-  }
-  
-  return(p)
-}
-```
-
 ------------------------------------------------------------------------
 
 Let us load the data now, and remove the extra feature `veh_category` because we are **exclusively analyzing 2 wheels vehicles now**.
@@ -950,7 +555,7 @@ This preview is already interesting.
 
 # Univariate EDA
 
-## Targets
+## Target
 
 ```{r enforcement-dist}
 p1 <- plot_binary_bar(
@@ -977,7 +582,7 @@ What can we say?
 - **Comment**: The high class disparity *makes accuracy a limiting metric* for our models' evaluation. This is due to the fact a predictive model aiming for accuracy could achieve a high score by simply classifying every stop as "No". Therefore, it completely fails to capture the what characterizes an arrest after a stop. This is also sub-optimal for our research, as capturing the true patterns is what drives our investigation towards enforcement bias.
 - **Proposed Action**: Although we could employ cost-sensitive learning models, this is outside the scope of the course. As an alternative, we will **employ stratified down-sampling of the majority class** ("No") to create a balanced training set, ensuring compatibility across all models (LDA, QDA, KNN, etc...). For the **GLM-based models** (Logistic, Lasso, Ridge), we will specifically **utilize observation weighting within the likelihood function** to account for the class disparity. Finally, we will move away from the default 0.5 classification threshold, **optimizing the decision boundary based on the Precision-Recall curve** to ensure our model maintains sensitivity to the minority class ("Yes").
 
-## Command Unit, Geospatial and Area-related predictors
+## Geospatial predictors
 
 ### Area
 
@@ -994,10 +599,10 @@ plot_univariate_cat(
 
 What can we say?
 
-- Key finding: There is a high degree of variance in the volume of stops across areas. We observe three "high-volume" areas (Brooklyn, Queens, and Manhattan) with comparable stop counts (ranging between \~50k and 56k), one "medium-volume" area (Bronx, \~30k), and a distinct "low-volume" area (Staten Island, \~1.5k).
-- Interpretation: The distribution is highly non-uniform, or better, uneven. The lower frequency of stops in the Bronx and Staten Island suggests that geographic location could be a strong predictor of the probability of being stopped (in case the targets' ratio distributed by area follows a specific pattern).
-- Comment: From a modeling perspective, this introduces a risk of **overfitting to the high-volume areas**. Since some of the available models (especially KNN or QDA) rely on local neighborhood data or global likelihoods, they will naturally prioritize minimizing errors in the areas with the most observations. Furthermore, the extreme sparsity of the Staten Island group may lead to high variance in the parameter estimates for that specific categorical level, potentially skewing the coefficients for the area predictor.
-- Proposed Action: We still need to check its correlation with subject-related predictors. Also, we prefer to explore finer-grained versions of this geographical predictor, which may be able to yield better results when used in the models. Later on, we will use dummy coding to represent the areas, but we will interpret the coefficients with caution (which is our to-go tactic for most categorical variables). However, when using **Lasso or Ridge regression**, we will carefully tune the penalty parameter ($\lambda$) to ensure that the "Area" coefficients are not artificially inflated or suppressed due to the sample size disparity.
+- **Key finding**: There is a high variance in the volume of stops across areas. We observe three "high-volume" areas (Brooklyn, Queens, and Manhattan) with comparable stop counts (ranging between \~50k and 56k), one "medium-volume" area (Bronx, \~30k), and a distinct "low-volume" area (Staten Island, \~1.5k).
+- **Interpretation**: The distribution is highly non-uniform, or better, uneven. The lower frequency of stops in the Bronx and Staten Island suggests that geographic location could be a strong predictor of the probability of being stopped (in case the targets' ratio distributed by area follows a specific pattern).
+- **Comment**: From a modeling perspective, this introduces a risk of **overfitting to the high-volume areas**. Since some of the available models (especially KNN or QDA) rely on local neighborhood data or global likelihoods, they will naturally prioritize minimizing errors in the areas with the most observations. Furthermore, the extreme sparsity of the Staten Island group may lead to high variance in the parameter estimates for that specific categorical level, potentially skewing the coefficients for the area predictor. The visualization succeeds in highlighting a pattern, but it leaves the causal mechanisms open to speculation.
+- **Proposed Action**: We still need to check its association with subject-related predictors. Also, we still want to explore the finer-grained version of this geographical predictor (`boro`), which may achieve better results in the models. If using **Lasso or Ridge regression**, we will carefully tune the penalty parameter ($\lambda$) to ensure that the "Area" coefficients are not inflated/suppressed due to the sample size difference.
 
 ### Borough
 
@@ -1013,33 +618,29 @@ plot_univariate_cat(
 
 What can we say?
 
-- Key finding: The comparison reveals that while "Staten Island" is uniformly sparse, boroughs like "Queens" and "Manhattan" are internally heterogeneous. Aggregating sub-boroughs into a single `area` feature assumes that police behavior is homogeneous across those sub-sectors.
-- Interpretation: If the arrest rate in "North West Queens" (a high-volume area) is statistically distinct from "South Queens," the `area` variable acts as a source of **aggregation bias**. By averaging these rates, we lose the model’s ability to differentiate between high-risk and low-risk zones within the same borough, potentially obscuring patterns of excessive enforcement. On the other hand, in a regression or classification context, this means our parameter estimates for these low-frequency categories will likely suffer from high variance and wide confidence intervals, making them unreliable indicators of systematic enforcement bias.
-- Comment: Discarding granularity prematurely is a legitimate methodological risk. If a specific sub-borough has a disproportionately higher event rate than its parent borough, the model will fail to capture that specific hotspot. We should not treat granularity as "noise" until we have empirical evidence that the target ratios are homogeneous within the boroughs. In fact, if the target ratio (arrest or checkpoint probability) differs significantly between "North West Queens" and "South Queens," aggregating them into a single "Queens" category would indeed "wash out" a genuine, predictive signal, resulting in an under-fitted model.
-- Proposed Action: As previously stated, we wish to plot the arrest/checkpoint rate for each borough level, as well for the areas. Then, based on our observations, we could train two alternative versions of the same model using `area` and `boro`. In fact, we could employ means of model comparison (for instance, Stratified K-fold Cross Validation) and, in case the granular version yields lower CV error, we may be able to discard the hypothesis of introducing noise/variability.
+- **Key finding**: The comparison reveals that while "Staten Island" is uniformly sparse, boroughs like "Queens" and "Manhattan" are internally heterogeneous.
+- **Interpretation**: If the arrest rate in "North West Queens" (a high-volume area) is statistically distinct from "South Queens," the `area` variable acts as a source of **aggregation bias**. By averaging these rates, we lose the model’s ability to differentiate between high-risk and low-risk zones within the same borough (potentially obscuring patterns of excessive enforcement). On the other hand, in a regression or classification context, this means our parameter estimates for these low-frequency categories will likely suffer from high variance and wide confidence intervals, making them unreliable indicators of systematic enforcement bias.
+- **Comment**: Discarding granularity prematurely is a risk. If a specific sub-borough has a disproportionately higher event rate than its parent borough, the model will fail to capture that specific hotspot. We should not treat granularity as "noise" until we have empirical evidence that the target ratios are homogeneous within the boroughs. In fact, if the target ratio differs significantly between "North West Queens" and "South Queens," aggregating them into a single "Queens" category would indeed "wash out" a genuine, predictive signal, resulting in an under-fitted model.
+- **Proposed Action**: As previously stated, we wish to plot the arrest rate for each borough level, as well for the areas. Then, based on our observations, we could train two alternative versions of the same model using `area` and `boro`. In fact, we could employ means of model comparison (for instance, Stratified K-fold Cross Validation) and, in case the granular version yields lower CV error, we may be able to discard the hypothesis of introducing noise/variability.
 
 ### Latitude and Longitude for Stop Density
 
 For what concerns these two predictors, we will use the to plot a spatial heat map of the stops with these values available.
 
 ```{r stop-density}
-# Download NYC Borough boundaries once
 nyc_map <- counties(state = "NY", cb = TRUE) %>%
   filter(NAME %in% c("Bronx", "Kings", "New York", "Queens", "Richmond"))
 
-# 1. Define the grid resolution (match this with your desired density)
 bins <- 100
 lon_breaks <- seq(-74.26, -73.71, length.out = bins + 1)
 lat_breaks <- seq(40.48, 40.92, length.out = bins + 1)
 
-# 2. Generate the grid_sum object from your main data
 grid_sum <- vehstops %>%
   filter(!is.na(longitude) & !is.na(latitude)) %>%
   mutate(
     xbin = cut(longitude, breaks = lon_breaks, include.lowest = TRUE, right = FALSE),
     ybin = cut(latitude, breaks = lat_breaks, include.lowest = TRUE, right = FALSE)
   ) %>%
-  # Extract the center point of each bin for the tile plot
   mutate(
     x = as.numeric(gsub(".*\\[(.*),.*", "\\1", xbin)) + (lon_breaks[2] - lon_breaks[1])/2,
     y = as.numeric(gsub(".*\\[(.*),.*", "\\1", ybin)) + (lat_breaks[2] - lat_breaks[1])/2
@@ -1047,13 +648,9 @@ grid_sum <- vehstops %>%
   group_by(x, y) %>%
   summarise(n = n(), .groups = "drop")
 
-# Plot with base layer
 ggplot() +
-  # Add NYC base layer
   geom_sf(data = nyc_map, fill = "white", color = "grey80", size = 0.2) +
-  # Add density data on top
   geom_tile(data = grid_sum, aes(x, y, fill = n), alpha = 0.8) +
-  # Use a more high-contrast color scale
   scale_fill_viridis_c(trans = "log10", name = "Stops (log10)", option = "mako", direction = -1) +
   coord_sf(xlim = c(-74.26, -73.71), ylim = c(40.48, 40.92)) +
   theme_minimal() +
@@ -1067,10 +664,9 @@ rm(grid_sum, nyc_map, bins, lat_breaks, lon_breaks)
 
 What can we say?
 
-- Key finding: The heatmap reveals a highly heterogeneous spatial distribution, characterized by distinct high-density corridors and hotspots.
-- Interpretation: This spatial clustering indicates that police enforcement is not randomly distributed; it is structurally tied to urban infrastructure, likely following major traffic arteries or high-activity transit corridors.
-- Comment: Again, high stop density does not necessarily imply aggressive policing; it may simply reflect high traffic exposure. Also, this plot just give us an idea, because we are skipping over missing data.
-- Proposed Action: To prevent data leakage we cannot just include then in the models. These two predictors will be later removed.
+- **Key finding**: The heatmap reveals a highly heterogeneous spatial distribution, characterized by distinct high-density hotspots.
+- **Interpretation**: This spatial clustering indicates that police enforcement is not randomly distributed but it is likely to be following the major traffic arteries.
+- **Proposed Action**: To prevent data leakage we cannot just include then in the models. These two predictors will be later removed.
 
 ## Time-related predictors
 
@@ -1082,24 +678,17 @@ vehstops %>%
   count(year) %>%
   mutate(year = as.numeric(as.character(year))) %>%
   arrange(year) %>%
-  # 1. Calculate growth and create the combined label
   mutate(
     prev_n = lag(n), pct_change = (n - prev_n) / prev_n * 100,
-    # Combine count and percentage with a newline character
     label_text = ifelse(
       is.na(pct_change), 
       comma(n), 
       paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)")
     )) %>%
   ggplot(aes(x = factor(year), y = n, group = 1)) +
-  # Draw the trend line
   geom_line(color = "steelblue", linewidth = 1) +
-  # Add points for clarity
   geom_point(color = "steelblue", size = 3) +
-  # 2. Add the combined label
-  # vjust = -0.5 helps center the multi-line text just above the point
   geom_text(aes(label = label_text), vjust = -0.8, nudge_x = -0.1, size = 3.5, lineheight = 0.8) +
-  # Increase top expansion (0.3) to accommodate the taller labels
   scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.2))) +
   theme_minimal() +
   theme(
@@ -1116,17 +705,15 @@ vehstops %>%
 
 What can we say?
 
-- Key finding: There has been a significant, multi-year surge in the volume of police stops involving 2-wheeled vehicles, with the number of encounters increasing from \~33k in 2023 to \~85k in 2025.
-- Interpretation: The growth trajectory is non-linear. The 113% jump between 2023 and 2024 represents a massive inflection point, which is suggesting either a shift in departmental priority or a new legislation targeting these vehicles. On the other hand, the 19.8% increase in 2025 indicates that while activity is still rising, the rate of acceleration is starting to stabilize.
-- Comment: The visualization clearly demonstrates that the "enforcement burden" or "public exposure" to these stops is intensifying. However, since the dataset analyzed was aggregated by 2-wheels vehicles, we could be seeing the result of policies regarding a specific subset. Plus, 3 years is not a sufficient time span for us to deliver some substantial proof.
-- Proposed Action: We are going to look for some level of contextualization, in order to see if something changed during late 2023 or early 2024.
+- **Key finding**: There has been a significant, multi-year surge in the volume of police stops involving 2-wheeled vehicles, with the number of encounters increasing from \~33k in 2023 to \~85k in 2025.
+- **Interpretation**: The growth trajectory is non-linear. The 113% jump between 2023 and 2024 represents a massive inflection point, which is suggesting either a shift in departmental priority or a new legislation targeting these vehicles. On the other hand, the 19.8% increase in 2025 indicates that while activity is still rising, the rate of acceleration is starting to stabilize.
+- **Comment**: The visualization clearly demonstrates that the "public exposure" to these stops is increasing. However, since the dataset analyzed was aggregated by 2-wheels vehicles, we could be seeing the result of policies regarding a specific subset. Plus, 3 years is not a sufficient time span for us to deliver some substantial proof.
 
 In fact, we found the article ["New York City Council Votes to Pass New E-Bike Safety Rules in Continued Effort to Address the Dangers of Lithium-Ion Batteries"](https://council.nyc.gov/press/2024/02/28/2564/) published in February 28, 2024. From its content, we could justify the raise in volume as natural consequence to new laws being put in place.
 
 ### Month
 
 ```{r count-stops-by-month}
-# Aggregate and calculate monthly change
 month_data <- vehstops %>%
   filter(!is.na(month)) %>%
   count(month) %>%
@@ -1134,18 +721,15 @@ month_data <- vehstops %>%
   arrange(month) %>%
   mutate(
     prev_n = lag(n), pct_change = (n - prev_n) / prev_n * 100,
-    # Create the label: Count on top, Percentage on bottom
     label_text = ifelse(
       is.na(pct_change), comma(n),
       paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
   )
 
-# Plot
 month_data %>%
   ggplot(aes(x = month, y = n, group = 1)) +
   geom_line(color = "steelblue", linewidth = 1) +
   geom_point(color = "steelblue", size = 3) +
-  # Apply text tweaks: nudge_x moves it left, vjust raises it
   geom_text(aes(label = label_text), vjust = -1, nudge_x = -0.1, size = 3, lineheight = 0.8) +
   scale_x_discrete(labels = month.abb) +
   scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.3))) +
@@ -1169,15 +753,14 @@ rm(month_data)
 
 What can we say?
 
-- Key finding: The data exhibits strong seasonality, with stop volumes peaking in a sustained plateau between June and October (roughly 18k–19k stops/month). Enforcement bottoms out in the winter, with the sharpest declines occurring in November (-17%) and December (-28%).
-- Interpretation: The stop volume is likely a direct proxy for "exposure." As temperatures rise, more 2-wheeled vehicles are on the road, increasing the opportunity for police to conduct stops. The "plateau" from June through October suggests that once the weather is consistently warm, ridership hits a saturation point, and enforcement activity maintains a high, stable operational baseline.
-- Comment: The sharp drops at the end of the year demonstrate that enforcement is reactive: it tracks the behavior of the riders. In other words, the decline in stops during winter is likely due to **reduced vehicle usage** rather than a change in police behavior.
-- Proposed Action: Given this clear seasonal pattern, we ensure our predictive models to include this time-related feature.
+- **Key finding**: The data exhibits strong seasonality for bikers, with stop volumes peaking in a plateau between June and October (roughly 18k–19k stops/month). Enforcement bottoms out in the winter, with the sharpest declines occurring in November (-17%) and December (-28%).
+- **Interpretation**: As temperatures rise, more 2-wheeled vehicles are on the road, increasing the opportunity for police to conduct stops. The "plateau" from June through October suggests that (once the weather is consistently warm) the trend hits a saturation point, and enforcement activity maintains a high baseline.
+- **Comment**: It would be easy to state that, the decline in stops during winter is likely due to **reduced vehicle usage** rather than a change in police behavior. However, both mechanisms are not distinguishable from the data alone.
+- **Proposed Action**: Given this clear seasonal pattern, we ensure our predictive models to include this time-related feature.
 
 Let us see this with respect to the year
 
 ```{r year-monthly-distribution}
-# Data prep with explicit "+" sign logic
 plot_data <- vehstops %>%
   filter(!is.na(year) & !is.na(month)) %>%
   count(year, month) %>%
@@ -1187,11 +770,9 @@ plot_data <- vehstops %>%
     n_jan = n[month == 1],
     n_max = max(n),
     is_max = n == n_max,
-    # Pre-calculate percentages for cleaner label logic
     pct_max = round((n - n_jan) / n_jan * 100, 0),
     pct_dec = round((n - n_max) / n_max * 100, 0),
     
-    # Custom Label Logic
     label_text = case_when(
       month == 1 ~ comma(n), 
       is_max ~ paste0(comma(n), "\n(", ifelse(pct_max > 0, "+", ""), pct_max, "%)"),
@@ -1235,10 +816,10 @@ rm(plot_data)
 
 What can we say?
 
-- Key finding: There is a pronounced "seasonal amplification" effect. While stop volume is increasing annually, the seasonal peaks are becoming more extreme, and the year-end "cooling off" period is becoming significantly sharper (from a -22% drop in 2023 to a -54% drop in 2025).
-- Interpretation: The data indicates that enforcement is becoming increasingly "concentrated" in the summer/autumn months. The gap between your "active season" (Max) and "off-season" (Dec) is widening. This suggests that the NYPD's activity for 2-wheelers is highly reactive to seasonal changes—either directly due to weather (fewer riders in winter) or due to a policy strategy that focuses enforcement efforts heavily on warmer months.
-- Comment: By highlighting the Jan-to-Max growth and the Max-to-Dec decline, we have moved the analysis beyond simple "volume counts". It clearly shows that while the baseline (January) is rising slightly, the *intensity* of the mid-year surges is growing much faster.
-- Proposed Action: Creating a binary indicator for "Hot Season" (April–Oct), that can effectively tell our models: "There is a structural change in the world during these months." This is way more interpretable than just a list of months.
+- **Key finding**: There is a pronounced "seasonal amplification" effect. While stop volume is increasing annually, the seasonal peaks are becoming more extreme, and the year-end "cooling off" period is becoming significantly sharper (from a -22% drop in 2023 to a -54% drop in 2025).
+- **Interpretation**: The data indicates that enforcement is becoming increasingly "concentrated" in the summer/autumn months. The gap between Max and "off-season" (Dec) shows a widening trend.
+- **Comment**: It clearly shows that while the baseline (January) is rising slightly, the *intensity* of the mid-year surges is growing much faster.
+- **Proposed Action**: Creating a binary indicator for "Hot Season" (April–Oct).
 
 ### Checking out `hot_season`
 
@@ -1252,7 +833,6 @@ vehstops <- vehstops %>%
 Now, for plotting
 
 ```{r year-hot-season-distribution}
-# 1. Create the indicator, count, and calculate percentages
 plot_data <- vehstops %>%
   filter(!is.na(year) & !is.na(month)) %>%
   mutate(
@@ -1264,19 +844,14 @@ plot_data <- vehstops %>%
   mutate(
     year_total = sum(n),
     pct = n / year_total,
-    # Combine count and percentage into a single label string
     label_text = paste0(comma(n), "\n(", round(pct * 100, 1), "%)")
   )
 
-# 2. Build the faceted barplot
 plot_data %>%
   ggplot(aes(x = is_hot_season, y = n, fill = is_hot_season)) +
   geom_col(show.legend = FALSE) +
-  # Facet by year
   facet_wrap(~year, nrow = 1) +
-  # Add labels: count on top, percentage below
   geom_text(aes(label = label_text), vjust = -0.5, size = 3.5, lineheight = 0.8) +
-  # Add vertical breathing room for the text
   scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
   scale_fill_brewer(palette = "Paired") +
   theme_minimal() +
@@ -1299,16 +874,15 @@ rm(plot_data)
 
 What can we say?
 
-- Key finding: Total enforcement volume is surging, but more importantly, the enforcement pattern is becoming **increasingly concentrated** in the "Hot Season." While the hot season accounted for \~64% of stops in 2023, it climbed to \~68% of stops in 2025.
-- Interpretation: The growth in stops is not uniform throughout the year. The rising percentage indicates that the "Hot Season" (April–Oct) is becoming a disproportionately larger driver of total annual stops year-over-year. This suggests that the NYPD's enforcement efforts for 2-wheelers are becoming more sensitive—or reactive—to the seasonal influx of riders.
-- Comment: This plot confirms that `hot_season` could be a "high-signal" feature.
-- Proposed Action: We could either use it in place of the month, or make it an interaction term with `year` (i.e., `is_hot_season * year`).
+- **Key finding**: Total enforcement volume is surging but, more importantly, the enforcement pattern is slowly becoming **increasingly concentrated** in the "Hot Season." In fat, while the hot season accounted for \~64% of stops in 2023, it reached \~68% of stops in 2025.
+- **Interpretation**: The growth in stops is not uniform throughout the year. The rising percentage indicates that the "Hot Season" (April–Oct) is becoming a disproportionately larger driver of total annual stops year-over-year. However, the 3 year span of the data does not make this definite.
+- **Comment**: This plot confirms that `hot_season` could be a "high-signal" feature. On the other hand, this cannot be just inferred by looking at the year.
 
 ### Dow/Weekday, Day and Doy
 
-We have decided to exclude 'Day of Month' (`day`) and 'Day of Year' (`doy`) from our feature set to mitigate 'calendar artifact' bias. These variables introduce artificial statistical noise rather than genuine operational signals.
+We have decided to exclude 'Day of Month' (`day`) and 'Day of Year' (`doy`) from our feature set to mitigate 'calendar artifact' bias.
 
-As we can see below, the structural variation in month length creates false activity dips for end-of-month dates
+As we can see below, the variation in month length creates false activity dips for end-of-month dates
 
 ```{r day-bias}
 vehstops %>%
@@ -1324,25 +898,20 @@ vehstops %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(title = "Volume of Stops by Day of the Month (1–31) for 2-Wheels Vehicles",
-       subtitle = "Note the drop at 31: this is a calendar artifact, not a behavior!",
+       subtitle = "The drop towards 30-31 indicates it is not a behavior!",
        x = "Day of the Month", y = "Count")
 ```
 
 Furthermore, `doy` variable suffers from inconsistent data density.
 
 ```{r doy-incosistent-3-years-span}
-# 1. Ensure you have a Date object
-# If you don't have a 'date' column, create one from year, month, day
 plot_data <- vehstops %>%
   mutate(date = as.Date(paste(year, month, day, sep = "-"))) %>%
   count(date)
 
-# 2. Plot the timeline
 plot_data %>%
   ggplot(aes(x = date, y = n)) +
-  # Raw data points (using alpha to reduce overplotting)
   geom_line(color = "grey70", alpha = 0.6, linewidth = 0.5) +
-  # Trend line (using a slightly larger span to show the multi-year trajectory)
   geom_smooth(method = "loess", span = 0.2, color = "steelblue", se = FALSE, linewidth = 1.2) +
   scale_x_date(date_breaks = "3 months", date_labels = "%b %Y") +
   theme_minimal() +
@@ -1366,7 +935,7 @@ rm(plot_data)
 
 While we observe a consistent seasonal clustering peaking in late summer, our current 3-year dataset captures three seasonal cycles. This is sufficient to identify a recurring pattern, but insufficient to establish it as a long-term trend.
 
-The next plot, demonstrates high daily volatility (indicated by the grey jitter) that significantly obscures the underlying seasonal trend (the blue trend line). Because the daily fluctuation is massive relative to the overall pattern, including 'Day of Year' as a feature risks overfitting.
+The next plot, demonstrates high daily volatility (indicated by the grey jitter) that obscures the underlying seasonal trend (the blue trend line). Because the daily fluctuation is relative to the overall pattern, including 'Day of Year' as a feature risks overfitting.
 
 ```{r doy-inconsistent-density}
 vehstops %>%
@@ -1382,7 +951,7 @@ vehstops %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(title = "Volume of Stops by Day of the Year (1–365) for 2-Wheels Vehicles",
-       subtitle = "The extreme jitter confirms this feature is too noisy to predict",
+       subtitle = "The extreme jitter confirms this feature is too noisy to predict, but the trend favors hot months",
        x = "Day of Year", y = "Count")
 ```
 
@@ -1397,9 +966,7 @@ vehstops %>%
   mutate(
     dow = factor(dow, levels = 1:7, 
                  labels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")),
-    # Calculate % change relative to the previous day
     pct_change = (n - lag(n)) / lag(n) * 100,
-    # Create the label: Count on top, % change on bottom
     label_text = ifelse(is.na(pct_change), 
                         comma(n), 
                         paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
@@ -1407,7 +974,6 @@ vehstops %>%
   ggplot(aes(x = dow, y = n, group = 1)) +
   geom_line(color = "steelblue", linewidth = 1) +
   geom_point(color = "steelblue", size = 3) +
-  # vjust = -0.6 lifts text off the point, lineheight compacts the text
   geom_text(aes(label = label_text), vjust = -1, size = 3, lineheight = 0.8) +
   scale_y_continuous(labels = comma, 
                      limits = c(0, NA), 
@@ -1428,30 +994,25 @@ vehstops %>%
 
 What can we say?
 
-- Key finding: Enforcement activity follows a distinct "Mid-Week Peak" cycle. The volume starts at its lowest on Monday, surges aggressively (+52.7%) into Tuesday, peaks on Wednesday/Thursday, and then exhibits a sustained decline toward the weekend.
-- Interpretation: This pattern strongly suggests that these stops are primarily linked to **commercial usage** (e.g., food delivery/courier services) rather than recreational riding. Recreational riders typically peak on weekends; the fact that your stops drop off on Saturday and Sunday reinforces that this enforcement is targeting "work-hour" traffic. The +52% jump from Monday to Tuesday is the most critical signal here—it suggests that Monday may be a "low volume" day for this specific gig-economy demographic, or that enforcement resources are being ramped up as the work week settles into its rhythm.
-- Comment: We have identified a non-linear relationship: the "Day of Week" effect isn't a straight line, it's a curve.
-- Proposed Action: We may keep `weekday` as the new `day` in the model, and even think about an interaction with `hot_season`. Also we need first to check the signal from other indicators previously built.
+- **Key finding**: Enforcement activity follows a distinct "Mid-Week Peak" cycle. The volume starts at its lowest on Monday, raises aggressively (+52.7%) into Tuesday, peaks on Wednesday/Thursday, and then declines toward the weekend.
+- **Comment**: This pattern *might* suggests that these stops are primarily linked to **commercial usage** (ex: food delivery/courier services) rather than recreational riding. In fact, it would be easier to think that recreational riders typically peak on weekends, while here we find that enforcement is targeting "work-hour" traffic as the volume drops on the weekend. The interpretation is plausible but not derivable from these counts alone.
+- **Proposed Action**: We may keep `weekday` as the new `day` in the model. Also we need first to check the signal from other indicators previously built.
 
 ### Hour and Time Bracket
 
 First of all we look at the overall cycle of stops volume
 
 ```{r hour-dist}
-# 1. Define the specific hours you want to highlight
 hours_to_show <- c(0, 4, 8, 12, 16, 19, 20, 23)
 
-# 2. Prepare the full dataset for the background line
 full_data <- vehstops %>%
   filter(!is.na(hour)) %>%
   count(hour)
 
-# 3. Prepare the highlighted data for points and labels
 highlight_data <- full_data %>%
   filter(hour %in% hours_to_show) %>%
   arrange(hour) %>%
   mutate(
-    # Percent change relative to the PREVIOUS HOUR IN THE LIST
     pct_change = (n - lag(n)) / lag(n) * 100,
     label_text = ifelse(
       is.na(pct_change), 
@@ -1459,15 +1020,11 @@ highlight_data <- full_data %>%
       paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
   )
 
-# 4. Plot
 ggplot() +
-  # Background line showing the full 24-hour context
   geom_line(data = full_data, aes(x = hour, y = n), color = "grey80", linewidth = 1) +
-  # Points and labels for specific hours only
   geom_point(data = highlight_data, aes(x = hour, y = n), color = "steelblue", size = 3) +
   geom_text(data = highlight_data, aes(x = hour, y = n, label = label_text), 
             vjust = -0.6, size = 3, lineheight = 0.8) +
-  # Scaling and Theme
   scale_x_continuous(breaks = 0:23) +
   scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
   theme_minimal() +
@@ -1491,47 +1048,36 @@ rm(hours_to_show, full_data, highlight_data)
 
 What can we say? In our opinion this looks like a "sine wave broken by a bridge". To be more precise:
 
-- Key finding: Enforcement volume is characterized by a "fractured" daily cycle. It follows a predictable overnight decline and morning ascent (0:00–12:00), but is interrupted by a distinct midday plateau (12:00–15:00) before reaching an aggressive evening peak at 19:00.
-- Interpretation: The data behaves like a sine wave that hits a structural impediment at noon. This suggests that the enforcement cycle is divided into two distinct operational phases: the **Morning Phase** (likely commuter-driven) and the **Evening Phase** (likely delivery/service-driven). The plateau is the "bridge" between these two worlds—a period of transition where ridership demographics potentially shift from commuters to service workers. Therefore, the variability during 10:00 to 15:00 is limited because the amount of vehicles on the road remains stable, as well as the police work.
-- Comment: This "bridge" (12:00–15:00) is the most revealing part of the graph. If this were a simple, smooth traffic curve, we would expect a direct climb to the peak. The fact that it plateaus indicates a "lull" or a shift in the operational tempo. It proves that a single `rush_hour` binary variable will be insufficient for your model; it will fail to capture the reality that the "evening rush" is a different phenomenon entirely from the "morning commute."
-- Proposed Action: We could optionally modify our bucketing of `time_bracket` into: `Overnight` (22:00–05:00), `Morning_Commute` (06:00–11:00), `Midday_Transition` (12:00–15:00), and `Evening_Peak` (16:00–21:00).
+- **Key finding**: Enforcement volume is characterized by a "fractured" daily cycle. It follows a predictable overnight decline and morning ascent (0:00–12:00), but is interrupted by a distinct midday plateau (12:00–15:00) before reaching an aggressive evening peak at 19:00.
+- **Interpretation**: This suggests that the enforcement cycle is divided into two distinct operational phases: the **Morning Phase** (likely commuter-driven) and the **Evening Phase** (likely delivery/service-driven). The plateau is the "bridge" between these two. the variability during 10:00 to 15:00 is limited because the amount of vehicles on the road remains stable, as well as the police work.
 
 Before anything else, let us see whether this cycle changed throughout the years.
 
 ```{r hour-year-dist}
-# 1. Define the specific hours you want to highlight
 hours_to_show <- c(0, 4, 8, 12, 16, 20, 23)
 
-# 2. Prepare the full background data for the lines
 full_data <- vehstops %>%
   filter(!is.na(year) & !is.na(hour)) %>%
   count(year, hour)
 
-# 3. Prepare the highlighted data for points and labels
-# We filter for our key hours *before* calculating percentage change
-# so it calculates the jump between those specific selected points.
 highlight_data <- full_data %>%
   filter(hour %in% hours_to_show) %>%
   group_by(year) %>%
   arrange(hour) %>%
   mutate(
     pct_change = (n - lag(n)) / lag(n) * 100,
-    label_text = ifelse(is.na(pct_change), 
-                        comma(n), 
-                        paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
+    label_text = ifelse(
+      is.na(pct_change), 
+      comma(n), 
+      paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
   )
 
-# 4. Plot
 ggplot() +
-  # Background line showing the full 24-hour context per year
   geom_line(data = full_data, aes(x = hour, y = n), color = "grey85", linewidth = 0.8) +
-  # Points and labels for specific hours only
   geom_point(data = highlight_data, aes(x = hour, y = n), color = "steelblue", size = 2) +
   geom_text(data = highlight_data, aes(x = hour, y = n, label = label_text), 
             vjust = -0.7, size = 2.5, lineheight = 0.8) +
-  # Facet by year
   facet_wrap(~year, nrow = 1) +
-  # Scaling and Theme
   scale_x_continuous(breaks = c(0, 4, 8, 12, 16, 20, 23)) +
   scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
   theme_minimal() +
@@ -1543,7 +1089,7 @@ ggplot() +
     strip.text = element_text(size = 11)
   ) +
   labs(
-    title = "Hourly Volume of Stops for 2-Wheels Vehicles",
+    title = "Hourly Volume of Stops, by Year, for 2-Wheels Vehicles",
     subtitle = "Aggregated stops showing velocity between key hours per year",
     x = "Hour of Day (0–23)", 
     y = "Count"
@@ -1554,22 +1100,15 @@ ggplot() +
 rm(hours_to_show, full_data, highlight_data)
 ```
 
-What can we say? \* Key finding: We are witnessing an "Evening Migration" of enforcement. While 2023 enforcement peaked at 16:00 (4:00 PM), the peak has decisively migrated to 20:00 (8:00 PM) in 2024 and 2025. Additionally, the enforcement volume near the 19:00-20:00 peak has nearly tripled between 2023 and 2025. \* Interpretation: The "operational center of gravity" has shifted later into the day. This suggests that the primary targets of enforcement (likely delivery/gig-economy riders) are increasingly active later into the evening, or that enforcement strategy has pivoted to address higher evening density. The "Morning Rush" (8:00–12:00) is growing, but the "Evening Rush" (16:00–20:00) is the clear driver of the total volume increase. \* Comment: It is critical to note that the shape of the curve is changing. In 2023, the distribution was flatter; by 2025, it has become a "sharper" curve with a very pronounced evening spike. This indicates that your predictive model cannot rely on a static "hour" feature. If the model treats "Hour 20" the same way in 2023 as it does in 2025, it will drastically under-predict the volume for 2025. \* Proposed Action: When building the model, we might consider to include an interaction term between `hour` and `year`. This will mathematically allow the model to learn that the "value" of 8:00 PM changes as the years progress. Alternatively we can better refine the binning dynamically over specific periods of time.
-
 What can we say?
 
-- Key finding: Enforcement is defined by routine, daily operations rather than event-based triggers. Among the three temporal variables analyzed, only "Weekend" status provides a meaningful statistical differentiation.
-- Interpretation: Police activity appears to be highly consistent, suggesting that enforcement is targeted at baseline daily traffic flow (likely commercial/commuter) rather than reacting to external calendar anomalies. The lack of variation during holidays and events indicates that these stops are not "surge" enforcement but rather a steady-state, daily commitment.
-- Comment: The "Holiday" and "Event" categories suffer from severe class imbalance (96–97% 'No'). Statistically, these features lack the variance required to train a robust model and will function more as "background noise" than as actionable predictive indicators.
-- Proposed Action: Exclude holiday and event_day from the feature set to reduce model complexity and prevent overfitting. Retain weekend as a core predictor.
+- **Key finding**: While 2023 enforcement peaked at 16:00 (4:00 PM), the peak has decisively migrated to 19:00-20:00 (7:00-8:00 PM) in 2024 and 2025. Additionally, the volume near the 19:00-20:00 peak has nearly tripled between 2023 and 2025.
+- **Interpretation**: This suggests that the primary targets of enforcement (likely delivery riders) are increasingly active later into the evening, or that (since 2024) enforcement volume and trend has taken a new look. The "Evening Rush" (16:00–20:00) is the clear driver of the total volume increase.
+- **Comment**: This may confirm our previous idea concerning the article cited above. It is possible that new regulations directly translated into increased amount of stops by the police.
 
 Now let us see if the hot season might shift this cycle
 
-TODO: Title and Subtitle
-
 ```{r hour-hot-season}
-# 1. Prepare data with hot_season variable
-# Assuming month column exists. If not, you may need to join/create it.
 plot_data_full <- vehstops %>%
   mutate(
     hot_season = ifelse(month %in% 4:10, 1, 0),
@@ -1578,11 +1117,9 @@ plot_data_full <- vehstops %>%
   ) %>%
   filter(!is.na(hour))
 
-# 2. Prepare full background data
 full_data <- plot_data_full %>%
   count(hot_season_label, hour)
 
-# 3. Define key hours and calculate velocity
 hours_to_show <- c(0, 4, 8, 12, 16, 20, 23)
 
 highlight_data <- full_data %>%
@@ -1596,7 +1133,6 @@ highlight_data <- full_data %>%
                         paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
   )
 
-# 4. Faceted plot
 ggplot() +
   geom_line(data = full_data, aes(x = hour, y = n), color = "grey85", linewidth = 0.8) +
   geom_point(data = highlight_data, aes(x = hour, y = n), color = "steelblue", size = 2) +
@@ -1627,10 +1163,9 @@ rm(plot_data_full, hours_to_show, full_data, highlight_data)
 
 What can we say?
 
-- Key finding: The "Center of Gravity" for enforcement shifts significantly between seasons. In the Off Season (Nov–Mar), activity peaks at 16:00 and declines rapidly thereafter. In the Hot Season (Apr–Oct), the peak is delayed until 20:00, with high volume sustained well into the evening.
-- Interpretation: Enforcement curve is governed by the "Sun and Temperature" cycle. During the colder months, ridership and commercial delivery activity are compressed into the earlier, slightly warmer/brighter parts of the day. In the Hot Season, the extended daylight and milder evening temperatures allow the "rush" to sustain four hours longer, shifting the peak demand to later in the day.
-- Comment: If we treat `hour` and `hot_season` as separate variables, our models will be "blind" to this shift. So it is best to use interaction terms and bin the hours in the best way possible.
-- Proposed Action: We must check the hours against the targets' ratios to double check our previous binning and then we can consider restricting the bins.
+- **Key finding**: The trend for enforcement shifts significantly between seasons. In the Off Season (Nov-Mar), activity peaks at 16:00 and then declines rapidly. In the Hot Season (Apr-Oct), the peak is at 20:00, with high volume sustained well into the evening.
+- **Interpretation**: Enforcement curve is governed by the "Sun and Temperature" cycle. During the colder months, police stops tend to take place during slightly warmer parts of the day.
+- **Proposed Action**: We must check the hours against the targets' ratios to double check our previous binning and then we can consider restricting the bins.
 
 Let us check the time brackets previously built.
 
@@ -1640,22 +1175,21 @@ plot_univariate_cat(
   FEATURE = time_bracket, 
   X_LABEL = "Time Bracket", 
   TITLE = "Distribution of Time Brackets",
-  SUBTITLE = "TODO"
+  SUBTITLE = "Enforcement is heavily skewed toward the latter half of the day (16-23)"
 )
 ```
 
 What can we say?
 
-- Key finding: Enforcement is heavily skewed toward the latter half of the day. The "Afternoon/evening" (16–19) and "Night" (20–23) brackets collectively account for the majority of stops, with the afternoon/evening block acting as the dominant peak. Consistent time-bracket definitions are essential for maintaining longitudinal integrity. Modifying brackets to "fit" observed peaks introduces selection bias that invalidates historical comparisons across your three-year dataset.
-- Interpretation: This confirms that the "Evening Migration" we observed in the previous charts is a structural trend. This effectively validates that your categorical buckets align with real-world activity peaks, rather than arbitrary time splits.
-- Comment: This is a clean, robust way to feed time data into a machine learning model. By using these brackets, you have significantly reduced the "noise" (like the variance between 16:00 and 17:00) while keeping the "signal" (the fact that 16:00–23:00 is high volume). This reduces the risk of overfitting compared to using the raw hour (0–23) or day_of_year (1–365) variables we discarded earlier.
-- Proposed Action: Maintain your existing time_bracket definitions exactly as they are. Instead of changing them, introduce an interaction term (time_bracket \* year) in your model.
+- **Key finding**: The "Afternoon/evening" (16–19) and "Night" (20–23) brackets collectively account for the majority of stops, with the afternoon/evening block acting as the dominant peak.
+- **Interpretation**: This confirms that the "Evening Migration" we observed in the previous charts is a structural trend. Also, it confirms that our buckets align well with the data.
+- **Proposed Action**: We can maintain our existing `time_bracket` exactly it is.
 
 Also, we are going to drop minute as its level of granularity cannot be properly included in the dataset.
 
 ## Motorist related predictors
 
-### Reported Age and Age Bracket
+### Reported Age
 
 We have mainly one issue here. First, we have many instances of drivers with unknown age,
 
@@ -1665,23 +1199,19 @@ plot_univariate_cat(
   FEATURE = age_bracket, 
   X_LABEL = "Age Bracket", 
   TITLE = "Distribution of Stops by Age Bracket",
-  SUBTITLE = "TODO"
+  SUBTITLE = "Enforcement volume is highly concentrated in the demographic (18–44)"
 )
 ```
 
 What can we say?
 
-- Key finding: Enforcement is highly concentrated in the "Early Career" demographic (18–44), with a massive, dominant peak at 25–34. The "Unknown" age category represents roughly 4–5% of the total dataset—a significant enough portion to require a specific strategy, but not enough to undermine the reliability of the overall distribution.
-- Interpretation: The data reflects a clear operational focus on younger, active drivers, which aligns perfectly with a gig-economy or courier demographic. The "Unknown" values are likely "Missing At Random" (MAR)—clerical omissions during the stop process (e.g., driver didn't have ID, officer was in a rush)—rather than a deliberate, systematic suppression of age data.
-- Comment: We do not treat the "Unknown" category as garbage data to be discarded. However, we could find useful to merge some categories such as Under 18 and 18-24, and adults between 55-64 and senior of 65+ years of age. This could be paired with some re-binning to shift the volume of overall stops and reduce the number of bins.
-- Proposed Action: We should check first how this
+- **Key finding**: A part from, what we decided to put into the subtitle, the "Unknown" age category represents a significant enough portion of the distribution.
+- **Interpretation**: The data reflects a clear operational focus on younger drivers, which represent the majority of bikers. There are very few observation for the 65+ bin, which may be considered outliers.
+- **Comment**: We do not treat the "Unknown" category as garbage data to be discarded.
 
 And now, let us see how this looks when looking at the full distribution
 
-FIXME: Horrible color scale TODO: Title, subtitle, annotations
-
 ```{r age-vs-age-bracket}
-# 1. Create the brackets and clean the data
 age_data <- vehstops %>%
   filter(!is.na(age), age >= 0, age < 100) %>%
   mutate(
@@ -1694,16 +1224,12 @@ age_data <- vehstops %>%
       age >= 55 & age <= 64 ~ "55–64",
       age >= 65 ~ "65+"
     ),
-    # Ensure the order is kept in the plot
     age_group = factor(age_group, levels = c("<18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+"))
   )
 
-# 2. Plotting
 ggplot(age_data, aes(x = age, fill = age_group)) +
-  # binwidth = 1 keeps the individual resolution
   geom_histogram(binwidth = 1, color = "white", linewidth = 0.1) +
-  # Adding clear color differentiation for the brackets
-  scale_fill_viridis_d(option = "mako") +
+  scale_fill_viridis_d() +
   theme_minimal() +
    theme(
     panel.grid.major.x = element_blank(),
@@ -1714,7 +1240,7 @@ ggplot(age_data, aes(x = age, fill = age_group)) +
   ) +
   labs(
     title = "Age Distribution of Drivers by Target Bracket",
-    subtitle = "Individual year resolution with custom enforcement brackets",
+    subtitle = "Enforcement volume is confirmed to be concentrated in 20-45 age range",
     x = "Driver Age", 
     y = "Count",
     fill = "Age Group"
@@ -1729,48 +1255,18 @@ rm(age_data)
 
 What can we say?
 
-- Key finding: Enforcement is heavily concentrated within the 20–45 age range, with a distinct operational peak occurring in the mid-20s. After age 50, there is a continuous, rapid decline in stop volume, forming a long, sparse "tail" that extends past 75.
-- Interpretation: The 20–45 concentration directly reflects the demographic profile of NYC's gig-economy delivery workforce, which is predominantly young-adult male. The sparse upper tail (55–75) consists of recreational riders and retirees who use 2-wheeled vehicles infrequently, reducing their exposure to enforcement stops.
-- Comment: The steep drop-off after age 40 creates high-leverage conditions for older age bins in any model using continuous `age`. A single linear coefficient cannot capture the sharp non-linearity; the bracket encoding is therefore superior to the raw numeric predictor.
-- Proposed Action: Filter your dataset to exclude drivers over age 75. This clarifies the "true" shape of your enforcement curve without losing actionable predictive signal. Collapse Sparse Brackets: Since the 55–64 and 65+ buckets have significantly lower counts than the 25–34 bucket, consider collapsing all drivers aged 55+ into a single "55+" category. This increases the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic. After checking ratio. This clarifies the "true" shape of your enforcement curve without losing actionable predictive signal. Collapse Sparse Brackets: Since the 55–64 and 65+ buckets have significantly lower counts than the 25–34 bucket, consider collapsing all drivers aged 55+ into a single "55+" category. This increases the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic. After checking ratio.
+- **Key finding**: Enforcement is confirmed to be heavily concentrated within the 20-45 age range, with a distinct operational peak occurring in the mid-20s. After age 50, there is a continuous, rapid decline in stop volume, forming a long and sparse "tail" that extends past 75.
+- **Proposed Action**: We want to filter our dataset to exclude drivers over age 75. This should enhance the shape of the enforcement curve without losing predictive signal. Furthermore, we may think of collapsing the 55–64 and 65+ buckets into a single "55+" category. This should increase the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic.
 
-
-```{r age-outlier-boxplot-before}
-vehstops %>%
-  filter(!is.na(age)) %>%
-  ggplot(aes(y = age)) +
-  geom_boxplot(fill = "steelblue", alpha = 0.6, width = 0.4,
-               outlier.size = 1.5, outlier.alpha = 0.4) +
-  coord_flip() +
-  theme_minimal() +
-  theme(
-    panel.grid.major.y = element_blank(),
-    plot.title         = element_text(size = 14),
-    plot.subtitle      = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title    = "Age Distribution before Outlier Removal",
-    subtitle = "Values span the plausible 16–60 enforcement range",
-    y = "Reported Age", x = NULL
-  )
-```
-
-What can we say?
-
-- Key finding: 
-- Interpretation: 
-- Comment:
-- Proposed Action:
-
-TODO: Boxplot to justfy this removal TODO: In 4-wheels, change this accordingly
+Let us remove the outliers
 
 ```{r remove-age-outliers}
+# Keep the NAs
 vehstops <- vehstops %>%
-  filter(age < 76)
+  filter(age < 76 | is.na(age))
 ```
 
 From now on we will consider drivers of age in the range 16-75.
-
 
 ```{r age-outlier-boxplot-after}
 vehstops %>%
@@ -1782,11 +1278,11 @@ vehstops %>%
   theme_minimal() +
   theme(
     panel.grid.major.y = element_blank(),
-    plot.title         = element_text(size = 14),
-    plot.subtitle      = element_text(color = "grey50", size = 10)
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title    = "Age Distribution after Outlier Removal (76+ excluded)",
+    title = "Age Distribution after Outlier Removal (76+ excluded)",
     subtitle = "Remaining values span the plausible 16–75 enforcement range",
     y = "Reported Age", x = NULL
   )
@@ -1794,14 +1290,11 @@ vehstops %>%
 
 What can we say?
 
-- Key finding: After removing riders aged 76+, the remaining distribution is right-skewed with the median around 28–32 and the IQR roughly 22–40. The residual "outliers" shown by the boxplot (ages \~65–75) are plausible and are retained.
-- Interpretation: The right skew confirms the gig-economy delivery worker demographic profile. The sparse upper tail (55–75) consists of recreational riders and retirees whose low volume reduces their enforcement exposure.
-- Comment: The steep drop-off after age 40 means older ages have high statistical leverage if continuous `age` is used — a small number of observations at unusual predictor values can pull coefficients. The bracket encoding mitigates this by pooling sparse ages into wider bins.
-- Proposed Action: Use `age_bracket` as the primary age predictor. Retain continuous `age` for non-parametric diagnostics only.
+- **Key finding**: After removing riders aged 76+, the remaining distribution is right-skewed with the median around 28–32 and the IQR roughly 22–40. The residual "outliers" shown by the boxplot (ages \~65–75) are plausible.
+- **Interpretation**: The steep drop (seen before) after age 40 means older ages may have high statistical leverage if continuous `age` is used. In fact, a small number of observations at unusual values can pull coefficients. The bracket encoding mitigates this by pooling sparse ages into wider bins.
+- **Proposed Action**: We want to use `age_bracket` as the primary age predictor. Also we may compare it against `age` for model comparison.
 
 ### Reported Sex
-
-TODO: Make it better FIXME: Use "Male", "Female", "Unknown"
 
 ```{r sex-distribution}
 plot_univariate_cat(
@@ -1816,14 +1309,12 @@ plot_univariate_cat(
 
 What can we say?
 
-- Key finding: The data exhibits extreme class imbalance. "Male" (M) drivers represent the overwhelming majority of enforcement stops (approximately 96%), while "Female" (F) and "Unknown" (U) represent a negligible fraction of the total volume.
-- Interpretation: This is not a data quality issue—it is an operational reflection of the driver demographic being targeted Because the skew is so profound, "Sex" will inevitably become a high-importance feature in any model you train. The model will essentially learn that "Being Male = High Probability of Stop" simply because that is the status quo in the dataset.
-- Comment: You must be cautious here. If you use this feature as-is, you risk creating a model that is "biased by design." Because the dataset is so skewed, the model could achieve very high mathematical accuracy by simply predicting "Male" for every single case. You are currently looking at exposure (who is on the road), not necessarily propensity (who is most likely to be stopped).
-- Proposed Action: Run a correlation matrix to see if sex is highly correlated with other variables. When splitting your data for training/testing, ensure you use stratified sampling (preserving the M/F/U ratio in both sets). If you don't, your test set might end up with no "Female" or "Unknown" records, making it impossible to evaluate your model's performance on those sub-groups
+- **Key finding**: The data exhibits extreme class imbalance. "Male" (M) drivers represent the overwhelming majority of enforcement stops (approximately 96%), while "Female" (F) and "Unknown" (U) represent a negligible fraction of the total volume.
+- **Interpretation**: This is a reflection of the driver demographic being targeted.
+- **Comment**: Because the skew is so profound, `sex` will inevitably become a high-importance feature in any model we train.
+- **Proposed Action**: We are going to investigate this predictor further. First, we are going to use correlation matrix (in the bivariate EDA) to see if sex is highly correlated with other variables. Then, we ensure to use stratified sampling (preserving the M/F/U ratio in both sets) for fitting and testing.
 
 ### Reported Ethnicity
-
-TODO: Better title, subtitle, annotation with percentage, less angle
 
 ```{r ethnicity-distribution}
 plot_univariate_cat(
@@ -1831,45 +1322,34 @@ plot_univariate_cat(
   FEATURE = ethnicity, 
   X_LABEL = "Reported Ethnicity", 
   TITLE = "Distribution of Stops by Reported Ethnicity (Sorted by Count)",
-  SUBTITLE = "TODO",
+  SUBTITLE = "Hispanic drivers seem to account for the plurality of stops",
   order_by = "freq"
 )
 ```
 
 What can we say?
 
-- Key finding: The distribution is heavily skewed, with "Hispanic" drivers accounting for the plurality of stops (over 86,000), far outpacing other groups. The "Unknown" category is also statistically significant (\~16,800), mirroring the data quality patterns you observed with age.
-- Interpretation: This data does not reflect a balanced, random sampling of the driving population; it reflects an enforcement density. The high concentration of specific demographics suggests that either the geographic areas targeted for enforcement have high Hispanic populations, or the specific types of vehicles/courier work being monitored are disproportionately staffed by this demographic.
-- Comment: Because the distribution is so imbalanced, a machine learning model will aggressively use "ethnicity" to predict stops. It will effectively "learn" that a stop is more likely for one group over another based on the historical pattern.
-- Proposed Action: Before including ethnicity in your regression, perform a correlation check against boro. When training your model, ensure your training and testing splits are stratified by ethnicity.
+- **Key finding**: The distribution is heavily skewed towards hispanic and black subjects. The "Unknown" category is also statistically important, mirroring the patterns we observed with age.
+- **Interpretation**: This data does not reflect a random sampling of the driving population. The high concentration of specific demographics suggests that either (a) the geographic areas targeted for enforcement have high Hispanic populations, or (b) the specific types of vehicles being monitored are disproportionately staffed by this demographic.
+- **Comment**: Because the distribution is so imbalanced, a machine learning model will probably use "ethnicity" to predict stops. In this case it "learns" that a stop is more likely for one group over another based on this pattern.
+- **Proposed Action**: Before including ethnicity in our regression, we perform a correlation check against geographical and time related predictors. Also, we will stratify the splits based also on this predictor.
 
 ------------------------------------------------------------------------
 
 # Bivariate EDA
 
-We have structured this analysis into three distinct phases. First, we employ a Cramer’s V association matrix to assess categorical relationships; this is preferred over a standard Chi-squared test as it provides a normalized measure of strength better suited to our large data volume.
-
-To complement this, we utilize visual trend analysis to detect potential collinearity. By plotting arrest rates over time and faceting by variables such as "Area," we can observe whether patterns "drift" in unison. Parallel movement across these facets strongly suggests collinearity.
-
-Finally, once we transition to the modeling phase, we will implement formal post-hoc diagnostics, such as Generalized Variance Inflation Factors (GVIF), to rigorously validate our model's integrity.
-
 ## Association of Binary Response vs. Categorical Predictors
 
-When dealing with a massive dataset like ours (nearly 200,000 records), traditional p-values from Chi-squared tests become hypersensitive—nearly every relationship will appear "statistically significant" simply because of the sample size.
+When dealing with a dataset of this size, traditional p-values from chi-squared tests become meaningless. With \~185k observations, virtually any association achieves p \< 0.001 regardless of whether it matters in practice.
 
-To bypass this, we use Cramer’s V to measure Effect Size. It acts as a correlation coefficient for categorical data, scaling the association between two variables on a range from 0 to 1:
+To get around this, we use Cramer’s V to measure effect size (association).
 
-- 0: Indicates no association between the variables.
-- 1: Indicates a perfect association.
-
-By calculating the square root of the Chi-squared statistic ($X^2$) divided by the sample size ($n$) and the minimum dimension of the contingency table ($k−1$), we obtain a normalized value. This allows us to move beyond "Is there a relationship?" and instead answer "How strong is this relationship?", effectively ranking our features by their practical importance rather than just their statistical noise.
-
-Because of how the `table()` function works in R, we are able to include numerical predictors, such as `hour` and `age`, due to the fact they do not take "continuous" values and can be treated like categorical predictors.
+Because of how the `table()` function works in R, we can also include integer predictors like `hour` and `age`: they do not take truly continuous values in this dataset, so treating each integer as its own category is valid.
 
 ```{r categorical-correlation-heatmap}
 # Excluding doy (redundant) and dow (we use weekday instead)
 columns <- c(
-  "year" , "month", "hot_season", "day", "weekday", 
+  "year" , "month", "hot_season", "weekday", 
   "hour", "time_bracket",
   "area", "boro", 
   "sex", "ethnicity", "age", "age_bracket",
@@ -1883,40 +1363,14 @@ plot_categorical_correlation(
 )
 ```
 
-What can we say? Arrested and Veh Checkpoint is mostly associated with (sex?), age/age_bracket, ethnicity, area/boro, year, month/hot_seson, and hour/time_bracket
-
-- Key finding: No single categorical predictor achieves a strong Cramer's V (\> 0.30) with `arrested`. The highest individual associations with the targets are modest, suggesting that predictive signal is distributed across many weakly informative features. The strongest associations in the matrix are between pairs of redundant predictors: `month` ↔ `hot_season` (definitional overlap), `age` ↔ `age_bracket` (re-encoding), and `area` ↔ `boro` (hierarchical geography).
-- Interpretation: The low values across the arrested row suggest that no single categorical feature is a "smoking gun" for predicting an arrest on its own. The classification problem is inherently multivariate — no variable alone differentiates arrested from non-arrested stops. This is consistent with enforcement being a complex interaction of time, location, and demographic factors simultaneously.
-- Comment: With \~185k observations, Cramer's V is the right measure here — chi-squared p-values are essentially meaningless at this sample size since nearly any association achieves p \< 0.001. Cramer's V between 0.10–0.20 represents a weak-to-moderate practical effect; above 0.30 is strong. The matrix also flags potential collinearity pairs: including both `month` and `hot_season`, or both `area` and `boro`, in the same model would be redundant.
-- Proposed Action: Do not use this matrix to rank-order individual predictors for inclusion. Instead, use LASSO with cross-validation to identify the optimal combination of features. Remove one member of each high-V pair (`hot_season` over `month` for parsimony; `boro` over `area` if CV supports it). The pair `age` ↔ `age_bracket` is a re-encoding choice — use only one.
-
-## Correlation of Numerical Features
-
-We can still check Pearson's correlation of numerical columns.
-
-```{r}
-numerical_cols <- c(
-  "arrested",
-  "year", "month", "day", "hour", 
-  "latitude", "longitude", 
-  "age"
-  )
-
-cor_matrix <- cor(vehstops[, numerical_cols], use = "complete.obs")
-
-corrplot(cor_matrix, method = "color", type = "upper",
-         order = "hclust", addCoef.col = "black", number.cex = 0.7,
-         tl.col = "black", tl.srt = 45,
-         title = "Correlation Matrix of Numerical Features",
-         mar = c(0, 0, 2, 0))
-```
-
 What can we say?
 
-- Key finding: 
-- Interpretation:
-- Comment: 
-- Proposed Action:
+- **Key finding**: The association matrix reveals that the only predictors showing a noticeable signal with `arrested` are `ethnicity` ($0.1$), `time_bracket` ($0.11$), `hour` ($0.12$), `area` ($0.13$), and `boro` ($0.13$). Conversely, demographic features such as `sex` ($0.02$) and `age` / `age_bracket` ($0.04$) share negligible pairwise associations with the target. The matrix highlights a moderate association between these top predictors, specifically between
+  - the geographic and temporal blocks `area`/`boro` $\leftrightarrow$ `hour`/`time_bracket` (which cluster around a Cramer's V of $0.08$ to $0.09$) and,
+  - between `ethnicity` $\leftrightarrow$ `area`/`boro` ($0.17$ to $0.19$).
+- **Interpretation**: Temporal and spatial circumstances carry the strongest individual impact when predicting an arrest, while motorist demographics are less informative as standalone predictors. However, the $0.09$ association between the main spatial and temporal features indicates the volume of stops are non-uniformly distributed across time and space. In other words, this suggests an underlying interaction between these two classes of predictors.
+- **Comment**: Because no single predictor strongly correlates with `arrested`, models relying purely on main effects will likely underfit the data. The intersection of geography and time is where the true narrative of police behavior resides, as patrol priorities and ridership composition (such as delivery workers vs. overnight riders) change depending on the borough and hour. Surfacing patterns of excessive enforcement requires us to model these blocks conditionally rather than treating them as entirely independent factors.
+- **Proposed Action**: We will focus our predictive models on the spatial and temporal axes by retaining `area` and `time_bracket` as our primary drivers. Possibly, we can try to capture the interaction term (`area` $\times$ `time_bracket`) in our logistic regression. This approach will allow us to test if the probability of arrest spikes during specific hours in specific areas.
 
 ## Geospatial Features
 
@@ -1947,10 +1401,10 @@ vehstops %>%
 
 What can we say? Remember that Staten Island and Bronx are the areas with the least volume of stops.
 
-- Key finding: Low-volume areas (Staten Island, Bronx) show arrest rates noticeably above the citywide average, while high-volume areas (Brooklyn, Queens) cluster closer to the global mean of \~5.6%. The gap can reach 3–5 percentage points between the extremes.
-- Interpretation: In low-volume areas, patrol officers conduct fewer but more targeted stops; the baseline event rate is therefore higher because uninformative stops are less common. This precision-volume tradeoff is a common feature of enforcement data: where officers have fewer total stops, each one tends to be more consequential.
-- Comment: The apparent higher arrest rate in low-volume areas may partly reflect geographic heterogeneity within each area category rather than genuinely more aggressive policing — the area aggregation compresses large within-group variance. Small denominators also inflate uncertainty; confidence intervals around Staten Island and Bronx estimates are substantially wider.
-- Proposed Action: Include `area` as a candidate predictor in both models, but also test `boro` as a finer-grained alternative. Do not discard `area` prematurely; the aggregate signal is real even if the mechanism is partially compositional.
+- **Key finding**: This plot reveals a noticeable disparity in the proportions of vehicle stops that culminate in arrests for two-wheeled vehicles across New York City boroughs. The arrest rate ranges from a minimum of $3.2\%$ in Manhattan to a maximum of $12.1\%$ in the Bronx. This represents nearly a 4x increase in the relative probability of an arrest depending on the location of the encounter. Also, low-volume areas (Staten Island, Bronx) show arrest rates above the citywide average, while high-volume areas (Brooklyn, Queens) are closer to the global mean.
+- **Interpretation**: For the Bronx ($N = 29,874$), the $12.1\%$ arrest rate is calculated from the 3,628 arrests, proving that the elevated rate is a robust signal. However, the $8.5\%$ arrest rate in Staten Island is derived from only 125 events ($n = 125$ out of $N = 1,477$), meaning our parameter estimation (for this area) will have a wider confidence interval and higher susceptibility to sampling noise. For the remaining areas, we have more stable signals.
+- **Comment**: While the absolute majority of stops do not end in an arrest anywhere, the relative jump to a $12.1\%$ arrest rate in the Bronx is statistically and socially salient. The plot, together with this table, add critical context to the narrative. It reveals that the areas with the fewest total stops (Staten Island and the Bronx) yield the highest relative proportions of arrests. It highlights an interesting paradox where high-density, high-volume areas like Manhattan experience a massive volume of stops ($50,928$) but maintain a minimal arrest incidence. This could confirm that police behavior **vary** by territory.
+- **Proposed Action**: We include `area` as a candidate predictor in our models, but also test `boro` as a finer-grained alternative. We are going to stratify this aspect of the data too.
 
 ### Borough
 
@@ -1962,40 +1416,35 @@ ratio_by_cat(
   target_labels = c("No", "Yes"),
   subtitle = "For 2-Wheels Vehicles it confirms the Increased Arrest Ratio in Low Volume Areas",
   label_vjust = 0.5,
-  bar_width = 0.6,
+  bar_width = 0.8,
   text_size = 2.5
 )
 ```
 
 What can we say?
 
-- Key finding: The borough-level view reveals heterogeneity that the coarser area aggregation conceals. Several boroughs sit 3–4 percentage points above their parent area's average arrest rate, indicating that averaging across boroughs within an area masks meaningful within-area variation. High-arrest boroughs are not limited to a single geographic cluster.
-- Interpretation: Borough-level differences likely reflect a combination of patrol allocation decisions, local enforcement priorities, and the composition of riders (e.g., delivery-worker density varies considerably across sub-boroughs). Where a single borough dominates stop volume within its area category, it can pull the area average toward its own rate, masking outlier boroughs in the same category.
-- Comment: With around 70+ distinct boroughs, the per-borough sample sizes vary enormously and some boroughs carry wide uncertainty. Boroughs with fewer than a few hundred stops should be interpreted with caution; their extreme rates may be sampling artifacts rather than structural enforcement differences.
-- Proposed Action: Prefer `boro` over `area` as the geographic predictor in the arrest model given its higher discriminative power. If collinearity or sparsity is a concern, consider grouping the lowest-volume boroughs into an "Other" category or using a hierarchical random-effect specification.
+- **Key finding**: Disaggregating (some of) the geographic data into finer regions preserves the overall ranking but reveals a minor intra-borough variance. The Bronx ($12.1\%$) and Staten Island ($8.5\%$) remain the primary "outliers", while the separated regions display a steady gradient ranging from a minimum of $3.0\%$ in Manhattan (South) to a maximum of $6.1\%$ in Brooklyn (South).
+- **Interpretation**: This fine-grained visualization confirms that the macro patterns (observed previously) are robust. Within the boroughs that were split, we observe small localized shifts. This suggests that this predictor could explain even better the association with arrests.
+- **Proposed Action**: Since this level of fine-grain does not change the macro narrative but adds complexity, we should perform a test on nested logistic models. This aims to see whether a greater division achieves a statistically significant improvement over the simpler area-based model. In case the change is not significant, we will opt for a parsimonious model.
 
 We will need to choose between one or the other.
 
 ### Latitude and Longitude for Stop Rate
 
 ```{r}
-# Download NYC Borough boundaries once
 nyc_map <- counties(state = "NY", cb = TRUE) %>%
   filter(NAME %in% c("Bronx", "Kings", "New York", "Queens", "Richmond"))
 
-# 1. Define the grid resolution (match this with your desired density)
 bins <- 100
 lon_breaks <- seq(-74.26, -73.71, length.out = bins + 1)
 lat_breaks <- seq(40.48, 40.92, length.out = bins + 1)
 
-# 1. Generate the grid_sum object for Arrest Rate
 grid_sum_rate <- vehstops %>%
   filter(!is.na(longitude), !is.na(latitude), !is.na(arrested)) %>%
   mutate(
     xbin = cut(longitude, breaks = lon_breaks, include.lowest = TRUE, right = FALSE),
     ybin = cut(latitude, breaks = lat_breaks, include.lowest = TRUE, right = FALSE)
   ) %>%
-  # Extract the center point of each bin
   mutate(
     x = as.numeric(gsub(".*\\[(.*),.*", "\\1", xbin)) + (lon_breaks[2] - lon_breaks[1])/2,
     y = as.numeric(gsub(".*\\[(.*),.*", "\\1", ybin)) + (lat_breaks[2] - lat_breaks[1])/2
@@ -2006,20 +1455,15 @@ grid_sum_rate <- vehstops %>%
     arrest_rate = mean(arrested == 1),
     .groups = "drop"
   ) %>%
-  # Filter out low-volume bins to reduce statistical noise
   filter(total_stops >= 5)
 
-# 2. Plot with NYC Map base layer
 ggplot() +
-  # NYC Borough Boundaries
   geom_sf(data = nyc_map, fill = "white", color = "grey80", linewidth = 0.2) +
-  # Arrest Rate Tiles
   geom_tile(data = grid_sum_rate, aes(x, y, fill = arrest_rate), alpha = 0.8) +
-  # Color scale: Highlighting high arrest rate areas
   scale_fill_viridis_c(
     labels = scales::percent, 
     name = "Arrest Rate", 
-    option = "inferno", # 'Inferno' is great for highlighting "hot" spots
+    option = "inferno",
     direction = -1
   ) +
   coord_sf(xlim = c(-74.26, -73.71), ylim = c(40.48, 40.92)) +
@@ -2037,14 +1481,16 @@ ggplot() +
   )
 ```
 
+What can we say?
+
+- **Key finding**: The visualization displays highly localized hot spots, particularly in the Bronx,, southern Brooklyn and northern Staten Island. Here, in fact, some specific bins show arrest rates climbing well above $40\%$ and even reaching up to $80\%$.
+- **Interpretation**: While this highlights a great geographic heterogeneity, it exposes a critical limitation regarding model integration because spatial data violates the assumption of independence.
+
 ## Time related features
 
 ### Year
 
-FIXME: Do by line plot by year
-
 ```{r year-vs-arrested-ratio}
-# 1. Calculate Arrest Rate per year
 arrest_trends <- vehstops %>%
   filter(!is.na(year), !is.na(arrested)) %>%
   group_by(year) %>%
@@ -2055,11 +1501,9 @@ arrest_trends <- vehstops %>%
     .groups = 'drop'
   ) %>%
   arrange(year) %>%
-  # 2. Calculate the year-over-year change in percentage points
   mutate(
     prev_rate = lag(rate),
-    delta = (rate - prev_rate) * 100, # Convert to percentage points
-    # 3. Create labels: Rate + Delta
+    delta = (rate - prev_rate) * 100,
     label_text = ifelse(
       is.na(prev_rate), 
       scales::percent(rate, accuracy = 0.1), 
@@ -2068,14 +1512,10 @@ arrest_trends <- vehstops %>%
     )
   )
 
-# 4. Plotting
 ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
-  # Draw the trend line
   geom_line(color = "steelblue", linewidth = 1) +
   geom_point(color = "steelblue", size = 3) +
-  # Add the labels
   geom_text(aes(label = label_text), vjust = -0.8, size = 3.5, lineheight = 0.8) +
-  # Scale y-axis as percentage
   scale_y_continuous(
     labels = scales::percent, 
     limits = c(0, max(arrest_trends$rate) * 1.3), # Extra room for labels
@@ -2089,22 +1529,20 @@ ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
   ) +
   labs(
     title = "Annual Arrest Rate has been Slowly Rising in the last 3 years",
-    subtitle = "Calculated as the percentage of stops resulting in an arrest",
+    subtitle = "The percentage of arrests kept increasing in this period",
     x = "Year", y = "Arrest Rate (%)"
   )
 ```
 
 What can we say?
 
-- Key finding: The annual arrest rate has risen monotonically from approximately 4.5% in 2023 to approximately 6.5% in 2025, an increase of roughly 2 percentage points over three years. This rise occurred against a backdrop of a large volume surge in 2024 driven by new e-bike regulation enforcement, meaning the absolute number of arrests grew even faster than the rate implies.
-- Interpretation: The most plausible mechanism is regulatory: New York City's expanded e-bike enforcement framework introduced in 2023–2024 reclassified certain violations as arrestable offenses, lowering the threshold for custodial action. If more stops now carry a legal basis for arrest, a rising rate would be expected even without any change in officer behavior. Compositional effects — a larger share of stops involving registered violations — may also contribute.
-- Comment: Because 2025 data covers only part of the year (data collected through March 2026 but stops may be distributed unevenly), the 2025 rate should be interpreted cautiously. Partial-year data can distort seasonal averages if the covered months differ systematically in their arrest propensity. This is an observational dataset; a rising arrest rate does not by itself indicate escalating enforcement aggressiveness.
-- Proposed Action: Include `year` as a linear or categorical predictor in both models to absorb the secular trend. Test whether the year effect interacts with `hot_season` before deciding on a specification. If only three year values are available, treat year as a categorical rather than continuous variable to avoid imposing linearity.
+- **Key finding**: The line chart displays the trajectory (of the annual arrest rate for two-wheeled vehicles over a three-year period) revealing an upward trend. The proportion of stops resulting in an arrest rose from $4.4\%$ in 2023 to $5.6\%$ in 2024 (a jump of $+1.2$ percentage points), followed by a slighter increase to $6.0\%$ in 2025 (an additional $+0.4$ percentage points).
+- **Interpretation**: From a time related perspective, this demonstrates the probability of an arrest given a stop is evolving over time. In a predictive framework, this upward drift means that older data points (such as those from 2023) may underestimate current arrest probabilities.
+- **Proposed Action**: We should check for an association effect between time and geography by plotting these three-year trends faceted by area/borough to see if the growth is uniform. Furthemore, we may include `year` as a categorical predictor to absorb the yearly trend.
 
 ### Month and Hot Season
 
 ```{r month-vs-arrested-ratio}
-# 1. Aggregate and calculate monthly arrest rate
 monthly_arrest_data <- vehstops %>%
   filter(!is.na(month), !is.na(arrested)) %>%
   group_by(month) %>%
@@ -2116,11 +1554,9 @@ monthly_arrest_data <- vehstops %>%
   ) %>%
   mutate(month = factor(month, levels = 1:12)) %>%
   arrange(month) %>%
-  # 2. Calculate point difference (delta)
   mutate(
     prev_rate = lag(rate),
     delta = (rate - prev_rate) * 100,
-    # Create the label: Rate on top, Point change on bottom
     label_text = ifelse(
       is.na(prev_rate), 
       scales::percent(rate, accuracy = 0.1), 
@@ -2129,12 +1565,10 @@ monthly_arrest_data <- vehstops %>%
     )
   )
 
-# 3. Plot
 monthly_arrest_data %>%
   ggplot(aes(x = month, y = rate, group = 1)) +
   geom_line(color = "steelblue", linewidth = 1) +
   geom_point(color = "steelblue", size = 3) +
-  # Use nudge_y if labels overlap the line, vjust handles the vertical position
   geom_text(aes(label = label_text), vjust = -1.2, size = 3, lineheight = 0.8) +
   scale_x_discrete(labels = month.abb) +
   scale_y_continuous(
@@ -2150,7 +1584,7 @@ monthly_arrest_data %>%
   ) +
   labs(
     title = "Monthly Arrest Rate Trend",
-    subtitle = "Aggregated monthly arrest rate; variation shown in percentage points",
+    subtitle = "Aggregated monthly arrest rate, the peak is found in the summer months",
     x = "Month",
     y = "Arrest Rate (%)"
   )
@@ -2158,14 +1592,11 @@ monthly_arrest_data %>%
 
 What can we say?
 
-- Key finding: Monthly arrest rates display a pronounced counter-seasonal pattern: winter months (November–February) show the highest rates, in the range of roughly 7–8%, while summer months (June–August) dip to approximately 4–5%. The seasonal swing amounts to 3–4 percentage points, a substantial effect relative to the overall mean of \~5.6%.
-- Interpretation: This counter-seasonality is consistent with a precision-volume tradeoff. In summer, enforcement volume surges due to higher rider activity and targeted e-bike regulation campaigns; the influx of stops includes many lower-risk riders, diluting the arrest rate. In winter, overall stop volume falls sharply, but the residual stops tend to involve riders with more serious violations or outstanding warrants — the type who ride in adverse conditions despite elevated risk of contact. The composition of the stopped population therefore shifts toward higher-risk individuals in winter.
-- Comment: The counter-seasonal pattern contrasts sharply with the pro-seasonal checkpoint rate (see below) and is a key analytical finding: the two targets respond in opposite directions to the same seasonal driver. Any model that pools them without accounting for this divergence will produce misleading seasonal coefficients. Note that month aggregates across years; year-specific variation is examined in the faceted chart.
-- Proposed Action: Encode seasonality using the `hot_season` binary as the primary seasonal signal. Additionally, test `month` as a factor or a circular spline to capture finer within-season variation. Expect a negative coefficient on `hot_season` for the arrest model.
+- **Key finding**: The monthly arrest rate line chart describes a clear intra-year pattern. The arrest rates climb up from March and peak at $6.5\%$ in July and September. Then, they drop sharply during autumn and winter months to a minimum of $4.4\%$ in December.
+- **Interpretation**: The surge in the arrest rate during warmer months indicates that enforcement volume increases along with rider volume, or that specific initiatives are altering the probability of an arrest.
+- **Proposed Action**: We try to encode seasonality using the `hot_season` binary predictor.
 
 What about `hot_season`?
-
-FIXME: Correct it
 
 ```{r hot-season-vs-arrested-ratio}
 ratio_by_cat(
@@ -2173,7 +1604,7 @@ ratio_by_cat(
   "Hot Season", "Arrest Rate (%)", "Arrest Ratio by Season",
   style = "stack", legend_title = "Stop ended in arrest?",
   target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio in Low Volume Areas",
+  subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio during Hot Months",
   label_vjust = 0.5,
   text_size = 2.5,
   bar_width = 0.7
@@ -2182,17 +1613,13 @@ ratio_by_cat(
 
 What can we say?
 
-- Key finding: The off-season arrest rate (approximately 6–6.5%) is noticeably higher than the hot-season rate (approximately 4.5–5%), a gap of roughly 1.5–2 percentage points. This validates the `hot_season` binary as capturing a meaningful partition of enforcement intensity: the two season categories do differ substantially in their arrest propensity.
-- Interpretation: During the hot season (April–October), rider volume surges and enforcement campaigns target a broader, more diverse pool of 2-wheel vehicles; many stopped riders have minor or no violations, diluting the arrest rate. In the off-season, activity is lower but residual riders tend to be more habitual users or those with outstanding violations, concentrating higher-risk encounters in fewer stops.
-- Comment: The `hot_season` binary collapses seven months into a single category, which will average over within-season heterogeneity — for example, April and October may behave more like the off-season than June or August. Nevertheless, the binary is a pragmatic choice that balances interpretability with predictive utility. If finer resolution is needed, the monthly analysis provides the additional granularity.
-- Proposed Action: Include `hot_season` in the arrest model as a main-effect predictor with an expected negative coefficient. Confirm that the effect persists after controlling for geography and hour, which may partially confound the seasonal signal (e.g., summer brings more stops in high-volume areas, which already have lower arrest rates).
+- **Key finding**: In the cold season, the arrest rate stays at $4.8\%$, whereas during the hot season, the probability of a stop ending in an arrest climbs to $5.9\%$.
+- **Comment**: This visualization acts as a feature engineering verification step, confirming that compressing the 12 calendar months into a simplified variable preserves a robust signal. The $1.1$ percentage point difference, confirms that seasonal enforcement behavior can be captured via a single binary flag.
+- **Proposed Action**: Before committing exclusively to this binary feature in our final production model, we should evaluate if this oversimplifies the data.
 
 #### Faceted
 
-FIXME: Fix the annotations
-
 ```{r month-faceted-vs-arrested-ratio}
-# Data prep: Calculate arrest rates and labeling logic
 plot_data <- vehstops %>%
   filter(!is.na(year), !is.na(month), !is.na(arrested)) %>%
   group_by(year, month) %>%
@@ -2206,13 +1633,10 @@ plot_data <- vehstops %>%
     rate_jan = arrest_rate[month == 1],
     rate_max = max(arrest_rate),
     is_max = arrest_rate == rate_max,
-    
-    # Calculate percentage point differences
-    # Jan vs current, Max vs current
+  
     diff_jan = (arrest_rate - rate_jan) * 100,
     diff_dec = (arrest_rate - rate_max) * 100, 
     
-    # Custom Label Logic
     label_text = case_when(
       month == 1 ~ scales::percent(arrest_rate, accuracy = 0.1), 
       is_max ~ paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", ifelse(diff_jan > 0, "+", ""), round(diff_jan, 1), " pts)"),
@@ -2221,7 +1645,7 @@ plot_data <- vehstops %>%
     )
   )
 
-# Faceted plot for Arrest Rate
+
 plot_data %>%
   ggplot(aes(x = month, y = arrest_rate, group = 1)) +
   geom_line(color = "steelblue", linewidth = 1) +
@@ -2232,7 +1656,6 @@ plot_data %>%
     labels = c("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"), 
     expand = expansion(mult = c(0.1, 0.1))
   ) +
-  # Using percentage scale for Y
   scale_y_continuous(labels = scales::percent, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
   coord_cartesian(clip = "off") +
   theme_minimal() +
@@ -2245,7 +1668,7 @@ plot_data %>%
   ) +
   labs(
     title = "Monthly Arrest Rate, by Year, for 2-Wheels Vehicles in NYC",
-    subtitle = "Variation shown in percentage points (pts) relative to January and the Annual Peak",
+    subtitle = "The seasonal amplitude of the arrest rate appears to widen across the three years",
     x = "Month",
     y = "Arrest Rate"
   )
@@ -2253,13 +1676,11 @@ plot_data %>%
 
 What can we say?
 
-- Key finding: The seasonal amplitude of the arrest rate appears to widen across the three years: the peak-to-trough swing within a year is larger in 2024–2025 than in 2023. Early months (January–March) have risen in their arrest rate year-over-year, while summer months remain relatively suppressed, producing a growing divergence between winter peaks and summer troughs.
-- Interpretation: The widening amplitude suggests that the secular upward trend in the annual arrest rate (see Year vs Arrested) is not uniformly distributed across months but is concentrated in the off-season period. This is consistent with regulatory changes that increased the set of arrestable offenses being applied more aggressively in the winter months, when riders are fewer and more selective.
-- Comment: With only three years of data, assessing whether amplitude widening is a genuine trend or sampling variability is difficult. The 2025 panel covers partial months and may show an artificially elevated rate if only the high-enforcement months are represented. Caution is warranted before interpreting this as a confirmed structural acceleration.
-- Proposed Action: Test a `year × hot_season` interaction term in the arrest model. If the interaction is statistically meaningful, it implies that the off-season premium has grown over time — a finding worth highlighting. If not, retain main effects only for parsimony.
+- **Key finding**: The faceted line chart breaks down the monthly arrest rates across three consecutive years. It reveals that the seasonal pattern is consistent over time but is shifting vertically. Each panel exhibits the same behavior: a spring increase, a summer peak, a distinct dip in August, and a sharp late-autumn decline.
+- **Comment**: With only three years of data, assessing whether amplitude widening is a genuine trend is difficult. The fact that the August drop appears in all three panels proves that this mid-summer dip is not a random. Instead, it probably represents the consequence of a repeating event tied to the police administration behavior (for instance, police officers being on vacation).
+
 
 ```{r faceted-hot-season-vs-arrested-ratio}
-# 1. Create the indicator, calculate rate and raw arrests
 plot_data <- vehstops %>%
   filter(!is.na(year), !is.na(month), !is.na(arrested)) %>%
   mutate(
@@ -2274,19 +1695,14 @@ plot_data <- vehstops %>%
     .groups = "drop"
   ) %>%
   mutate(
-    # Label: Rate (Raw Arrest Count)
     label_text = paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", comma(arrests), " arrests)")
   )
 
-# 2. Build the faceted barplot
 plot_data %>%
   ggplot(aes(x = is_hot_season, y = arrest_rate, fill = is_hot_season)) +
   geom_col(show.legend = FALSE) +
-  # Facet by year
   facet_wrap(~year, nrow = 1) +
-  # Add labels
   geom_text(aes(label = label_text), vjust = -0.5, size = 3, lineheight = 0.8) +
-  # Use percent scale for the Y axis
   scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.2))) +
   scale_fill_brewer(palette = "Paired") +
   theme_minimal() +
@@ -2297,7 +1713,7 @@ plot_data %>%
   ) +
   labs(
     title = "Arrest Rate for 2-Wheels Vehicles: Hot Season vs. Off Season",
-    subtitle = "Comparing arrest intensity across seasons by year",
+    subtitle = "The hot-season arrest rate is consistently higher than the off-season rate",
     x = NULL,
     y = "Arrest Rate (%)"
   )
@@ -2305,15 +1721,13 @@ plot_data %>%
 
 What can we say?
 
-- Key finding: The off-season arrest rate is consistently higher than the hot-season rate, with the off-season hovering around 6–6.5% and the hot-season around 4.5–5% across all three years. The gap of approximately 1.5–2 percentage points is directionally stable and substantively meaningful given the overall base rate of \~5.6%.
-- Interpretation: This finding validates the theoretical mechanism described for the monthly analysis: summer volume surges dilute the arrest rate because the marginal stopped rider during peak enforcement campaigns is less likely to carry a warrantable offense. Off-season stops are more selective in composition. The consistency of the direction across all three years suggests a structural feature of the data, not a year-specific anomaly.
-- Comment: The `hot_season` binary collapses the April–October window uniformly, but the monthly chart suggests the transition is gradual rather than sharp. Months at the edge of the definition (April, October) may behave more like the off-season, which could attenuate the binary's effect size. Despite this limitation, the aggregated signal is clear enough to justify keeping the variable.
-- Proposed Action: Retain `hot_season` as a binary predictor for `arrested` with an expected negative coefficient. The faceted view (below) will indicate whether the effect has grown, shrunk, or remained stable across years — an interaction with `year` should be tested before finalizing the model specification.
+- **Key finding**: In every single year observed, the Hot Season arrest rate is higher than the Off Season rate.
+- **Interpretation**: The data explicitly shows the light blue bars (Hot Season) are taller than the dark blue bars (Off Season) across 2023 ($4.7\%$ vs $3.9\%$), 2024 ($6.0\%$ vs $5.0\%$), and 2025 ($6.4\%$ vs $5.1\%$). Furthermore, looking at the absolute numbers reveals that the Hot Season contains the vast majority of total arrests.
+- **Comment**: The chart confirms our previous finding: warmer months correlate with both a higher volume of absolute arrests and a higher conditional probability of a stop ending in an arrest.
 
 ### Day, Dow and Weekday
 
 ```{r day-vs-arrested-ratio}
-# 1. Aggregate and calculate daily arrest rate
 daily_arrest_rate <- vehstops %>%
   filter(!is.na(day), !is.na(arrested)) %>%
   group_by(day) %>%
@@ -2324,14 +1738,10 @@ daily_arrest_rate <- vehstops %>%
     .groups = "drop"
   )
 
-# 2. Plotting
 daily_arrest_rate %>%
   ggplot(aes(x = day, y = rate)) +
-  # Draw the raw daily variation
   geom_line(color = "grey60", alpha = 0.5) +
-  # Add a smoothed trend to see if rates rise/fall over the month
   geom_smooth(method = "loess", color = "steelblue", se = FALSE) +
-  # Format Y axis as percentage
   scale_y_continuous(labels = scales::percent, limits = c(0, NA)) +
   theme_minimal() + 
   theme(
@@ -2349,12 +1759,9 @@ daily_arrest_rate %>%
 
 What can we say?
 
-- Key finding: Arrest rates are broadly flat across days 1 through 28, with the LOESS smoother showing no meaningful systematic trend. Days 29, 30, and 31 show elevated and highly variable rates, consistent with the well-known artifact that not all months have these days and the resulting small denominators inflate rate estimates at the end of the calendar month.
-- Interpretation: The flat pattern across days 1–28 indicates that the day-of-month variable carries no genuine enforcement signal — officers do not target particular calendar days within a month, nor do riders systematically differ by day. The apparent spikes at days 29–31 are purely a denominator artifact: February and other short months never contribute to those bins, and the months that do contribute may have specific seasonal profiles that create spurious rate differences.
-- Comment: The LOESS smoother helps clarify the signal by averaging over the noise of individual day estimates, but the wide day-to-day variation even in the flat regime reflects the relatively small per-day sample sizes once the 185k records are divided across 31 bins and multiple calendar months. Any day-of-month effect visible in the raw line is very likely sampling noise.
-- Proposed Action: Exclude `day` from both models. The flat pattern from days 1–28 confirms it has no predictive value, and including the artifact-inflated days 29–31 would introduce numerical instability. The `month` and `dow` features capture all relevant temporal structure without this variable.
-
-TODO
+- **Key finding**: Arrest rates are broadly flat across days 1 through 28, showing no meaningful trend. Days 29, 30, and 31 show elevated and highly variable rates, which are consistent with the fact that not all months have these days.
+- **Interpretation**: The flat pattern across days 1–28 indicates that the day-of-month variable carries no genuine enforcement signal.
+- **Proposed Action**: Exclude `day` from our models.
 
 ```{r dow-vs-arrested-ratio}
 daily_arrest_rate <- vehstops %>%
@@ -2397,7 +1804,7 @@ daily_arrest_rate %>%
   ) +
   labs(
     title = "Arrest Rate by Day of the Week for 2-Wheels Vehicles",
-    subtitle = "Percentage-point change from previous day shown in parentheses",
+    subtitle = "",
     x = "Day of the Week",
     y = "Arrest Rate (%)"
   )
@@ -2405,11 +1812,9 @@ daily_arrest_rate %>%
 
 What can we say?
 
-- Key finding: Weekend days (Saturday and Sunday) show the highest arrest rates, roughly 7–8%, while mid-week days (Tuesday through Thursday) have the lowest rates, approximately 5–5.5%. The weekend premium of approximately 2 percentage points is substantial and represents an inversion of the stop-volume pattern, where weekdays dominate total stop counts.
-- Interpretation: The weekend elevation in arrest rates likely reflects a compositional shift in the riding population: weekend 2-wheel riders in NYC are more likely to be recreational users, off-duty delivery workers without current delivery assignments, or individuals with outstanding warrants who are more mobile on their days off. Patrol officers on weekends may also apply different discretion thresholds. The inverse relationship between volume and arrest rate is consistent with the precision-volume tradeoff observed in the geographic dimension.
-- Comment: The inversion — high volume on weekdays but high rate on weekends — is a theoretically meaningful finding. It argues against interpreting raw stop counts as a proxy for enforcement aggressiveness; rates and volumes can move in opposite directions depending on which subpopulation is being stopped. The `weekend` binary used in modeling collapses Saturday and Sunday together, which appears appropriate given that both days show similar elevated rates.
-- Proposed Action: Retain the `weekend` binary as a predictor in both models, expecting a positive coefficient for `arrested`. Test whether adding `dow` as a full factor (seven levels) materially improves fit over the binary, and prefer the simpler binary unless the incremental AIC gain is substantial.
-
+- **Key finding**: The probability of an arrest given a stop peaks first on Tuesday at $5.9\%$ before dipping during mid-week, and then reaches its absolute maximum on Saturday at $6.2\%$, while the lowest arrest probabilities occur on Monday and Thursday at $5.3\%$.
+- **Interpretation**: The overall variation across the week is relatively tight which suggests it is a less powerful predictor with respect to the other time-related ones.
+- **Comment**: We should treat the day of the week as a categorical dummy in order to use it in our models.
 
 ### Hour and Time Bracket
 
@@ -2440,7 +1845,7 @@ hourly_arrest_rate %>%
   ) +
   labs(
     title = "Arrest Rate by Hour of Day for 2-Wheels Vehicles",
-    subtitle = "Aggregated percentage of stops resulting in arrest across all hours",
+    subtitle = "The hourly arrest rate follows a U-shaped diurnal pattern",
     x = "Hour of Day (0–23)",
     y = "Arrest Rate (%)"
   )
@@ -2448,42 +1853,27 @@ hourly_arrest_rate %>%
 
 What can we say?
 
-- Key finding: The hourly arrest rate follows a pronounced U-shaped diurnal pattern. Overnight hours (0–4h) show the highest arrest rates, in the range of approximately 10–14%, while daytime hours (9–17h) are the lowest at roughly 4–5%. An evening secondary peak around 19–22h elevates rates to approximately 7–8% before declining toward midnight.
-- Interpretation: The overnight peak likely reflects a compositional shift: riders out between midnight and 4am are disproportionately those with active violations, outstanding warrants, or operating outside of legal frameworks (unregistered or unlicensed vehicles). Officers working overnight shifts may also apply different discretion standards compared to day-shift colleagues. The daytime trough corresponds to the working hours of the majority of legitimate delivery workers, who are stopped frequently during their shifts but whose violation rate is lower.
-- Comment: The U-shape is a strong nonlinear signal that cannot be captured by the `working_hour` binary alone — the binary distinguishes 9–17h (low rate) from all other hours, but lumps together the overnight peak (very high rate) and early morning/late evening transitions. A finer `time_bracket` variable or inclusion of hour as a categorical predictor may better represent this nonlinearity. Overnight sample sizes are also smaller, so rate estimates at 1h–4h carry higher uncertainty.
-- Proposed Action: Use the `time_bracket` variable as the primary diurnal predictor to capture the U-shape in a parsimonious way. Confirm that the bracket boundaries align with the natural rate break-points visible in this plot. If `working_hour` is retained instead, note that it will miss the overnight peak, potentially underestimating the diurnal range captured by the model.
-
-```{r hour-vs-target}
-vehstops |>
-  filter(!is.na(arrested), !is.na(hour), !is.na(year)) |>
-  group_by(year, hour) |>
-  summarise(rate = mean(arrested), n = n(), .groups = "drop") |>
-  ggplot(aes(hour, rate, group = 1)) +
-  geom_line(linewidth = 0.6) +
-  geom_point(size = 0.8, alpha = 0.7) +
-  scale_x_continuous(breaks = seq(0, 23, by = 1)) +
-  scale_y_continuous(labels = percent_format()) +
-  labs(title = "Escalation rate by Hour", x = "Hour", y = "Rate") +
-  facet_wrap(~ year, ncol = 1, scales = "free_x") +
-  theme_minimal()
-```
+- **Key finding**: The line plot underlines the time-dependent pattern in the arrest rate resulting from stops across a 24-hour cycle. We observe a global minimum at 7:00 (07:00 AM), followed by a steady climb to a minor afternoon peak around 14:00 (02:00 PM). The absolute maximum occurs during the late-night and early-morning hours, specifically peaking at 3:00 (03:00 AM) with an arrest rate of nearly 11%.
+- **Interpretation**: This fluctuation suggests that our exploratory data analysis is heavily influenced by variations in motorist behavior, law enforcement patterns, or both depending on the hour of the day.
+- **Comment**: The low arrest rates during the morning commute hours (from 6:00 to 10:00) suggest that law enforcement actions during this window might focus on traffic management. On the other hand, the increase in the night might reflect stops related to more severe offenses, such as operating a vehicle under the influence or navigating without proper registration.
+- **Proposed Action**: We may opt for `time_bracket` as the primary predictor to capture the U-shape in a parsimonious way.
 
 Let us look at our grouping now
 
 ```{r time-bracket-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, time_bracket,
-  "Time bracket", "Rate", "Arrest ratio by time bracket",
-  style = "stack"
+  "Time bracket", "Arrest Rate (%)", "Arrest ratio by Custom Time Bracket",
+  style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
+  subtitle = "The night brackets show the highest arrest rate among all"
 )
 ```
 
-What can we say?
+What can we say? 
 
-- Key finding: The Night bracket shows the highest arrest rate among all time brackets, consistent with the overnight peak identified in the hourly analysis. The ordering of brackets by arrest rate follows the expected pattern from the diurnal curve: Night \> Evening \> Morning \> Afternoon (approximately), with Night substantially above the global mean.
-- Interpretation: The bracket ordering validates that the time bracket boundaries were defined in a way that meaningfully captures the nonlinear diurnal arrest pattern. The Night bracket correctly captures the high-risk overnight hours (0–6h roughly), while the Afternoon bracket contains the low-arrest daytime hours dominated by legitimate delivery work. The Evening bracket captures the secondary elevation seen in the hourly plot.
-- Comment: The stacked bar chart makes it easier to compare bracket-level arrest shares, but the underlying rates are what matter for modeling. Verifying that the bracket ordering is consistent with the hourly curve (as it appears to be) is important: if brackets were defined differently from the 4-wheel notebook, that could create inconsistencies across the two analyses that should be flagged.
-- Proposed Action: Use `time_bracket` as the primary hour-related predictor in the arrest model. Confirm that the Night bracket coefficient is positive and among the largest predictors. Consider whether merging Morning and Afternoon into a single "business hours" category reduces AIC without meaningful loss of fit, given their relatively similar rates.
+- **Key finding**: The ordering of brackets by arrest rate follows (almost) the expected pattern from the diurnal curve: Night \> Evening \> Morning \> Afternoon (approximately), with Night brackets substantially above the global mean.
+- **Comment**: Even during the peak enforcement window in the Late night bracket, the vast majority of interactions (90.6%) still do not result in an arrest. We can argue that, while the relative risk of arrest increases nearly sixfold from the morning commute to the late night, a stop ending in arrest remains a minority event across all examined time frames.
+- **Proposed Action**: We choose `time_bracket` as the primary hour-related predictor in the arrest model.
 
 ## Motorist related features
 
@@ -2494,85 +1884,55 @@ ratio_by_cat(
   vehstops, arrested, age_bracket,
   "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "TODO",
+  subtitle = "The 16–24 age bracket and Unknown show the highest arrest rates",
   label_vjust = 0.5
 )
 ```
 
-What can we say?
+What can we say? TODO
 
-- Key finding: The 18–24 age bracket shows the highest arrest rate among the named brackets, consistent with the general criminological pattern of peak risk in young adulthood. Older brackets show progressively lower rates that flatten out by the 35–50 range. The Unknown age bracket stands out as having a distinctly different rate from the named brackets, suggesting that missingness in age is not random.
-- Interpretation: The elevated arrest rate among 18–24 year-olds likely reflects both a genuine risk gradient (younger riders may be more likely to ride unregistered or unlicensed vehicles) and a targeting effect (officers may apply heightened scrutiny to younger riders). The Unknown bracket's distinct rate is analytically concerning: if officers are more likely to record age as unknown for stops that are escalating into arrests, the relationship between missing age and outcome is confounded by the very event being predicted, raising the risk of informative missingness.
-- Comment: With only 3–5 named brackets, the bracket-level analysis necessarily masks within-bracket heterogeneity. The 18–24 bracket is particularly heterogeneous — an 18-year-old first-time rider and a 24-year-old habitual delivery worker are substantively different subjects. The continuous age analysis (below) provides the finer-grained view needed to assess whether the bracket boundaries are optimal.
-- Proposed Action: Include `age_bracket` as a predictor in both models. Treat the Unknown category as a distinct level rather than imputing or dropping it, to preserve the informative missingness signal. Compare AIC between the bracket specification and a linear age term to determine whether the nonlinearity justifies the additional degrees of freedom.
+- **Key finding**: 
+- **Interpretation**:
+- **Comment**:
+- **Proposed Action**: We want to include `age_bracket` as a predictor in our models instead of just using `age`.
 
 In fact,
-
-TODO: Comment that escalation rate remains fixed after 25
-
-```{r age-by-target}
-vehstops %>%
-  filter(!is.na(age), between(age, 16, 100)) %>%
-  mutate(bin = ntile(age, 10)) %>%
-  group_by(bin) %>%
-  summarize(
-    age_mid = median(age, na.rm = TRUE),
-    rate = mean(arrested == 1, na.rm = TRUE),
-    n = n(), .groups = "drop"
-  ) %>%
-  mutate(
-    se = sqrt(rate * (1 - rate) / n),
-    lo = pmax(rate - 1.96 * se, 0),
-    hi = pmin(rate + 1.96 * se, 1)
-  ) %>%
-  ggplot(aes(age_mid, rate)) +
-  geom_point(size = 1.5) +
-  geom_line(linewidth = 0.6) +
-  geom_ribbon(aes(ymin = lo, ymax = hi), alpha = 0.15) +
-  scale_y_continuous(labels = percent) +
-  labs(x = "Age (bin median)", y = "Event rate", title = "Escalation rate vs age (deciles)")
-```
-
-What can we say?
-
-- Key finding: The continuous age-arrest relationship is strongly nonlinear: arrest rates peak in the late teens to early 20s (roughly age 18–22), then decline monotonically through the 20s and 30s, and flatten to a near-constant level for ages 30 and above. Confidence intervals widen substantially beyond age 50 due to small sample sizes, making rate estimates unreliable in that range.
-- Interpretation: The declining-and-flattening shape suggests that age has a strong effect in the younger range but becomes largely uninformative beyond approximately age 30. This pattern is consistent with the delivery worker demographic of the dataset: experienced, older delivery workers are a relatively homogeneous group whose enforcement exposure is driven more by geography and time of day than by age per se. Younger riders are more heterogeneous and include more individuals with unregistered or unlicensed vehicles.
-- Comment: The wide confidence intervals above age 50 justify collapsing older ages into a single bracket for modeling purposes, as individual decile estimates are statistically unreliable. The bracket collapsing convention used in this analysis (likely merging the 50+ and 65+ groups) is appropriate given this uncertainty. A linear age term would impose monotonic linearity across the entire range, which is inconsistent with the observed flat plateau — the bracket or spline specification is preferable.
-- Proposed Action: Retain `age_bracket` (or a small-knot spline on continuous age) as the age predictor rather than a linear term. Confirm that the bracket boundaries align with the natural kink in the decile curve — specifically, that the boundary between "young adult" and "adult" brackets falls near the observed inflection point at approximately age 25–28.
 
 ### Reported Sex
 
 ```{r sex-vs-target, fig.width=6}
 ratio_by_cat(
   vehstops, arrested, sex,
-  "Reported sex", "Share of stops", "Escalation ratio by reported sex",
-  style = "stack"
+  "Reported sex", "Arrest Rate (%)", "Arrest Ratio by Reported sex",
+  style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
+  subtitle = "Male drivers TODO",
 )
 ```
 
-What can we say?
+What can we say? TODO
 
-- Key finding: Male riders account for approximately 96% of all stops, leaving female (F) and unknown sex (U) categories with very small sample sizes. The arrest rates estimated for F and U categories carry wide uncertainty and cannot be reliably distinguished from the male rate. The dataset is effectively single-sex for practical modeling purposes.
-- Interpretation: The near-exclusive male composition of 2-wheel vehicle stops mirrors the demographics of NYC's delivery worker workforce, which is overwhelmingly male-presenting. This is not evidence of differential targeting by sex per se; it reflects the underlying population of 2-wheel vehicle operators. Female riders are genuinely a small minority of the stopped population, not a systematically excluded group.
-- Comment: Because \~96% of stops involve males, the marginal predictive value of a sex indicator is extremely low — any model that includes sex will have a near-degenerate dummy with almost no within-level variation. Including a near-constant predictor risks numerical instability in logistic regression and wastes a degree of freedom that could be allocated to more informative features.
-- Proposed Action: Exclude `sex` from both models due to extreme class imbalance and negligible marginal predictive value. Document the demographic composition briefly in the report to provide context for the near-absence of female-rider stops. If the Unknown sex category has a materially different arrest rate, consider flagging it as a binary missingness indicator instead of a sex category.
+- **Key finding**: 
+- **Interpretation**: 
+- **Comment**:
+- **Proposed Action**:
 
 ### Reported Ethnicity
 
 ```{r ethnicity-vs-target, fig.width=6}
 ratio_by_cat(
   vehstops, arrested, ethnicity,
-  "Reported ethnicity", "Share of stops", "Escalation ratio by reported ethnicity",
-  style = "stack"
+  "Reported ethnicity", "Share of stops", "Escalation ratio by Reported Ethnicity",
+  style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
+  subtitle = "Black and Hispanic drivers tend TODO",
 )
 ```
 
-What can we say?
+What can we say? TODO
 
-- Key finding: Hispanic riders constitute approximately 46% of all stops, reflecting the demographics of NYC's delivery worker workforce. Arrest rates vary across ethnicity categories, with the Unknown ethnicity category showing a noticeably elevated rate relative to most named categories — a pattern consistent with informative missingness. The plurality ethnicity group (Hispanic) sits close to the overall mean arrest rate.
-- Interpretation: The demographic composition of stops is best understood as a reflection of who operates 2-wheel vehicles in NYC rather than evidence of differential enforcement by ethnicity per se. The delivery industry workforce is disproportionately composed of Hispanic and recent immigrant workers, so their plurality in the stop data is consistent with their operational prevalence. The elevated Unknown arrest rate may reflect that officers are less likely to record ethnicity during encounters that escalate into arrests, creating a correlation between missingness and outcome through the mechanics of the enforcement encounter itself.
-- Comment: This is an observational dataset with self-reported ethnicity; any inference about disparate impact must account for the underlying population of riders, which is not directly observable from stops data alone. Ethnicity differences in arrest rates across groups may reflect compositional differences in the types of violations, vehicle registration status, or geographic distribution of stops rather than differential treatment. Causal claims cannot be supported by this analysis alone, and statistical language should be appropriately hedged.
-- Proposed Action: Include `ethnicity` as a candidate predictor to test its marginal contribution to model fit, but do not overinterpret coefficients causally. Treat the Unknown category as a separate level. If ethnicity is correlated with geography (which is likely given neighborhood segregation patterns), test whether its effect is attenuated by including `boro` — collinearity would suggest geography is the proximate predictor.
+- **Key finding**:
+- **Interpretation**:
+- **Comment**: 
+- **Proposed Action**:
 
 ------------------------------------------------------------------------
 
@@ -2584,64 +1944,55 @@ Since multivariate analysis is very complex, and we just want to get rid of some
 
 ### Reported Age (age bracket)
 
-```{r stacked-barplot-arrested-vs-age-bracket-x-area}
-# TODO: Stacked bar plot 
-# y axis: area
-# x axis: percentage of arrest
-# bars are segmented by age bracket (in order <18 to 65+)
-# legend shows correspondence colors to age bracket
-# 1. Prepare data with correct ordering
+```{r barplot-arrested-vs-age-bracket-x-area}
 plot_data <- vehstops %>%
   filter(!is.na(area), !is.na(age_bracket), !is.na(arrested)) %>%
-  # Ensure Age Brackets are in chronological order
-  mutate(age_bracket = factor(age_bracket, 
-                             levels = c("Under 18", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"))) %>%
-  # Standardize Arrest Labels
+  mutate(age_bracket = factor(
+    age_bracket, levels = c("Under 18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+", "Unknown"),
+    ordered = TRUE
+    )) %>%
   mutate(arrested_lbl = factor(arrested, levels = c(0, 1), labels = c("No", "Yes"))) %>%
   group_by(age_bracket, area, arrested_lbl) %>%
   summarise(n = n(), .groups = "drop_last") %>%
   mutate(pct = n / sum(n)) %>%
   ungroup()
 
-# 2. Build the faceted stacked barplot
 ggplot(plot_data, aes(x = area, y = pct, fill = arrested_lbl)) +
-  geom_col(position = "fill", width = 0.7) +
-  # Facet by age_bracket to create the "divided" structure
-  facet_wrap(~ age_bracket, nrow = 1) +
-  # Add percentage labels for the 'Yes' (Arrested) segments
+  geom_col(position = "fill",) +
+  facet_wrap(~ age_bracket, nrow = 1, labeller = label_wrap_gen(width = 7)) +
   geom_text(
     aes(label = ifelse(arrested_lbl == "Yes", scales::percent(pct, accuracy = 0.1), "")),
-    position = position_fill(vjust = 0.5),
-    size = 2,
-    color = "white",
-    fontface = "bold"
+    position = position_fill(vjust = 0.6),
+    size = 1.5,
+    color = "black",
   ) +
-  # Styling
   scale_y_continuous(labels = scales::percent) +
   scale_fill_manual(values = c("No" = "grey80", "Yes" = "steelblue")) +
   theme_minimal() +
   theme(
+    panel.spacing = unit(2, "lines"),
+    panel.spacing.x = unit(1, "lines"),
+    panel.spacing.y = unit(3, "lines"),
     panel.grid.major.x = element_blank(),
     panel.grid.minor = element_blank(),
-    # Title: font 14, plain
     plot.title = element_text(size = 14, face = "plain"),
-    # Subtitle: grey, font 10
     plot.subtitle = element_text(size = 10, color = "grey50"),
-    # Rotate X labels for readability in narrow facets
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-    strip.text = element_text(face = "bold", size = 10),
-    legend.position = "right"
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+    strip.text = element_text(face = "bold", size = 8),
+    legend.position = "right",
+    plot.margin = margin(t = 10, r = 20, b = 40, l = 10)
   ) +
+  coord_cartesian(clip = "off") +
   labs(
     title = "Arrest Rate by Area, Faceted by Reported Age Bracket",
-    subtitle = "Analysis of how geographic enforcement intensity varies across different age demographics",
+    subtitle = "Bronx and Staten Island consistently show higher rates",
     x = "Area",
     y = "Arrest Rate (%)",
     fill = "Stop ended in arrest?"
   )
 ```
 
-What can we say?
+What can we say? TODO
 
 - **Key finding**: The area-based arrest rate differential (Bronx and Staten Island consistently higher) persists across all age brackets, suggesting these two predictors contribute additively to arrest risk. Within each area, younger brackets (Under 18 and 18–24) show noticeably higher arrest rates than adults aged 35 and above — a pattern that holds regardless of geography.
 - **Interpretation**: The stability of both the area-level ranking and the age gradient across all facets argues against an `area × age_bracket` interaction: being young increases arrest risk independently of where the stop occurs, and being stopped in a low-volume area increases risk independently of the rider's age.
@@ -2649,14 +2000,18 @@ What can we say?
 - **Proposed Action**: Include `age_bracket` and `area` as separate main-effect predictors rather than interacting them. If a likelihood-ratio test later suggests an interaction is warranted, test it only for the most populated brackets.
 
 
+
 ```{r lineplot-arrested-vs-age-bracket-x-hour}
+# TODO: Exclude (NA)
+
 vehstops %>%
   filter(!is.na(hour), !is.na(age_bracket), !is.na(arrested)) %>%
-  mutate(age_bracket = factor(age_bracket,
-    levels = c("Under 18", "18-24", "25-34", "35-44", "45-54", "55-64", "65+", "Unknown"))) %>%
+  mutate(age_bracket = factor(
+    age_bracket, levels = c("18–24", "25–34", "35–44", "45–54", "55–64", "65+", "Unknown"),
+    ordered = TRUE
+    )) %>%
   group_by(age_bracket, hour) %>%
   summarise(rate = mean(arrested == 1), n = n(), .groups = "drop") %>%
-  filter(n >= 10) %>%
   ggplot(aes(x = hour, y = rate, color = age_bracket, group = age_bracket)) +
   geom_line(linewidth = 0.8, alpha = 0.85) +
   geom_point(size = 1.5, alpha = 0.7) +
@@ -2665,19 +2020,62 @@ vehstops %>%
   scale_color_viridis_d(option = "turbo", name = "Age Bracket") +
   theme_minimal() +
   theme(
-    panel.grid.minor    = element_blank(),
-    panel.grid.major.x  = element_blank(),
-    plot.title          = element_text(size = 14),
-    plot.subtitle       = element_text(size = 10, color = "grey50"),
-    legend.position     = "right"
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10, color = "grey50"),
+    legend.position = "right"
   ) +
   labs(
-    title    = "Arrest Rate by Hour of Day, Grouped by Age Bracket",
-    subtitle = "Younger riders show a consistently elevated overnight arrest rate; the U-shaped pattern is universal",
-    x        = "Hour of Day (0–23)",
-    y        = "Arrest Rate (%)"
+    title = "Arrest Rate by Hour of Day, Grouped by Age Bracket (Except <18 and 65+)",
+    subtitle = "TODO",
+    x = "Hour of Day (0–23)",
+    y = "Arrest Rate (%)"
   )
 ```
+
+TODO: say
+
+```{r}
+area_hour_data <- vehstops %>%
+  filter(!is.na(hour),  !is.na(age_bracket), !is.na(arrested), age_bracket == "Under 18") %>%
+  mutate(age_bracket = factor(
+    age_bracket, levels = c("Under 18"),
+    ordered = TRUE
+    )) %>%
+  group_by(age_bracket, hour) %>%
+  summarise(
+    arrest_rate = mean(arrested == 1),
+    .groups = "drop"
+  )
+
+area_hour_data %>%
+  ggplot(aes(x = hour, y = arrest_rate, group = 1)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 1.5) +
+  facet_wrap(~age_bracket, nrow = 1) + 
+  scale_x_continuous(breaks = seq(0, 23, 6)) +
+  scale_y_continuous(
+    labels = scales::percent, 
+    expand = expansion(mult = c(0.1, 0.3)) 
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14, face = "plain"),
+    plot.subtitle = element_text(size = 10, color = "grey50"),
+    strip.text = element_text(size = 11, face = "bold")
+  ) +
+  labs(
+    title = "TODO",
+    subtitle = "TODO",
+    x = "Hour of Day (0–23)",
+    y = "Arrest Rate (%)"
+  )
+```
+
+We can say this may be due to school
 
 What can we say?
 
@@ -2688,30 +2086,59 @@ What can we say?
 
 ### Reported Sex
 
+```{r barplot-arrested-vs-sex-x-area}
+plot_data <- vehstops %>%
+  filter(!is.na(area), !is.na(sex), !is.na(arrested)) %>%
+  # Standardize Arrest Labels
+  mutate(arrested_lbl = factor(arrested, levels = c(0, 1), labels = c("No", "Yes"))) %>%
+  group_by(sex, area, arrested_lbl) %>%
+  summarise(n = n(), .groups = "drop_last") %>%
+  mutate(pct = n / sum(n)) %>%
+  ungroup()
 
-```{r heatmap-arrested-vs-sex-x-area}
-ratio_by_cat_split(
-  DF = vehstops,
-  TARGET = arrested,
-  CAT    = area,
-  SPLIT  = sex,
-  x_title = "Area",
-  y_title = "Share of stops",
-  title   = "Escalation ratio by area (split by reported sex)",
-  target_labels = c("Not escalated","Escalated"),
-  split_labels  = c("No","Yes")
-)
+ggplot(plot_data, aes(x = area, y = pct, fill = arrested_lbl)) +
+  geom_col(position = "fill",) +
+  facet_wrap(~ sex, nrow = 1, labeller = label_wrap_gen(width = 7)) +
+  geom_text(
+    aes(label = ifelse(arrested_lbl == "Yes", scales::percent(pct, accuracy = 0.1), "")),
+    position = position_fill(vjust = 0.6),
+    size = 2,
+    color = "black",
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("No" = "grey80", "Yes" = "steelblue")) +
+  theme_minimal() +
+  theme(
+    panel.spacing = unit(2, "lines"),
+    panel.spacing.x = unit(1, "lines"),
+    panel.spacing.y = unit(3, "lines"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14, face = "plain"),
+    plot.subtitle = element_text(size = 10, color = "grey50"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+    strip.text = element_text(face = "bold", size = 8),
+    legend.position = "right",
+    plot.margin = margin(t = 10, r = 20, b = 40, l = 10)
+  ) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = "Arrest Rate by Area, Faceted by Reported Sex",
+    subtitle = "TODO",
+    x = "Area",
+    y = "Arrest Rate (%)",
+    fill = "Stop ended in arrest?"
+  )
 ```
 
 What can we say?
 
-- **Key finding**: The area-level arrest rate differential (higher in Bronx and Staten Island) is detectable for male riders — who account for ~96% of all stops — but the Female (F) and Unknown (U) sex facets contain too few observations per area to yield statistically reliable estimates.
+- **Key finding**: The area-level arrest rate differential (higher in Bronx and Staten Island) is detectable for male riders — who account for \~96% of all stops — but the Female (F) and Unknown (U) sex facets contain too few observations per area to yield statistically reliable estimates.
 - **Interpretation**: Because male riders overwhelmingly drive the aggregate pattern, the sex × area visualization provides no additional explanatory power beyond `area` alone. The area effect observed in the bivariate analysis is essentially the area effect among male riders.
 - **Comment**: The Female and Unknown panels are illustrative rather than inferential. Even if a cell in those panels shows an extreme arrest rate, the underlying count is too small to distinguish it from sampling noise in the male baseline.
 - **Proposed Action**: Do not interact `sex` and `area` in the model. Retain `area` as an independent predictor. If a post-modeling fairness audit is performed, include sex as a stratification variable when computing per-group error rates.
 
-
-```{r lineplot-arrested-vs-sex-x-hour}
+```{r barplot-arrested-vs-reported-sex-x-area}
 vehstops %>%
   filter(!is.na(hour), !is.na(sex), !is.na(arrested)) %>%
   group_by(sex, hour) %>%
@@ -2725,23 +2152,23 @@ vehstops %>%
   scale_color_brewer(palette = "Set1", name = "Reported Sex") +
   theme_minimal() +
   theme(
-    panel.grid.minor    = element_blank(),
-    panel.grid.major.x  = element_blank(),
-    plot.title          = element_text(size = 14),
-    plot.subtitle       = element_text(size = 10, color = "grey50"),
-    legend.position     = "right"
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10, color = "grey50"),
+    legend.position = "right"
   ) +
   labs(
-    title    = "Arrest Rate by Hour of Day, by Reported Sex",
+    title = "Arrest Rate by Hour of Day, by Reported Sex",
     subtitle = "Male diurnal pattern mirrors the aggregate; Female and Unknown lines are unreliable due to small sample sizes",
-    x        = "Hour of Day (0–23)",
-    y        = "Arrest Rate (%)"
+    x = "Hour of Day (0–23)",
+    y = "Arrest Rate (%)"
   )
 ```
 
 What can we say?
 
-- **Key finding**: The male arrest-rate profile closely tracks the aggregate diurnal curve (overnight peak, daytime trough, secondary evening elevation), as expected given male riders account for ~96% of all stops. Female (F) and Unknown (U) lines are highly volatile, with erratic swings that reflect small per-hour denominators rather than genuine behavioral patterns.
+- **Key finding**: The male arrest-rate profile closely tracks the aggregate diurnal curve (overnight peak, daytime trough, secondary evening elevation), as expected given male riders account for \~96% of all stops. Female (F) and Unknown (U) lines are highly volatile, with erratic swings that reflect small per-hour denominators rather than genuine behavioral patterns.
 - **Interpretation**: The near-complete overlap between the male curve and the overall hourly arrest profile confirms that `sex` adds no independent diurnal information beyond what `hour` already captures. The hour-of-day effect is a structural property of when stops occur, not of who is being stopped.
 - **Comment**: The instability of the F and U curves is a direct consequence of the extreme marginal imbalance in `sex`: at most overnight hours, fewer than 10 female riders are stopped across the entire dataset, generating arrest-rate estimates that are essentially random noise.
 - **Proposed Action**: Do not include a `sex × hour` interaction term. The diurnal pattern is a property of the time slot and is shared across all sex categories; interacting the two would inflate model complexity without reducing prediction error.
@@ -2749,17 +2176,47 @@ What can we say?
 ### Reported Ethnicity
 
 ```{r heatmap-arrested-vs-ethnicity-x-area}
-ratio_by_cat_split(
-  DF            = vehstops,
-  TARGET        = arrested,
-  CAT           = ethnicity,
-  SPLIT         = area,
-  x_title       = "Reported Ethnicity",
-  y_title       = "Share of Stops (%)",
-  title         = "Arrest Rate by Ethnicity, Faceted by Area",
-  target_labels = c("Not Arrested", "Arrested"),
-  palette       = "Paired"
-)
+plot_data <- vehstops %>%
+  filter(!is.na(area), !is.na(ethnicity), !is.na(arrested)) %>%
+  mutate(arrested_lbl = factor(arrested, levels = c(0, 1), labels = c("No", "Yes"))) %>%
+  group_by(ethnicity, area, arrested_lbl) %>%
+  summarise(n = n(), .groups = "drop_last") %>%
+  mutate(pct = n / sum(n)) %>%
+  ungroup()
+
+ggplot(plot_data, aes(x = area, y = pct, fill = arrested_lbl)) +
+  geom_col(position = "fill",) +
+  facet_wrap(~ ethnicity, nrow = 2, labeller = label_wrap_gen(width = 7)) +
+  geom_text(
+    aes(label = ifelse(arrested_lbl == "Yes", scales::percent(pct, accuracy = 0.1), "")),
+    position = position_fill(vjust = 0.6),
+    size = 1.5,
+    color = "black",
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("No" = "grey80", "Yes" = "steelblue")) +
+  theme_minimal() +
+  theme(
+    panel.spacing = unit(2, "lines"),
+    panel.spacing.x = unit(1, "lines"),
+    panel.spacing.y = unit(3, "lines"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14, face = "plain"),
+    plot.subtitle = element_text(size = 10, color = "grey50"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 6),
+    strip.text = element_text(face = "bold", size = 8),
+    legend.position = "right",
+    plot.margin = margin(t = 10, r = 20, b = 40, l = 10)
+  ) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = "Arrest Rate by Area, Faceted by Reported Age Bracket",
+    subtitle = "TODO",
+    x = "Area",
+    y = "Arrest Rate (%)",
+    fill = "Stop ended in arrest?"
+  )
 ```
 
 What can we say?
@@ -2768,7 +2225,6 @@ What can we say?
 - **Interpretation**: The stability of both the within-group ethnicity ranking and the area ranking across facets suggests these two predictors contribute additively to the outcome. A multiplicative `ethnicity × area` interaction does not appear necessary to explain the observed pattern.
 - **Comment**: Hispanic riders dominate stop volume in every area, so their bars are the most statistically reliable. Small ethnic groups (e.g., Asian/Pacific Islander, White) in low-volume areas may have very few stops, making their per-area arrest rates fragile. Cross-group comparisons within area facets should be treated as directional rather than precise.
 - **Proposed Action**: Include `area` and `ethnicity` as independent predictors rather than interacting them. After model fitting, compute per-ethnicity marginal effects to check whether any residual ethnicity signal survives after controlling for area and hour.
-
 
 ```{r lineplot-arrested-vs-ethnicity-x-hour}
 vehstops %>%
@@ -2784,72 +2240,74 @@ vehstops %>%
   scale_color_brewer(palette = "Set2", name = "Reported Ethnicity") +
   theme_minimal() +
   theme(
-    panel.grid.minor    = element_blank(),
-    panel.grid.major.x  = element_blank(),
-    plot.title          = element_text(size = 14),
-    plot.subtitle       = element_text(size = 10, color = "grey50"),
-    legend.position     = "right"
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10, color = "grey50"),
+    legend.position = "right"
   ) +
   labs(
-    title    = "Arrest Rate by Hour of Day, by Reported Ethnicity",
-    subtitle = "The overnight arrest spike is a structural pattern shared across all ethnic groups",
-    x        = "Hour of Day (0–23)",
-    y        = "Arrest Rate (%)"
+    title = "Arrest Rate by Hour of Day x Reported Ethnicity",
+    subtitle = "The overnight spike is a shared pattern",
+    x = "Hour of Day (0–23)",
+    y = "Arrest Rate (%)"
   )
 ```
 
 What can we say?
 
-- **Key finding**: The overnight arrest-rate peak (0–4h) is a universal structural feature shared across all ethnic groups, not a phenomenon specific to any single demographic. All groups exhibit the same qualitative U-shape: high overnight rates, a daytime trough, and a secondary evening elevation. The Hispanic group's line is the smoothest and most reliable due to its large underlying sample size.
-- **Interpretation**: The convergence of all groups around the same diurnal shape confirms that the hour-of-day effect is orthogonal to ethnicity: it is driven by the type of rider present at each hour (overnight risk-profile vs. daytime delivery worker) rather than by the demographic identity of those riders.
-- **Comment**: Lines for smaller ethnic groups (White, Asian/Pacific Islander, Other) will show more volatility — especially overnight — where per-group per-hour counts can fall below 10. The `n >= 10` filter reduces the worst noise but does not eliminate wide uncertainty for sparse groups at low-volume hours.
-- **Proposed Action**: The shared diurnal pattern strengthens the case for using `time_bracket` or `hour` as a main-effect predictor without an `ethnicity × hour` interaction. The primary diurnal signal is stable and can be modeled independently of ethnicity.
+- **Key finding**: All groups exhibit the same qualitative U-shape: high overnight rates, a daytime trough, and a secondary evening elevation. The Hispanic group's line is the smoothest.
+- **Interpretation**: The convergence of all groups around the same shape confirms that the hour-of-day effect is independent of ethnicity.
 
-### Interactions
+This last interpretation may hold also for all demographic predictors. In other words, they seem to matter less than those concerning time and area. In fact, we have seen that they all tend to follow the U-shape pattern across. However, this cannot give us a definitive answer because 
 
+## Interactions of Motorist-related features
+
+### Reported Ethnicity x Reported Sex
 
 ```{r heatmap-arrested-vs-ethnicity-x-sex}
 ratio_by_cat_split(
-  DF            = vehstops,
-  TARGET        = arrested,
-  CAT           = ethnicity,
-  SPLIT         = sex,
-  x_title       = "Reported Ethnicity",
-  y_title       = "Share of Stops (%)",
-  title         = "Arrest Rate by Ethnicity, Faceted by Reported Sex",
+  DF = vehstops,
+  TARGET = arrested,
+  CAT = ethnicity,
+  SPLIT = sex,
+  x_title = "Reported Ethnicity",
+  y_title = "Share of Stops (%)",
+  title = "Arrest Rate by Ethnicity, Faceted by Reported Sex",
   target_labels = c("Not Arrested", "Arrested"),
-  palette       = "Paired"
+  palette = "Paired"
 )
 ```
 
 What can we say?
 
 - **Key finding**: The male panel dominates the visualization and closely mirrors the overall ethnicity arrest-rate profile. The Female (F) and Unknown (U) panels are too sparse to support reliable within-group conclusions; any apparent pattern in those facets is likely sampling noise.
-- **Interpretation**: The ethnicity-level arrest rate ordering observed in the aggregate bivariate analysis is primarily a property of male riders, who constitute ~96% of all stops. Any apparent `ethnicity × sex` pattern in the F or U facets should be attributed to random variation in small denominators rather than genuine differential enforcement behavior.
+- **Interpretation**: The ethnicity-level arrest rate ordering observed in the aggregate bivariate analysis is primarily a property of male riders, who constitute \~96% of all stops. Any apparent `ethnicity × sex` pattern in the F or U facets should be attributed to random variation in small denominators rather than genuine differential enforcement behavior.
 - **Comment**: The near-total dominance of male riders means this visualization adds limited new information beyond the univariate ethnicity chart. Its diagnostic value is confirming that no extreme outlier pattern is hidden within the minor sex groups that would distort the aggregate ethnicity signal.
 - **Proposed Action**: Do not include an `ethnicity × sex` interaction term. Both predictors may carry independent signal, but their interaction is empirically irrelevant given the extreme sex imbalance in this dataset.
+
+### Reported Age x Reported Sex
 
 ```{r arrested-vs-age-bracket-split-by-sex}
 ratio_by_cat_split(
   DF = vehstops,
   TARGET = arrested,
-  CAT    = age_bracket,
-  SPLIT  = sex,
+  CAT = age_bracket,
+  SPLIT = sex,
   x_title = "Reported Age Bracket",
   y_title = "Arrest Rate (%)",
-  title   = "Arrest Rate by Age Bracket, Faceted by Reported Sex",
+  title = "Arrest Rate by Age Bracket, Faceted by Reported Sex",
   target_labels = c("Not Arrested","Arrested"),
-  split_labels  = c("M", "F", "U")
+  split_labels = c("M", "F", "U")
 )
 ```
 
 What can we say?
 
 - **Key finding**: The age gradient (younger brackets showing higher arrest rates) is clearly visible in the Male (M) panel, which mirrors the overall age-bracket bivariate finding. The Female (F) and Unknown (U) panels show erratic patterns inconsistent with any clear age trend, driven entirely by small per-bracket sample sizes.
-- **Interpretation**: The age effect on arrest risk is primarily a male phenomenon, simply because ~96% of stops involve male riders. The pattern of decreasing arrest risk with age observed in aggregate is a direct reflection of the male sub-population's age dynamics. There is no evidence of a qualitatively different `age × sex` pattern that would justify an interaction term.
-- **Comment**: The title in the original code read "split by weekend" — this is a labeling artifact. The facets represent `sex` (M/F/U), not weekend status. This has been corrected. The F and U facets remain informative as a negative result: confirming that no strong counter-trend exists for those groups.
+- **Interpretation**: The age effect on arrest risk is primarily a male phenomenon, simply because \~96% of stops involve male riders. The pattern of decreasing arrest risk with age observed in aggregate is a direct reflection of the male sub-population's age dynamics. There is no evidence of a qualitatively different `age × sex` pattern that would justify an interaction term.
+- **Comment**: The F and U facets remain informative as a negative result: confirming that no strong counter-trend exists for those groups.
 - **Proposed Action**: Retain `age_bracket` as a main-effect predictor without a `sex` interaction. The consistent age gradient among male riders is the stable, modelable signal; interactions with the near-constant `sex` variable would not improve fit.
-
 
 ## Focus on Area
 
@@ -2873,17 +2331,17 @@ vehstops %>%
   facet_wrap(~ area, ncol = 3) +
   theme_minimal() +
   theme(
-    panel.grid.major.x  = element_blank(),
-    panel.grid.minor    = element_blank(),
-    plot.title          = element_text(size = 14),
-    plot.subtitle       = element_text(size = 10, color = "grey50"),
-    legend.position     = "none"
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14),
+    plot.subtitle = element_text(size = 10, color = "grey50"),
+    legend.position = "none"
   ) +
   labs(
-    title    = "Annual Arrest Rate by Area (2023–2025)",
+    title = "Annual Arrest Rate by Area (2023–2025)",
     subtitle = "All areas show a rising trend; Bronx and Staten Island maintain consistently higher baseline rates",
-    x        = "Year",
-    y        = "Arrest Rate (%)"
+    x = "Year",
+    y = "Arrest Rate (%)"
   )
 ```
 
@@ -2894,78 +2352,9 @@ What can we say?
 - **Comment**: With only three data points per area, distinguishing a genuine trend from sampling noise is limited. The consistent direction across all five areas strengthens confidence, but a `year × area` interaction should be tested formally before including it in the model. If not significant, the data support a simpler additive specification.
 - **Proposed Action**: Retain `area` and `year` as independent predictors. Test a `year × area` interaction with a likelihood-ratio test; drop it for parsimony if not significant. If retained, its primary contribution is capturing any area rising disproportionately faster than the citywide average.
 
-```{r}
-plot_temporal_split(
-  vehstops, hour, area, TARGET = arrested, 
-  metric = "rate", 
-  style = "facet",
-  x_title = "Hour", y_title = NULL, title = "Time Trend"
-)
-```
-
 ### Vs Hour
 
 Since in the bivariate analysis we have seen higher arrests rates for Staten Island and Bronx, we split the heatmaps into two
-
-```{r heatmap-arrested-vs-area-x-hour-staten-island-bronx}
-area_order <- vehstops %>%
-  group_by(area) %>%
-  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
-  arrange(rate) %>%
-  pull(area)
-
-vehstops %>%
-  filter(!is.na(area) & (area == "Bronx" | area == "Staten Island")) %>%
-  group_by(area, hour) %>%
-  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
-  mutate(area = factor(area, levels = area_order)) %>%
-  ggplot(aes(hour, area, fill = rate)) +
-  geom_tile(width = 1, height = 0.7) +
-  scale_fill_viridis_c(labels = scales::percent, name = "Arrest Rate (%)") +
-  scale_x_continuous(breaks = seq(0, 23, by = 4)) +
-  theme_minimal() +
-  theme(
-    panel.grid = element_blank(),
-    plot.title    = element_text(size = 14),
-    plot.subtitle = element_text(size = 10, color = "grey50")
-  ) +
-  labs(
-    x        = "Hour of Day (0–23)",
-    y        = "Area",
-    title    = "Arrest Rate by Hour × Area — Bronx and Staten Island",
-    subtitle = "Low-volume areas maintain elevated arrest rates throughout the day, peaking overnight (0–4h)"
-  )
-```
-
-```{r heatmap-arrested-vs-area-x-hour-rest}
-area_order <- vehstops %>%
-  group_by(area) %>%
-  summarize(rate = mean(arrested == 1, na.rm = TRUE), .groups = "drop") %>%
-  arrange(rate) %>%
-  pull(area)
-
-vehstops %>%
-  filter(!is.na(area) & area != "Bronx" & area != "Staten Island") %>%
-  group_by(area, hour) %>%
-  summarize(rate = mean(arrested == 1, na.rm = TRUE), n = n(), .groups = "drop") %>%
-  mutate(area = factor(area, levels = area_order)) %>%
-  ggplot(aes(hour, area, fill = rate)) +
-  geom_tile(width = 1, height = 0.7) +
-  scale_fill_viridis_c(labels = scales::percent, name = "Arrest Rate (%)") +
-  scale_x_continuous(breaks = seq(0, 23, by = 4)) +
-  theme_minimal() +
-  theme(
-    panel.grid = element_blank(),
-    plot.title    = element_text(size = 14),
-    plot.subtitle = element_text(size = 10, color = "grey50")
-  ) +
-  labs(
-    x        = "Hour of Day (0–23)",
-    y        = "Area",
-    title    = "Arrest Rate by Hour × Area — Brooklyn, Queens and Manhattan",
-    subtitle = "High-volume areas show the same overnight spike at a lower absolute level than Bronx and Staten Island"
-  )
-```
 
 What can we say? (heatmaps)
 
@@ -2975,7 +2364,6 @@ What can we say? (heatmaps)
 - **Proposed Action**: Confirm that an `area × time_bracket` interaction does not materially improve model AIC. If the interaction is not significant, the additive specification is preferred for its interpretability.
 
 ```{r lineplot-arrested-vs-faceted-area-x-hour}
-# 1. Prepare the daily arrest rate data faceted by Area
 area_hour_data <- vehstops %>%
   filter(!is.na(area), !is.na(hour), !is.na(arrested)) %>%
   group_by(area, hour) %>%
@@ -2984,7 +2372,6 @@ area_hour_data <- vehstops %>%
     .groups = "drop"
   )
 
-# 2. Build the faceted line plot
 area_hour_data %>%
   ggplot(aes(x = hour, y = arrest_rate, group = 1)) +
   geom_line(color = "steelblue", linewidth = 1) +
@@ -2993,8 +2380,6 @@ area_hour_data %>%
   scale_x_continuous(breaks = seq(0, 23, 6)) +
   scale_y_continuous(
     labels = scales::percent, 
-    # expand = expansion(mult = c(bottom, top))
-    # We add 0.1 (10%) padding to the bottom and 0.3 (30%) to the top
     expand = expansion(mult = c(0.1, 0.3)) 
   ) +
   theme_minimal() +
@@ -3013,17 +2398,18 @@ area_hour_data %>%
   )
 ```
 
-
 What can we say? (lineplot)
 
-- **Key finding**: The faceted line plot confirms that the U-shaped diurnal arrest-rate pattern is a universal feature of all five areas. Every area shows a pronounced overnight peak (0–4h), a daytime trough (~9–16h), and a moderate secondary elevation in the evening. Bronx and Staten Island sit at a consistently higher absolute level throughout, while Brooklyn, Queens, and Manhattan track each other closely at a lower baseline.
+- **Key finding**: The faceted line plot confirms that the U-shaped diurnal arrest-rate pattern is a universal feature of all five areas. Every area shows a pronounced overnight peak (0–4h), a daytime trough (\~9–16h), and a moderate secondary elevation in the evening. Bronx and Staten Island sit at a consistently higher absolute level throughout, while Brooklyn, Queens, and Manhattan track each other closely at a lower baseline.
 - **Interpretation**: The parallel shape of the diurnal curves across all areas reinforces the additive model interpretation: the hour-of-day effect is structurally the same everywhere, but the area-specific baseline shifts the entire curve up or down. An interaction between `area` and `hour` would not materially change the qualitative story — it would add parameters without changing the fundamental conclusion.
 - **Comment**: The `free_x` facet scaling means each panel is independently scaled, making direct cross-area comparisons of absolute rates difficult within this plot. For absolute comparisons, refer to the heatmaps above. The lineplot is best interpreted as confirming shape similarity rather than quantifying absolute differences.
 - **Proposed Action**: Use `time_bracket` (rather than raw `hour`) as the temporal predictor in the final model to reduce the number of parameters while preserving the diurnal signal. Retain `area` as an independent main effect. A formal `area × time_bracket` interaction test should be reported as a model selection step in the modeling notebook.
 
----
+------------------------------------------------------------------------
 
 # Recap
+
+TODO
 
 ------------------------------------------------------------------------
 
