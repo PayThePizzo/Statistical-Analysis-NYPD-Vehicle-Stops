@@ -30,7 +30,7 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 As the title of the project suggests, the goal of the project is to assess **whether** we can affirm that the **police behavior shows excessive enforcement patterns**, after a vehicle stop has been conducted.
 
-In particular, we focus on studying if there exist **relationships between arrests specific groups of people**, time frames, or areas. This should help to shed some light on the alleged "systemic nature" of the stops.
+In particular, we focus on studying if there exist **relationships between arrests and specific groups of people**, time frames, or areas. This should help to shed some light on the alleged "systemic nature" of the stops.
 
 However, some of the limiting factors for our study include:
 
@@ -38,15 +38,15 @@ However, some of the limiting factors for our study include:
 - The absence of information about the reason behind the halt;
 - The self-report nature of some variables and the partial anonymization of the values.
 
-Thus, this analysis will not be limited to performing basic univariate, bivariate or multivariate exploratory analysis. Instead, we first **start from formatting/converting the data** in a way we can understand the meaning of each variable, and the issues that come with it.
+Thus, this analysis will not be limited to performing basic univariate and bivariate exploratory analysis. Instead, we first **start from formatting/converting the data** in a way we can understand the meaning of each variable, and the issues that come with it.
 
 Furthermore, we may also **introduce transformations** or other means of engineering, until we feel satisfied with the final dataset. Adding new insights about the effects of, say, time-of-day, day-of-week and precinct, may help to reveal hidden patterns.
 
-All of the manipulations, are to be carefully tested for their impact. In fact, we might end up using some automatic variable selection approach to and other means of **model selection**.
+All of the manipulations, are to be carefully tested for their impact, through plots and inclusion in models. In fact, we might end up using some variable selection approach and other means of **model selection**.
 
-Only then, we can proceed to design the final plot, check for outliers and collinearity, and formulate our main assumptions. We will start with simple models and only introduce interactions when justified by performance or domain reasoning. This does not mean we are not going to try and evaluate combinations of predictors (that may also substitute the initial ones) nonetheless. The result of this initial part, aims to increase the reliability of the information, crucial to the next step.
+Only then, we can proceed to build the final models and diagnose them. We will start with simple models and only introduce interactions or trasformations if justified by performance or domain reasoning. This does not mean we are not going to try and evaluate combinations of predictors (that may also substitute the initial ones) nonetheless. The result of this initial part, aims to increase the reliability of the information, crucial to the next step.
 
-The core of this project is to **pragmatically build**, analyze and interpret (multiple) **predictive models** capable of estimating **whether a stop originates from a vehicle check point**, **whether it escalates into an arrest** and the importance of the factors used to build such models. This means, we want to differentiate between different target predictors by context, and build two different datasets for separate analyses.
+The core of this project is to **pragmatically build**, analyze and interpret (multiple) **predictive models** capable of estimating **whether a stop escalates into an arrest** and the importance of the factors used to build such models. This means, we want to differentiate between different predictors by context, and build two different datasets for separate analyses.
 
 Therefore, this requires an extensive training process, including the use of k-fold-cross validation, subset selection and other techniques to promote theoretical and empirical validity.
 

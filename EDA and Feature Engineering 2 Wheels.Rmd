@@ -43,7 +43,7 @@ We approach the dataset through three methodological phases to ensure a robust b
 Under these premises, we will plot many aspects of the data. Therefore, the way we decided to guide the reader through the Exploratory Data Analysis, is based on four key points that we try to include for any plot:
 
 - **Key finding**: This paragraph describes the main takeaway of the means of visualization employed. This should be a concise description of what we can gather from the plots.
-- **Interpretation**: Here we deal with an objective interpretation of our finding, such as understanding how our EDA is affected by . We also detail about how this affects our current framework and
+- **Interpretation**: Here we deal with an objective interpretation of our finding, such as understanding how our EDA is affected by it.
 - **Comment**: After a formal description, we deal with a more informal discussion that should highlight the qualitative aspects of the analysis. This paragraph is a fusion of previous considerations that we want the reader to be aware of, and a space for us to reason.
 - **Proposed Action**: Finally, we switch to a more pragmatic discussion to understand "what to do next", on the basis of what was previously presented. Without claim of completeness, we will name some best-practices, guidelines or ideas about what is best for our goal. We may also limit ourselves to inform the reader that we decided to take no action at all or post-pone it after further investigation.
 
@@ -430,106 +430,6 @@ ratio_by_cat <- function(
 }
 ```
 
-### Multivariate Plot Functions
-
-```{r multivariate-plot-helpers}
-# ==============================================================================
-# 3. Plots for Multivariate Analysis
-# ==============================================================================
-
-#' @title Stacked Ratio Bars Split by a Third Variable
-#' 
-#' @description Creates a faceted 100% stacked bar chart. This is highly effective 
-#' for visualizing how the rate of a binary TARGET changes across a primary category (CAT), 
-#' while simultaneously splitting the data by a third variable (SPLIT) to create side-by-side plots.
-#' 
-#' @param DF The input dataframe.
-#' @param TARGET The binary column to analyze (unquoted). It will be standardized to 0/1.
-#' @param CAT The main categorical variable for the X axis (unquoted).
-#' @param SPLIT The categorical variable used to split/facet the plots (unquoted).
-#' @param x_title Label for the X axis.
-#' @param y_title Label for the Y axis.
-#' @param title Main title of the entire plot.
-#' @param target_labels Character vector of length 2 defining labels for the binary outcomes (e.g., c("Not escalated", "Escalated")).
-#' @param split_labels Optional character vector to provide custom titles for the split panels (facets).
-#' @param palette A character string specifying an RColorBrewer palette name (e.g., "Paired", "Set1").
-#' @param percent_accuracy Accuracy for the percentage labels (e.g., 0.1 for one decimal place).
-#' 
-#' @return A ggplot2 object.
-ratio_by_cat_split <- function(DF, TARGET, CAT, SPLIT, x_title, y_title, title, target_labels = c("Not escalated", "Escalated"), split_labels = NULL, palette = "Paired", percent_accuracy = 0.1){
-  # Standardize target
-  dat <- DF %>%
-    mutate(
-      .target_raw = {{ TARGET }},
-      # Conversion to 0/1
-      .target_bin = case_when(
-        as.character(.target_raw) %in% c("1", "TRUE", "true") ~ 1L,
-        as.character(.target_raw) %in% c("0", "FALSE", "false") ~ 0L,
-        TRUE ~ NA_integer_
-      ),
-      .cat = {{ CAT }},
-      .split = {{ SPLIT }}
-    ) %>%
-    # Filter NAs
-    filter(!is.na(.cat), !is.na(.split), !is.na(.target_bin))
-
-  # Order the main categories based on the overall target rate (from lowest to highest)
-  cat_order <- dat %>%
-    group_by(.cat) %>%
-    summarise(
-      rate = mean(.target_bin == 1),
-      .groups = "drop"
-    ) %>%
-    arrange(rate) %>% 
-    pull(.cat)
-
-  # Tidy labels by converting character to factors
-  dat <- dat %>%
-    mutate(
-      # Apply the order to X axis
-      .cat = factor(as.character(.cat), levels = as.character(cat_order)),
-      # Apply custom labels to the target
-      .target_f = factor(.target_bin, levels = c(0, 1), labels = target_labels),
-      # Format the split variable
-      .split_f = {
-        lv <- unique(as.character(.split))
-        # If custom split labels are provided and the length matches, use them
-        if (!is.null(split_labels) && length(split_labels) == length(lv))
-          factor(as.character(.split), levels = lv, labels = split_labels)
-        else factor(as.character(.split), levels = lv)
-      }
-    )
-
-  # Compute rates
-  plot_df <- dat %>%
-    count(.split_f, .cat, .target_f, name = "n") %>%
-    group_by(.split_f, .cat) %>%
-    mutate(ratio = n/sum(n)) %>%
-    ungroup()
-
-  # Build plot
-  ggplot(plot_df, aes(x = .cat, y = ratio, fill = .target_f)) +
-    # Stacks the bars to exactly 100%
-    geom_col(position = "fill") +
-    # Add ratio text labels
-    geom_text(
-      aes(label = percent(ratio, accuracy = percent_accuracy)),
-      position = position_fill(vjust = 0.5), 
-      size = 3
-    ) +
-    # Format Y axis as percentages and make continuous
-    scale_y_continuous(labels = percent) +
-    # Use a clean palette for the target categories
-    scale_fill_brewer(palette = palette, name = rlang::as_name(rlang::enquo(TARGET))) +
-    labs(x = x_title, y = y_title, title = title) +
-    # Split the plot into separate panels based on the .split_f variable
-    facet_wrap(~ .split_f, nrow = 1) +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          panel.grid = element_blank())
-}
-```
-
 ------------------------------------------------------------------------
 
 Let us load the data now, and remove the extra feature `veh_category` because we are **exclusively analyzing 2 wheels vehicles now**.
@@ -739,7 +639,7 @@ month_data %>%
   ) +
   labs(
     title = "Monthly Volume of Stops for 2-Wheels Vehicles in NYC",
-    subtitle = "Over 3 Years, Most Vehichles are Stopped between June and October",
+    subtitle = "Over 3 Years, Most Vehicles are Stopped between June and October",
     x = "Month",
     y = "Count"
   )
@@ -872,7 +772,7 @@ rm(plot_data)
 
 What can we say?
 
-- **Key finding**: Total enforcement volume is surging but, more importantly, the enforcement pattern is slowly becoming **increasingly concentrated** in the "Hot Season." In fat, while the hot season accounted for \~64% of stops in 2023, it reached \~68% of stops in 2025.
+- **Key finding**: Total enforcement volume is surging but, more importantly, the enforcement pattern is slowly becoming **increasingly concentrated** in the "Hot Season." In fact, while the hot season accounted for \~64% of stops in 2023, it reached \~68% of stops in 2025.
 - **Interpretation**: The growth in stops is not uniform throughout the year. The rising percentage indicates that the "Hot Season" (April–Oct) is becoming a disproportionately larger driver of total annual stops year-over-year. However, the 3 year span of the data does not make this definite.
 - **Comment**: This plot confirms that `hot_season` could be a "high-signal" feature. On the other hand, this cannot be just inferred by looking at the year.
 
@@ -896,7 +796,7 @@ vehstops %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(title = "Volume of Stops by Day of the Month (1–31) for 2-Wheels Vehicles",
-       subtitle = "The drop towards 30-31 indicates it is not a behavior!",
+       subtitle = "The drop towards 30-31 indicates it is not a behavior, but depends on the month!",
        x = "Day of the Month", y = "Count")
 ```
 
@@ -1034,7 +934,7 @@ ggplot() +
   ) +
   labs(
     title = "Hourly Volume of Stops for 2-Wheels Vehicles",
-    subtitle = "Aggregated stops showing velocity between key hours",
+    subtitle = "The count of stops climbs up by the hour until the 19:00 peak",
     x = "Hour of Day (0–23)", 
     y = "Count"
   )
@@ -1088,7 +988,7 @@ ggplot() +
   ) +
   labs(
     title = "Hourly Volume of Stops, by Year, for 2-Wheels Vehicles",
-    subtitle = "Aggregated stops showing velocity between key hours per year",
+    subtitle = "Faceting the count of stops by year, reveals that by 2025 the climb becomes very steep",
     x = "Hour of Day (0–23)", 
     y = "Count"
   )
@@ -1149,7 +1049,7 @@ ggplot() +
   ) +
   labs(
     title = "Hourly Cycle of Enforcement: Hot Season vs. Off Season",
-    subtitle = "Comparing daily volume and velocity between seasons",
+    subtitle = "Hot season months is where the most volume is focused and changes rapidly",
     x = "Hour of Day (0–23)", 
     y = "Count"
   )
@@ -1347,10 +1247,10 @@ Because of how the `table()` function works in R, we can also include integer pr
 ```{r categorical-correlation-heatmap}
 # Excluding doy (redundant) and dow (we use weekday instead)
 columns <- c(
-  "year" , "month", "hot_season", "weekday", 
-  "hour", "time_bracket",
+  "hot_season", "weekday", 
+  "time_bracket",
   "area", "boro", 
-  "sex", "ethnicity", "age", "age_bracket",
+  "sex", "ethnicity", "age_bracket",
   "arrested"
   )
 
@@ -1363,12 +1263,34 @@ plot_categorical_correlation(
 
 What can we say?
 
-- **Key finding**: The association matrix reveals that the only predictors showing a noticeable signal with `arrested` are `ethnicity` ($0.1$), `time_bracket` ($0.11$), `hour` ($0.12$), `area` ($0.13$), and `boro` ($0.13$). Conversely, demographic features such as `sex` ($0.02$) and `age` / `age_bracket` ($0.04$) share negligible pairwise associations with the target. The matrix highlights a moderate association between these top predictors, specifically between
-  - the geographic and temporal blocks `area`/`boro` $\leftrightarrow$ `hour`/`time_bracket` (which cluster around a Cramer's V of $0.08$ to $0.09$) and,
-  - between `ethnicity` $\leftrightarrow$ `area`/`boro` ($0.17$ to $0.19$).
-- **Interpretation**: Temporal and spatial circumstances carry the strongest individual impact when predicting an arrest, while motorist demographics are less informative as standalone predictors. However, the $0.09$ association between the main spatial and temporal features indicates the volume of stops are non-uniformly distributed across time and space. In other words, this suggests an underlying interaction between these two classes of predictors.
+- **Key finding**: The association matrix reveals that the only predictors showing a noticeable signal with `arrested` are `ethnicity` ($0.1$), `time_bracket` ($0.11$), `area` ($0.13$), and `boro` ($0.13$). Conversely, demographic features such as `sex` ($0.02$) and `age_bracket` ($0.04$) share negligible pairwise associations with the target. The matrix highlights a moderate association between these top predictors, specifically between
+  - the geographic and temporal blocks `area`/`boro` $\leftrightarrow$ `time_bracket` (Cramer's V of $0.08$),
+  - between `ethnicity` $\leftrightarrow$ `area`/`boro` ($0.17$ to $0.19$), and
+  - between `ethnicity` $\leftrightarrow$ `sex` ($0.16$).
+- **Interpretation**: Temporal and spatial circumstances carry the strongest individual impact when predicting an arrest, while motorist demographics are less informative as standalone predictors. However, the $0.08$ association between the main spatial and temporal features indicates the volume of stops are non-uniformly distributed across time and space. In other words, this suggests an underlying interaction between these two classes of predictors.
 - **Comment**: Because no single predictor strongly correlates with `arrested`, models relying purely on main effects will likely underfit the data. The intersection of geography and time is where the true narrative of police behavior resides, as patrol priorities and ridership composition (such as delivery workers vs. overnight riders) change depending on the borough and hour. Surfacing patterns of excessive enforcement requires us to model these blocks conditionally rather than treating them as entirely independent factors.
 - **Proposed Action**: We will focus our predictive models on the spatial and temporal axes by retaining `area` and `time_bracket` as our primary drivers. Possibly, we can try to capture the interaction term (`area` $\times$ `time_bracket`) in our logistic regression. This approach will allow us to test if the probability of arrest spikes during specific hours in specific areas.
+
+## Correlation of Binary Response vs. Numerical Predictors
+
+```{r numerical-correlation-heatmap}
+# Ignoring Latitude and Longitude
+numerical_cols <- c(
+  "arrested",
+  "year", "month", "day", "dow", "doy", "hour", 
+  "age"
+  )
+
+cor_matrix <- cor(vehstops[, numerical_cols], use = "complete.obs")
+
+corrplot(cor_matrix, method = "color", type = "upper",
+         order = "hclust", addCoef.col = "black", number.cex = 0.7,
+         tl.col = "black", tl.srt = 45,
+         title = "Correlation Matrix of Numerical Features",
+         mar = c(0, 0, 2, 0))
+```
+
+What can we say? The target has no particularly important numerical correlation with any of the numerical predictors.
 
 ## Geospatial Features
 
@@ -1481,7 +1403,7 @@ ggplot() +
 
 What can we say?
 
-- **Key finding**: The visualization displays highly localized hot spots, particularly in the Bronx,, southern Brooklyn and northern Staten Island. Here, in fact, some specific bins show arrest rates climbing well above $40\%$ and even reaching up to $80\%$.
+- **Key finding**: The visualization displays highly localized hot spots, particularly in the Bronx, southern Brooklyn and northern Staten Island. Here, in fact, some specific bins show arrest rates climbing well above $40\%$ and even reaching up to $80\%$.
 - **Interpretation**: While this highlights a great geographic heterogeneity, it exposes a critical limitation regarding model integration because spatial data violates the assumption of independence.
 
 ## Time related features
@@ -1811,8 +1733,9 @@ daily_arrest_rate %>%
 What can we say?
 
 - **Key finding**: The probability of an arrest given a stop peaks first on Tuesday at $5.9\%$ before dipping during mid-week, and then reaches its absolute maximum on Saturday at $6.2\%$, while the lowest arrest probabilities occur on Monday and Thursday at $5.3\%$.
-- **Interpretation**: The overall variation across the week is relatively tight which suggests it is a less powerful predictor with respect to the other time-related ones.
-- **Comment**: We should treat the day of the week as a categorical dummy in order to use it in our models.
+- **Interpretation**: The overall variation across the week is relatively tight which suggests it is a less powerful predictor with respect to the other time-related ones. 
+- **Comment**: Surprisingly, the arrest rate peaks on Saturday (6.2%) while mid-week has the highest stop count (see Univariate) but lower per-stop arrest probability.
+- **Proposed Action**: We should treat the day of the week as a categorical dummy in order to use it in our models.
 
 ### Hour and Time Bracket
 
@@ -1883,15 +1806,21 @@ ratio_by_cat(
   "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
   subtitle = "The 16–24 age bracket and Unknown show the highest arrest rates",
-  label_vjust = 0.5
+  label_vjust = 0.5,
 )
 ```
 
-What can we say? TODO
+```{r confirm-age-bracket-vs-target-ratio}
+vehstops %>%
+  group_by(age_bracket, arrested) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(percentage = count / sum(count))
+```
 
-- **Key finding**: 
-- **Interpretation**:
-- **Comment**:
+What can we say?
+
+- **Key finding**: This plot shows a clear demographic trend where the arrest rate generally increases as the reported age bracket gets younger. The absolute lowest arrest rate is found within the 65+ demographic at just 3.2%, which also accounts only for 45 arrests (the lowest amount). The highest ratio belongs to the Under 18 bracket, where the arrest rate reaches a peak of 10.9% (424 arrests). On the other hand, the highest amount of arrests comes from 25-34 bracket, whose 5% accounts for 3561 arrests. Following the underage bracket, the unknown label shows the second highest arrest rate of 7.1% (630 arrests), and in third place, we find the 18–24 bracket at 6.3% (2493 arrests).
+- **Interpretation**: The data demonstrates a near-monotonic progression where younger operators face a higher conditional probability of arrest upon being stopped.
 - **Proposed Action**: We want to include `age_bracket` as a predictor in our models instead of just using `age`.
 
 In fact,
@@ -1903,16 +1832,23 @@ ratio_by_cat(
   vehstops, arrested, sex,
   "Reported sex", "Arrest Rate (%)", "Arrest Ratio by Reported sex",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "Male drivers TODO",
+  subtitle = "Male drivers are subject to higher arrest rates, followed by Unknown category",
 )
 ```
 
-What can we say? TODO
+```{r confirm-sex-vs-target-ratio}
+vehstops %>%
+  group_by(sex, arrested) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(percentage = count / sum(count))
+```
 
-- **Key finding**: 
-- **Interpretation**: 
-- **Comment**:
-- **Proposed Action**:
+What can we say?
+
+- **Key finding**: This highlights a clear disparity in arrest rates across reported sex categories for two-wheels vehicle stops. Female drivers (`F`) experience the lowest arrest rate at 2.7% (191 arrests), followed by the unknown or unrecorded category (`U`) at 3.8% (with just 38 arrests). Male drivers (`M`) are subject to the highest rate, with 5.7% of their total stops resulting in an arrest. In fact, the total Male drivers arrests are 10331.
+- **Interpretation**: The ratio of arrest, given a stop, **is more than twice as high for male drivers compared to female** drivers. This variation affects our current analysis by suggesting that reported sex is another key predictor that needs to be included in our statistical models.
+- **Comment**: The higher arrest rate among male drivers might align with the broader demographic trends in traffic violations, where they are associated with risky driving behaviors. Interestingly, the Unknown category is not even, suggesting that incomplete data entry might be randomly distributed or slightly skewed toward cases that did not escalate to a full arrest.
+- **Proposed Action**: We will try to understand the importance of this component, because the low association with the target and the imbalance nature of this feature may become tricky in the modeling phase.
 
 ### Reported Ethnicity
 
@@ -1921,22 +1857,22 @@ ratio_by_cat(
   vehstops, arrested, ethnicity,
   "Reported ethnicity", "Share of stops", "Escalation ratio by Reported Ethnicity",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "Black and Hispanic drivers tend TODO",
+  subtitle = "Hispanic and Black Motorists have the highest arrest rates and account for most arrests",
 )
 ```
 
-What can we say? TODO
+```{r confirm-ethnicity-vs-target-ratio}
+vehstops %>%
+  group_by(ethnicity, arrested) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(percentage = count / sum(count))
+```
 
-- **Key finding**:
-- **Interpretation**:
-- **Comment**: 
-- **Proposed Action**:
+What can we say?
 
----
-
-# Recap
-
-TODO
+- **Key finding**: Hispanic motorists represent the largest slice with $90,250$ total stops and the highest absolute number of arrests at $6,533$ ($7.24\%$). Black motorists experience the second-highest escalation rate with $2,686$ arrests out of $39,130 stops$ ($6.86\%$). In contrast, White motorists account for $18,494$ stops and $597$ arrests ($3.23\%$). Finally, Asian / Pacific Islander, Other, and Unknown categories maintain the lowest arrest rates, all remaining near or below $2.0\%$.
+- **Interpretation**: The probability of a stop resulting in an arrest is more than twice as high for Black and Hispanic motorists compared to White motorists. The rates are calculated from a large sample, indicating they are highly stable and unlikely to be the result of small-sample variance.
+- **Proposed Action**: This imbalance indicates that reported ethnicity is a critical factor that must be included in our models.
 
 ------------------------------------------------------------------------
 
