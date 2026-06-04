@@ -164,7 +164,7 @@ plot_binary_bar <- function(DF, FEATURE, OPTION_0, OPTION_1, X_LABEL, Y_LABEL, T
 #' @param DF The input dataframe.
 #' @param FEATURE The categorical column to analyze (unquoted).
 #' @param X_LABEL Label for the X axis.
-#' @param Y_LABEL Label for the Y axis (default is "Count").
+#' @param Y_LABEL Label for the Y axis (default is "Count of Stops").
 #' @param TITLE Main title of the plot.
 #' @param SUBTITLE Subtitle of the plot.
 #' @param top_n Optional integer; if set, keeps only the top N most frequent categories.
@@ -173,7 +173,7 @@ plot_binary_bar <- function(DF, FEATURE, OPTION_0, OPTION_1, X_LABEL, Y_LABEL, T
 #' @param text_vjust Vertical adjustment for the text labels on top of bars.
 #' 
 #' @return A ggplot2 object.
-plot_univariate_cat <- function(DF, FEATURE, X_LABEL, Y_LABEL = "Count", TITLE, SUBTITLE, top_n = NULL, order_by = c("freq", "none"), pad = 0.12, text_vjust = -0.35) {
+plot_univariate_cat <- function(DF, FEATURE, X_LABEL, Y_LABEL = "Count of Stops", TITLE, SUBTITLE, top_n = NULL, order_by = c("freq", "none"), pad = 0.12, text_vjust = -0.35) {
   
   order_by <- match.arg(order_by)
   
@@ -459,13 +459,13 @@ This preview is already interesting.
 p1 <- plot_binary_bar(
   vehstops, arrested, 
   "No", "Yes",
-  "Was the motorist arrested?", "Count (Rate %)", ""
+  "Was the motorist arrested?", "Count of Stops (Percentage %)", ""
 )
 
 row1 <- p1
 
 row1 + 
-plot_annotation(title = "Distribution of 2-Wheels Vehicles Stops by Target") &
+plot_annotation(title = "Distribution of 2-Wheels Vehicles Stops by Arrested") &
 theme(legend.position = "bottom") 
 ```
 
@@ -489,7 +489,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = area, 
   X_LABEL = "Area", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Area",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Area (Sorted by Count Desc)",
   SUBTITLE = "Brooklyn is where the most amount of vehicles are stopped",
   order_by = "freq"
 )
@@ -509,7 +509,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = boro, 
   X_LABEL = "Borough", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Borough",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Borough (Sorted by Count Desc)",
   SUBTITLE = "A more fine-grained bracketing of areas shows that North Queens dominates for amount of stops"
 )
 ```
@@ -597,7 +597,7 @@ vehstops %>%
   labs(
     title = "Annual Volume of Stops for 2-Wheels Vehicles in NYC",
     subtitle = "In 3 Years the Total Volume Increased by 2,5 Times",
-    x = "Year", y = "Count"
+    x = "Year", y = "Count of Stops"
     )
 ```
 
@@ -641,7 +641,7 @@ month_data %>%
     title = "Monthly Volume of Stops for 2-Wheels Vehicles in NYC",
     subtitle = "Over 3 Years, Most Vehicles are Stopped between June and October",
     x = "Month",
-    y = "Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -704,7 +704,7 @@ plot_data %>%
     title = "Monthly Volume of Stops, by Year, for 2-Wheels Vehicles in NYC",
     subtitle = "Custom Growth/Decline analysis: January vs Max, and Max vs December",
     x = "Month",
-    y = "Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -762,7 +762,7 @@ plot_data %>%
     title = "Volume of Stops for 2-Wheels Vehicles: Hot Season vs. Off Season",
     subtitle = "While Overall Volume Increase, Percentages slightly Drift Towards Hot Season",
     x = NULL,
-    y = "Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -797,7 +797,7 @@ vehstops %>%
   ) +
   labs(title = "Volume of Stops by Day of the Month (1–31) for 2-Wheels Vehicles",
        subtitle = "The drop towards 30-31 indicates it is not a behavior, but depends on the month!",
-       x = "Day of the Month", y = "Count")
+       x = "Day of the Month", y = "Count of Stops")
 ```
 
 Furthermore, `doy` variable suffers from inconsistent data density.
@@ -823,7 +823,7 @@ plot_data %>%
     title = "Volume of Stops by Day of the Year (1–365) for 2-Wheels Vehicles",
     subtitle = "Continuous time series shows that there might be a pattern drifting towards a bell centered in August",
     x = "Period", 
-    y = "Daily Stop Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -850,7 +850,7 @@ vehstops %>%
   ) +
   labs(title = "Volume of Stops by Day of the Year (1–365) for 2-Wheels Vehicles",
        subtitle = "The extreme jitter confirms this feature is too noisy to predict, but the trend favors hot months",
-       x = "Day of Year", y = "Count")
+       x = "Day of Year", y = "Count of Stops")
 ```
 
 Finally, these granular temporal markers are prone to overfitting. Excluding them allows the model to focus on more robust predictors, such as seasonality and weekly rhythms.
@@ -886,7 +886,7 @@ vehstops %>%
     title = "Daily Volume of Stops for 2-Wheels Vehicles",
     subtitle = "Daily volume and day-over-day growth/decline show high stop counts during mid-week",
     x = "Day of the Week", 
-    y = "Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -936,7 +936,7 @@ ggplot() +
     title = "Hourly Volume of Stops for 2-Wheels Vehicles",
     subtitle = "The count of stops climbs up by the hour until the 19:00 peak",
     x = "Hour of Day (0–23)", 
-    y = "Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -990,7 +990,7 @@ ggplot() +
     title = "Hourly Volume of Stops, by Year, for 2-Wheels Vehicles",
     subtitle = "Faceting the count of stops by year, reveals that by 2025 the climb becomes very steep",
     x = "Hour of Day (0–23)", 
-    y = "Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -1051,7 +1051,7 @@ ggplot() +
     title = "Hourly Cycle of Enforcement: Hot Season vs. Off Season",
     subtitle = "Hot season months is where the most volume is focused and changes rapidly",
     x = "Hour of Day (0–23)", 
-    y = "Count"
+    y = "Count of Stops"
   )
 ```
 
@@ -1096,7 +1096,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = age_bracket, 
   X_LABEL = "Age Bracket", 
-  TITLE = "Distribution of Stops by Age Bracket",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Age Bracket (Sorted by Count Desc)",
   SUBTITLE = "Enforcement volume is highly concentrated in the demographic (18–44)"
 )
 ```
@@ -1140,7 +1140,7 @@ ggplot(age_data, aes(x = age, fill = age_group)) +
     title = "Age Distribution of Drivers by Target Bracket",
     subtitle = "Enforcement volume is confirmed to be concentrated in 20-45 age range",
     x = "Driver Age", 
-    y = "Count",
+    y = "Count of Stops",
     fill = "Age Group"
   ) +
   theme(legend.position = "bottom") +
@@ -1199,7 +1199,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = sex, 
   X_LABEL = "Reported Sex", 
-  TITLE = "Distribution of Stops by Reported Sex (Sorted by Count)",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Reported Sex (Sorted by Count Desc)",
   SUBTITLE = "The vast majority of stopped bikers are males",
   order_by = "freq"
 )
@@ -1219,7 +1219,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = ethnicity, 
   X_LABEL = "Reported Ethnicity", 
-  TITLE = "Distribution of Stops by Reported Ethnicity (Sorted by Count)",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Reported Ethnicity (Sorted by Count Desc)",
   SUBTITLE = "Hispanic drivers seem to account for the plurality of stops",
   order_by = "freq"
 )
@@ -1238,19 +1238,17 @@ What can we say?
 
 ## Association of Binary Response vs. Categorical Predictors
 
-When dealing with a dataset of this size, traditional p-values from chi-squared tests become meaningless. With \~185k observations, virtually any association achieves p \< 0.001 regardless of whether it matters in practice.
-
-To get around this, we use Cramer’s V to measure effect size (association).
+When dealing with a dataset of this size, traditional p-values from chi-squared tests become meaningless. To get around this, we use Cramer’s V to measure effect size (association).
 
 Because of how the `table()` function works in R, we can also include integer predictors like `hour` and `age`: they do not take truly continuous values in this dataset, so treating each integer as its own category is valid.
 
 ```{r categorical-correlation-heatmap}
 # Excluding doy (redundant) and dow (we use weekday instead)
 columns <- c(
-  "hot_season", "weekday", 
-  "time_bracket",
+  "year", "month", "hot_season", "weekday", 
+  "hour", "time_bracket",
   "area", "boro", 
-  "sex", "ethnicity", "age_bracket",
+  "sex", "ethnicity", "age", "age_bracket",
   "arrested"
   )
 
@@ -1263,8 +1261,8 @@ plot_categorical_correlation(
 
 What can we say?
 
-- **Key finding**: The association matrix reveals that the only predictors showing a noticeable signal with `arrested` are `ethnicity` ($0.1$), `time_bracket` ($0.11$), `area` ($0.13$), and `boro` ($0.13$). Conversely, demographic features such as `sex` ($0.02$) and `age_bracket` ($0.04$) share negligible pairwise associations with the target. The matrix highlights a moderate association between these top predictors, specifically between
-  - the geographic and temporal blocks `area`/`boro` $\leftrightarrow$ `time_bracket` (Cramer's V of $0.08$),
+- **Key finding**: The association matrix reveals that the only predictors showing a noticeable signal with `arrested` are `ethnicity` ($0.1$), `hour` / `time_bracket` ($0.11$), `area` ($0.13$), and `boro` ($0.13$). Conversely, demographic features such as `sex` ($0.02$) and `age` / `age_bracket` ($0.04$) share negligible pairwise associations with the target. The matrix highlights a moderate association between these top predictors, specifically between
+  - the geographic and temporal blocks `area`/`boro` $\leftrightarrow$ `hour` / `time_bracket` (Cramer's V of $0.08$),
   - between `ethnicity` $\leftrightarrow$ `area`/`boro` ($0.17$ to $0.19$), and
   - between `ethnicity` $\leftrightarrow$ `sex` ($0.16$).
 - **Interpretation**: Temporal and spatial circumstances carry the strongest individual impact when predicting an arrest, while motorist demographics are less informative as standalone predictors. However, the $0.08$ association between the main spatial and temporal features indicates the volume of stops are non-uniformly distributed across time and space. In other words, this suggests an underlying interaction between these two classes of predictors.
@@ -1382,7 +1380,7 @@ ggplot() +
   geom_tile(data = grid_sum_rate, aes(x, y, fill = arrest_rate), alpha = 0.8) +
   scale_fill_viridis_c(
     labels = scales::percent, 
-    name = "Arrest Rate", 
+    name = "Arrest Rate (%)", 
     option = "inferno",
     direction = -1
   ) +
@@ -1590,7 +1588,7 @@ plot_data %>%
     title = "Monthly Arrest Rate, by Year, for 2-Wheels Vehicles in NYC",
     subtitle = "The seasonal amplitude of the arrest rate appears to widen across the three years",
     x = "Month",
-    y = "Arrest Rate"
+    y = "Arrest Rate (%)"
   )
 ```
 
@@ -1855,7 +1853,7 @@ What can we say?
 ```{r ethnicity-vs-target, fig.width=6}
 ratio_by_cat(
   vehstops, arrested, ethnicity,
-  "Reported ethnicity", "Share of stops", "Escalation ratio by Reported Ethnicity",
+  "Reported ethnicity", "Arrest Rate (%)", "Escalation ratio by Reported Ethnicity",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
   subtitle = "Hispanic and Black Motorists have the highest arrest rates and account for most arrests",
 )

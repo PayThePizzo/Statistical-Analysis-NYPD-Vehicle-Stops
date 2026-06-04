@@ -25,7 +25,7 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 ---
 
-<!-- # Problem Statement -->
+# Problem Statement
 
 ## Goal of this notebook
 
@@ -98,7 +98,7 @@ tbkt_levels <- c(
 )
 
 # Ordered age-bracket levels
-abkt_levels <- c("Under 18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+")
+abkt_levels <- c("Under 18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+", "Unknown")
 
 vehstop <- vehstop %>%
   mutate(
@@ -694,6 +694,8 @@ class_metrics <- function(actual, predicted, pos = 1) {
 
 # Full metrics tibble (one row per model)
 compute_metrics <- function(actual, prob, model_name = "Model") {
+  valid  <- !is.na(actual) & !is.na(prob)
+  actual <- actual[valid]; prob <- prob[valid]
   roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
   auc_val <- as.numeric(pROC::auc(roc_obj))
   thr     <- best_thresh(roc_obj)
@@ -1628,10 +1630,13 @@ library(glmnet)
 ```
 
 ```{r ridge-matrix, include=FALSE}
-X_train <- model.matrix(f_final, data = train)[, -1]
-X_test  <- model.matrix(f_final, data = test)[, -1]
-y_train <- train$arrested
-y_test  <- test$arrested
+mm_train       <- model.frame(f_final, data = train, na.action = na.omit)
+X_train        <- model.matrix(f_final, data = mm_train)[, -1]
+y_train        <- mm_train$arrested
+
+mm_test  <- model.frame(f_final, data = test, na.action = na.omit)
+X_test   <- model.matrix(f_final, data = mm_test)[, -1]
+y_test   <- mm_test$arrested
 ```
 
 ## Cross-Validated Lambda
@@ -1641,7 +1646,7 @@ cv_ridge <- cv.glmnet(
   X_train, y_train,
   family       = "binomial",
   alpha        = 0,
-  foldid       = cv_folds,
+  nfolds = 10,
   type.measure = "auc"
 )
 
@@ -1763,10 +1768,13 @@ library(glmnet)
 ## Model Matrix
 
 ```{r lasso-matrix}
-X_train <- model.matrix(f_final, data = train)[, -1]   # drop intercept column
-X_test  <- model.matrix(f_final, data = test)[, -1]
-y_train <- train$arrested
-y_test  <- test$arrested
+mm_train <- model.frame(f_final, data = train, na.action = na.omit)
+X_train  <- model.matrix(f_final, data = mm_train)[, -1]
+y_train  <- mm_train$arrested
+
+mm_test  <- model.frame(f_final, data = test, na.action = na.omit)
+X_test   <- model.matrix(f_final, data = mm_test)[, -1]
+y_test   <- mm_test$arrested
 
 cat("Training matrix:", nrow(X_train), "×", ncol(X_train), "\n")
 cat("Test matrix    :", nrow(X_test),  "×", ncol(X_test),  "\n")
