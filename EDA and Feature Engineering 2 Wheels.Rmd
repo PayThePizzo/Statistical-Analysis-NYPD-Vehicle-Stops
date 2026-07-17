@@ -30,7 +30,7 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 This notebook serves as the primary Exploratory Data Analysis (EDA) and (final) Feature Engineering phase for the project. In particular, we focus solely on **2-Wheeled Vehicles** (including e-bikes, motorcycles, and mopeds).
 
-The reason for this is the fact that, these vehicles, have been the subject a of 2.5x increase in stop volume in NYC between 2023 and 2025 (which will be later shown). Furthermore, they show a completely separate behavior with respect to vehicles with four wheels (due to environmental factors like temperature and weather).
+The reason for this is the fact that, these vehicles, have been the subject a of $2.5$x increase in stop volume in NYC between 2023 and 2025 (which will be later shown). Furthermore, they show a completely separate behavior with respect to vehicles with four wheels (due to environmental factors like temperature and weather).
 
 The goal is to identify the features that characterize **arrests**.
 
@@ -475,10 +475,10 @@ rm(p1, row1)
 
 What can we say?
 
-- **Key finding**: The dataset, for 2 wheels-vehicles, **exhibits extreme class imbalance**. Arrests are highly sparse, representing only approximately 5.6% of the times (10,560 "Yes" out of 189,610 total records).
+- **Key finding**: The dataset, for 2 wheels-vehicles, **exhibits extreme class imbalance**. Arrests are highly sparse, representing only approximately $5.6\%$ of the times ($10,560$ "Yes" out of $189,610$ total records).
 - **Interpretation**: The target constitutes "rare event" when we contemplate the stops of 2-wheels vehicles. In fact, they remain an infrequent occurrence with respect to the total volume of police stops.
 - **Comment**: The high class disparity *makes accuracy a limiting metric* for our models' evaluation. This is due to the fact a predictive model aiming for accuracy could achieve a high score by simply classifying every stop as "No". Therefore, it completely fails to capture the what characterizes an arrest after a stop. This is also sub-optimal for our research, as capturing the true patterns is what drives our investigation towards enforcement bias.
-- **Proposed Action**: Although we could employ cost-sensitive learning models, this is outside the scope of the course. As an alternative, we will **employ stratified down-sampling of the majority class** ("No") to create a balanced training set, ensuring compatibility across all models (LDA, QDA, KNN, etc...). For the **GLM-based models** (Logistic, Lasso, Ridge), we will specifically **utilize observation weighting within the likelihood function** to account for the class disparity. Finally, we will move away from the default 0.5 classification threshold, **optimizing the decision boundary based on the Precision-Recall curve** to ensure our model maintains sensitivity to the minority class ("Yes").
+- **Proposed Action**: Although we could employ cost-sensitive learning models, this is outside the scope of the course. As an alternative, we will **employ stratified down-sampling of the majority class** ("No") to create a balanced training set, ensuring compatibility across all models (LDA, QDA, KNN, etc...). For the **GLM-based models** (Logistic, Lasso, Ridge), we will specifically **utilize observation weighting within the likelihood function** to account for the class disparity. Finally, we will move away from the default $0.5$ classification threshold, **optimizing the decision boundary based on the Precision-Recall curve** to ensure our model maintains sensitivity to the minority class ("Yes").
 
 ## Geospatial predictors
 
@@ -497,7 +497,7 @@ plot_univariate_cat(
 
 What can we say?
 
-- **Key finding**: There is a high variance in the volume of stops across areas. We observe three "high-volume" areas (Brooklyn, Queens, and Manhattan) with comparable stop counts (ranging between \~50k and 56k), one "medium-volume" area (Bronx, \~30k), and a distinct "low-volume" area (Staten Island, \~1.5k).
+- **Key finding**: There is a high variance in the volume of stops across areas. We observe three "high-volume" areas (Brooklyn, Queens, and Manhattan) with comparable stop counts (ranging between $50$k and $56$k), one "medium-volume" area (Bronx, $30$k), and a distinct "low-volume" area (Staten Island, $1.5$ k).
 - **Interpretation**: The distribution is highly non-uniform, or better, uneven. The lower frequency of stops in the Bronx and Staten Island suggests that geographic location could be a strong predictor of the probability of being stopped (in case the targets' ratio distributed by area follows a specific pattern).
 - **Comment**: From a modeling perspective, this introduces a risk of **overfitting to the high-volume areas**. Since some of the available models (especially KNN or QDA) rely on local neighborhood data or global likelihoods, they will naturally prioritize minimizing errors in the areas with the most observations. Furthermore, the extreme sparsity of the Staten Island group may lead to high variance in the parameter estimates for that specific categorical level, potentially skewing the coefficients for the area predictor. The visualization succeeds in highlighting a pattern, but it leaves the causal mechanisms open to speculation.
 - **Proposed Action**: We still need to check its association with subject-related predictors. Also, we still want to explore the finer-grained version of this geographical predictor (`boro`), which may achieve better results in the models. If using **Lasso or Ridge regression**, we will carefully tune the penalty parameter ($\lambda$) to ensure that the "Area" coefficients are not inflated/suppressed due to the sample size difference.
@@ -603,8 +603,8 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: There has been a significant, multi-year surge in the volume of police stops involving 2-wheeled vehicles, with the number of encounters increasing from \~33k in 2023 to \~85k in 2025.
-- **Interpretation**: The growth trajectory is non-linear. The 113% jump between 2023 and 2024 represents a massive inflection point, which is suggesting either a shift in departmental priority or a new legislation targeting these vehicles. On the other hand, the 19.8% increase in 2025 indicates that while activity is still rising, the rate of acceleration is starting to stabilize.
+- **Key finding**: There has been a significant, multi-year surge in the volume of police stops involving 2-wheeled vehicles, with the number of encounters increasing from $33$k in $2023$ to $85$k in $2025$.
+- **Interpretation**: The growth trajectory is non-linear. The $113\%$ jump between $2023$ and $2024$ represents a massive inflection point, which is suggesting either a shift in departmental priority or a new legislation targeting these vehicles. On the other hand, the $19.8\%$ increase in 2025 indicates that while activity is still rising, the rate of acceleration is starting to stabilize.
 - **Comment**: The visualization clearly demonstrates that the "public exposure" to these stops is increasing. However, since the dataset analyzed was aggregated by 2-wheels vehicles, we could be seeing the result of policies regarding a specific subset. Plus, 3 years is not a sufficient time span for us to deliver some substantial proof.
 
 In fact, we found the article ["New York City Council Votes to Pass New E-Bike Safety Rules in Continued Effort to Address the Dangers of Lithium-Ion Batteries"](https://council.nyc.gov/press/2024/02/28/2564/) published in February 28, 2024. From its content, we could justify the raise in volume as natural consequence to new laws being put in place.
@@ -651,7 +651,7 @@ rm(month_data)
 
 What can we say?
 
-- **Key finding**: The data exhibits strong seasonality for bikers, with stop volumes peaking in a plateau between June and October (roughly 18k–19k stops/month). Enforcement bottoms out in the winter, with the sharpest declines occurring in November (-17%) and December (-28%).
+- **Key finding**: The data exhibits strong seasonality for bikers, with stop volumes peaking in a plateau between June and October (roughly $18$k - $19$k stops/month). Enforcement bottoms out in the winter, with the sharpest declines occurring in November ($-17\%$) and December ($-28\%$).
 - **Interpretation**: As temperatures rise, more 2-wheeled vehicles are on the road, increasing the opportunity for police to conduct stops. The "plateau" from June through October suggests that (once the weather is consistently warm) the trend hits a saturation point, and enforcement activity maintains a high baseline.
 - **Comment**: It would be easy to state that, the decline in stops during winter is likely due to **reduced vehicle usage** rather than a change in police behavior. However, both mechanisms are not distinguishable from the data alone.
 - **Proposed Action**: Given this clear seasonal pattern, we ensure our predictive models to include this time-related feature.
@@ -714,10 +714,10 @@ rm(plot_data)
 
 What can we say?
 
-- **Key finding**: There is a pronounced "seasonal amplification" effect. While stop volume is increasing annually, the seasonal peaks are becoming more extreme, and the year-end "cooling off" period is becoming significantly sharper (from a -22% drop in 2023 to a -54% drop in 2025).
+- **Key finding**: There is a pronounced "seasonal amplification" effect. While stop volume is increasing annually, the seasonal peaks are becoming more extreme, and the year-end "cooling off" period is becoming significantly sharper (from a $-22\%$ drop in $2023$ to a $-54\%$ drop in $2025$).
 - **Interpretation**: The data indicates that enforcement is becoming increasingly "concentrated" in the summer/autumn months. The gap between Max and "off-season" (Dec) shows a widening trend.
 - **Comment**: It clearly shows that while the baseline (January) is rising slightly, the *intensity* of the mid-year surges is growing much faster.
-- **Proposed Action**: Creating a binary indicator for "Hot Season" (April–Oct).
+- **Proposed Action**: Creating a binary indicator for "Hot Season" (April-Oct).
 
 ### Checking out `hot_season`
 
@@ -772,8 +772,8 @@ rm(plot_data)
 
 What can we say?
 
-- **Key finding**: Total enforcement volume is surging but, more importantly, the enforcement pattern is slowly becoming **increasingly concentrated** in the "Hot Season." In fact, while the hot season accounted for \~64% of stops in 2023, it reached \~68% of stops in 2025.
-- **Interpretation**: The growth in stops is not uniform throughout the year. The rising percentage indicates that the "Hot Season" (April–Oct) is becoming a disproportionately larger driver of total annual stops year-over-year. However, the 3 year span of the data does not make this definite.
+- **Key finding**: Total enforcement volume is surging but, more importantly, the enforcement pattern is slowly becoming **increasingly concentrated** in the "Hot Season." In fact, while the hot season accounted for $64\%$ of stops in $2023$, it reached $68\%$ of stops in $2025$.
+- **Interpretation**: The growth in stops is not uniform throughout the year. The rising percentage indicates that the "Hot Season" (April-Oct) is becoming a disproportionately larger driver of total annual stops year-over-year. However, the $3$ year span of the data does not make this definite.
 - **Comment**: This plot confirms that `hot_season` could be a "high-signal" feature. On the other hand, this cannot be just inferred by looking at the year.
 
 ### Dow/Weekday, Day and Doy
@@ -795,7 +795,7 @@ vehstops %>%
     plot.title = element_text(size = 14),
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
-  labs(title = "Volume of Stops by Day of the Month (1–31) for 2-Wheels Vehicles",
+  labs(title = "Volume of Stops by Day of the Month (1-31) for 2-Wheels Vehicles",
        subtitle = "The drop towards 30-31 indicates it is not a behavior, but depends on the month!",
        x = "Day of the Month", y = "Count of Stops")
 ```
@@ -820,7 +820,7 @@ plot_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Volume of Stops by Day of the Year (1–365) for 2-Wheels Vehicles",
+    title = "Volume of Stops by Day of the Year (1-365) for 2-Wheels Vehicles",
     subtitle = "Continuous time series shows that there might be a pattern drifting towards a bell centered in August",
     x = "Period", 
     y = "Count of Stops"
@@ -848,7 +848,7 @@ vehstops %>%
     plot.title = element_text(size = 14),
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
-  labs(title = "Volume of Stops by Day of the Year (1–365) for 2-Wheels Vehicles",
+  labs(title = "Volume of Stops by Day of the Year (1-365) for 2-Wheels Vehicles",
        subtitle = "The extreme jitter confirms this feature is too noisy to predict, but the trend favors hot months",
        x = "Day of Year", y = "Count of Stops")
 ```
@@ -892,7 +892,7 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: Enforcement activity follows a distinct "Mid-Week Peak" cycle. The volume starts at its lowest on Monday, raises aggressively (+52.7%) into Tuesday, peaks on Wednesday/Thursday, and then declines toward the weekend.
+- **Key finding**: Enforcement activity follows a distinct "Mid-Week Peak" cycle. The volume starts at its lowest on Monday, raises aggressively ($+52.7\%$) into Tuesday, peaks on Wednesday/Thursday, and then declines toward the weekend.
 - **Comment**: This pattern *might* suggests that these stops are primarily linked to **commercial usage** (ex: food delivery/courier services) rather than recreational riding. In fact, it would be easier to think that recreational riders typically peak on weekends, while here we find that enforcement is targeting "work-hour" traffic as the volume drops on the weekend. The interpretation is plausible but not derivable from these counts alone.
 - **Proposed Action**: We may keep `weekday` as the new `day` in the model. Also we need first to check the signal from other indicators previously built.
 
@@ -935,7 +935,7 @@ ggplot() +
   labs(
     title = "Hourly Volume of Stops for 2-Wheels Vehicles",
     subtitle = "The count of stops climbs up by the hour until the 19:00 peak",
-    x = "Hour of Day (0–23)", 
+    x = "Hour of Day (0-23)", 
     y = "Count of Stops"
   )
 ```
@@ -946,8 +946,8 @@ rm(hours_to_show, full_data, highlight_data)
 
 What can we say? In our opinion this looks like a "sine wave broken by a bridge". To be more precise:
 
-- **Key finding**: Enforcement volume is characterized by a "fractured" daily cycle. It follows a predictable overnight decline and morning ascent (0:00–12:00), but is interrupted by a distinct midday plateau (12:00–15:00) before reaching an aggressive evening peak at 19:00.
-- **Interpretation**: This suggests that the enforcement cycle is divided into two distinct operational phases: the **Morning Phase** (likely commuter-driven) and the **Evening Phase** (likely delivery/service-driven). The plateau is the "bridge" between these two. the variability during 10:00 to 15:00 is limited because the amount of vehicles on the road remains stable, as well as the police work.
+- **Key finding**: Enforcement volume is characterized by a "fractured" daily cycle. It follows a predictable overnight decline and morning ascent ($0:00-12:00$), but is interrupted by a distinct midday plateau ($12:00-15:00$) before reaching an aggressive evening peak at $19:00$.
+- **Interpretation**: This suggests that the enforcement cycle is divided into two distinct operational phases: the **Morning Phase** (likely commuter-driven) and the **Evening Phase** (likely delivery/service-driven). The plateau is the "bridge" between these two. the variability during $10:00$ to $15:00$ is limited because the amount of vehicles on the road remains stable, as well as the police work.
 
 Before anything else, let us see whether this cycle changed throughout the years.
 
@@ -989,7 +989,7 @@ ggplot() +
   labs(
     title = "Hourly Volume of Stops, by Year, for 2-Wheels Vehicles",
     subtitle = "Faceting the count of stops by year, reveals that by 2025 the climb becomes very steep",
-    x = "Hour of Day (0–23)", 
+    x = "Hour of Day (0-23)", 
     y = "Count of Stops"
   )
 ```
@@ -1000,8 +1000,8 @@ rm(hours_to_show, full_data, highlight_data)
 
 What can we say?
 
-- **Key finding**: While 2023 enforcement peaked at 16:00 (4:00 PM), the peak has decisively migrated to 19:00-20:00 (7:00-8:00 PM) in 2024 and 2025. Additionally, the volume near the 19:00-20:00 peak has nearly tripled between 2023 and 2025.
-- **Interpretation**: This suggests that the primary targets of enforcement (likely delivery riders) are increasingly active later into the evening, or that (since 2024) enforcement volume and trend has taken a new look. The "Evening Rush" (16:00–20:00) is the clear driver of the total volume increase.
+- **Key finding**: While $2023$ enforcement peaked at $16:00$ ($4:00$ PM), the peak has decisively migrated to $19:00-20:00$ ($7:00-8:00$ PM) in $2024$ and $2025$. Additionally, the volume near the $19:00-20:00$ peak has nearly tripled between $2023$ and $2025$.
+- **Interpretation**: This suggests that the primary targets of enforcement (likely delivery riders) are increasingly active later into the evening, or that (since $2024$) enforcement volume and trend has taken a new look. The "Evening Rush" ($16:00-20:00$) is the clear driver of the total volume increase.
 - **Comment**: This may confirm our previous idea concerning the article cited above. It is possible that new regulations directly translated into increased amount of stops by the police.
 
 Now let us see if the hot season might shift this cycle
@@ -1050,7 +1050,7 @@ ggplot() +
   labs(
     title = "Hourly Cycle of Enforcement: Hot Season vs. Off Season",
     subtitle = "Hot season months is where the most volume is focused and changes rapidly",
-    x = "Hour of Day (0–23)", 
+    x = "Hour of Day (0-23)", 
     y = "Count of Stops"
   )
 ```
@@ -1061,7 +1061,7 @@ rm(plot_data_full, hours_to_show, full_data, highlight_data)
 
 What can we say?
 
-- **Key finding**: The trend for enforcement shifts significantly between seasons. In the Off Season (Nov-Mar), activity peaks at 16:00 and then declines rapidly. In the Hot Season (Apr-Oct), the peak is at 20:00, with high volume sustained well into the evening.
+- **Key finding**: The trend for enforcement shifts significantly between seasons. In the Off Season (Nov-Mar), activity peaks at $16:00$ and then declines rapidly. In the Hot Season (Apr-Oct), the peak is at $20:00$, with high volume sustained well into the evening.
 - **Interpretation**: Enforcement curve is governed by the "Sun and Temperature" cycle. During the colder months, police stops tend to take place during slightly warmer parts of the day.
 - **Proposed Action**: We must check the hours against the targets' ratios to double check our previous binning and then we can consider restricting the bins.
 
@@ -1079,7 +1079,7 @@ plot_univariate_cat(
 
 What can we say?
 
-- **Key finding**: The "Afternoon/evening" (16–19) and "Night" (20–23) brackets collectively account for the majority of stops, with the afternoon/evening block acting as the dominant peak.
+- **Key finding**: The "Afternoon/evening" ($16-19$) and "Night" ($20-23$) brackets collectively account for the majority of stops, with the afternoon/evening block acting as the dominant peak.
 - **Interpretation**: This confirms that the "Evening Migration" we observed in the previous charts is a structural trend. Also, it confirms that our buckets align well with the data.
 - **Proposed Action**: We can maintain our existing `time_bracket` exactly it is.
 
@@ -1097,7 +1097,7 @@ plot_univariate_cat(
   FEATURE = age_bracket, 
   X_LABEL = "Age Bracket", 
   TITLE = "Distribution of 2-Wheels Vehicles Stops by Age Bracket (Sorted by Count Desc)",
-  SUBTITLE = "Enforcement volume is highly concentrated in the demographic (18–44)"
+  SUBTITLE = "Enforcement volume is highly concentrated in the demographic (18-44)"
 )
 ```
 
@@ -1153,8 +1153,8 @@ rm(age_data)
 
 What can we say?
 
-- **Key finding**: Enforcement is confirmed to be heavily concentrated within the 20-45 age range, with a distinct operational peak occurring in the mid-20s. After age 50, there is a continuous, rapid decline in stop volume, forming a long and sparse "tail" that extends past 75.
-- **Proposed Action**: We want to filter our dataset to exclude drivers over age 75. This should enhance the shape of the enforcement curve without losing predictive signal. Furthermore, we may think of collapsing the 55–64 and 65+ buckets into a single "55+" category. This should increase the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic.
+- **Key finding**: Enforcement is confirmed to be heavily concentrated within the 20-45 age range, with a distinct operational peak occurring in the mid-20s. After age $50$, there is a continuous, rapid decline in stop volume, forming a long and sparse "tail" that extends past $75$.
+- **Proposed Action**: We want to filter our dataset to exclude drivers over age $75$. This should enhance the shape of the enforcement curve without losing predictive signal. Furthermore, we may think of collapsing the $55-64$ and $65+$ buckets into a single "55+" category. This should increase the sample size for that bin, ensuring the model has enough data to learn a stable weight for the older demographic.
 
 Let us remove the outliers
 
@@ -1181,14 +1181,14 @@ vehstops %>%
   ) +
   labs(
     title = "Age Distribution after Outlier Removal (76+ excluded)",
-    subtitle = "Remaining values span the plausible 16–75 enforcement range",
+    subtitle = "Remaining values span the plausible 16-75 enforcement range",
     y = "Reported Age", x = NULL
   )
 ```
 
 What can we say?
 
-- **Key finding**: After removing riders aged 76+, the remaining distribution is right-skewed with the median around 28–32 and the IQR roughly 22–40. The residual "outliers" shown by the boxplot (ages \~65–75) are plausible.
+- **Key finding**: After removing riders aged 76+, the remaining distribution is right-skewed with the median around $28-32$ and the IQR roughly $22-40$. The residual "outliers" shown by the boxplot (ages $65-75$) are plausible.
 - **Interpretation**: The steep drop (seen before) after age 40 means older ages may have high statistical leverage if continuous `age` is used. In fact, a small number of observations at unusual values can pull coefficients. The bracket encoding mitigates this by pooling sparse ages into wider bins.
 - **Proposed Action**: We want to use `age_bracket` as the primary age predictor. Also we may compare it against `age` for model comparison.
 
@@ -1207,7 +1207,7 @@ plot_univariate_cat(
 
 What can we say?
 
-- **Key finding**: The data exhibits extreme class imbalance. "Male" (M) drivers represent the overwhelming majority of enforcement stops (approximately 96%), while "Female" (F) and "Unknown" (U) represent a negligible fraction of the total volume.
+- **Key finding**: The data exhibits extreme class imbalance. "Male" (M) drivers represent the overwhelming majority of enforcement stops (approximately $96\%$), while "Female" (F) and "Unknown" (U) represent a negligible fraction of the total volume.
 - **Interpretation**: This is a reflection of the driver demographic being targeted.
 - **Comment**: Because the skew is so profound, `sex` will inevitably become a high-importance feature in any model we train.
 - **Proposed Action**: We are going to investigate this predictor further. First, we are going to use correlation matrix (in the bivariate EDA) to see if sex is highly correlated with other variables. Then, we ensure to use stratified sampling (preserving the M/F/U ratio in both sets) for fitting and testing.
@@ -1266,7 +1266,7 @@ What can we say?
   - between `ethnicity` $\leftrightarrow$ `area`/`boro` ($0.17$ to $0.19$), and
   - between `ethnicity` $\leftrightarrow$ `sex` ($0.16$).
 - **Interpretation**: Temporal and spatial circumstances carry the strongest individual impact when predicting an arrest, while motorist demographics are less informative as standalone predictors. However, the $0.08$ association between the main spatial and temporal features indicates the volume of stops are non-uniformly distributed across time and space. In other words, this suggests an underlying interaction between these two classes of predictors.
-- **Comment**: Because no single predictor strongly correlates with `arrested`, models relying purely on main effects will likely underfit the data. The intersection of geography and time is where the true narrative of police behavior resides, as patrol priorities and ridership composition (such as delivery workers vs. overnight riders) change depending on the borough and hour. Surfacing patterns of excessive enforcement requires us to model these blocks conditionally rather than treating them as entirely independent factors.
+- **Comment**: Because **no single predictor strongly correlates** with `arrested`, **models relying purely on main effects will likely underfit** the data. The intersection of geography and time is where the true narrative of police behavior resides, as patrol priorities and ridership composition (such as delivery workers vs. overnight riders) change depending on the borough and hour. Surfacing patterns of excessive enforcement requires us to model these blocks conditionally rather than treating them as entirely independent factors.
 - **Proposed Action**: We will focus our predictive models on the spatial and temporal axes by retaining `area` and `time_bracket` as our primary drivers. Possibly, we can try to capture the interaction term (`area` $\times$ `time_bracket`) in our logistic regression. This approach will allow us to test if the probability of arrest spikes during specific hours in specific areas.
 
 ## Correlation of Binary Response vs. Numerical Predictors
@@ -1343,7 +1343,7 @@ What can we say?
 
 - **Key finding**: Disaggregating (some of) the geographic data into finer regions preserves the overall ranking but reveals a minor intra-borough variance. The Bronx ($12.1\%$) and Staten Island ($8.5\%$) remain the primary "outliers", while the separated regions display a steady gradient ranging from a minimum of $3.0\%$ in Manhattan (South) to a maximum of $6.1\%$ in Brooklyn (South).
 - **Interpretation**: This fine-grained visualization confirms that the macro patterns (observed previously) are robust. Within the boroughs that were split, we observe small localized shifts. This suggests that this predictor could explain even better the association with arrests.
-- **Proposed Action**: Since this level of fine-grain does not change the macro narrative but adds complexity, we should perform a test on nested logistic models. This aims to see whether a greater division achieves a statistically significant improvement over the simpler area-based model. In case the change is not significant, we will opt for a parsimonious model.
+- **Proposed Action**: We should perform a test on nested logistic models. This aims to see whether a greater division achieves a statistically significant improvement over the simpler area-based model. In case the change is not significant, we will opt for a parsimonious model.
 
 We will need to choose between one or the other.
 
@@ -1668,7 +1668,7 @@ daily_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Day of the Month (1–31)",
+    title = "Arrest Rate by Day of the Month (1-31)",
     subtitle = "Aggregated percentage of stops resulting in arrest across all recorded months",
     x = "Day of the Month",
     y = "Arrest Rate (%)"
@@ -1678,7 +1678,7 @@ daily_arrest_rate %>%
 What can we say?
 
 - **Key finding**: Arrest rates are broadly flat across days 1 through 28, showing no meaningful trend. Days 29, 30, and 31 show elevated and highly variable rates, which are consistent with the fact that not all months have these days.
-- **Interpretation**: The flat pattern across days 1–28 indicates that the day-of-month variable carries no genuine enforcement signal.
+- **Interpretation**: The flat pattern across days 1-28 indicates that the day-of-month variable carries no genuine enforcement signal.
 - **Proposed Action**: Exclude `day` from our models.
 
 ```{r dow-vs-arrested-ratio}
@@ -1732,7 +1732,7 @@ What can we say?
 
 - **Key finding**: The probability of an arrest given a stop peaks first on Tuesday at $5.9\%$ before dipping during mid-week, and then reaches its absolute maximum on Saturday at $6.2\%$, while the lowest arrest probabilities occur on Monday and Thursday at $5.3\%$.
 - **Interpretation**: The overall variation across the week is relatively tight which suggests it is a less powerful predictor with respect to the other time-related ones. 
-- **Comment**: Surprisingly, the arrest rate peaks on Saturday (6.2%) while mid-week has the highest stop count (see Univariate) but lower per-stop arrest probability.
+- **Comment**: Surprisingly, the arrest rate peaks on Saturday ($6.2\%$) while mid-week has the highest stop count (see Univariate) but lower per-stop arrest probability.
 - **Proposed Action**: We should treat the day of the week as a categorical dummy in order to use it in our models.
 
 ### Hour and Time Bracket
@@ -1765,14 +1765,14 @@ hourly_arrest_rate %>%
   labs(
     title = "Arrest Rate by Hour of Day for 2-Wheels Vehicles",
     subtitle = "The hourly arrest rate follows a U-shaped diurnal pattern",
-    x = "Hour of Day (0–23)",
+    x = "Hour of Day (0-23)",
     y = "Arrest Rate (%)"
   )
 ```
 
 What can we say?
 
-- **Key finding**: The line plot underlines the time-dependent pattern in the arrest rate resulting from stops across a 24-hour cycle. We observe a global minimum at 7:00 (07:00 AM), followed by a steady climb to a minor afternoon peak around 14:00 (02:00 PM). The absolute maximum occurs during the late-night and early-morning hours, specifically peaking at 3:00 (03:00 AM) with an arrest rate of nearly 11%.
+- **Key finding**: The line plot underlines the time-dependent pattern in the arrest rate resulting from stops across a 24-hour cycle. We observe a global minimum at 7:00 (07:00 AM), followed by a steady climb to a minor afternoon peak around 14:00 (02:00 PM). The absolute maximum occurs during the late-night and early-morning hours, specifically peaking at 3:00 (03:00 AM) with an arrest rate of nearly $11\%$.
 - **Interpretation**: This fluctuation suggests that our exploratory data analysis is heavily influenced by variations in motorist behavior, law enforcement patterns, or both depending on the hour of the day.
 - **Comment**: The low arrest rates during the morning commute hours (from 6:00 to 10:00) suggest that law enforcement actions during this window might focus on traffic management. On the other hand, the increase in the night might reflect stops related to more severe offenses, such as operating a vehicle under the influence or navigating without proper registration.
 - **Proposed Action**: We may opt for `time_bracket` as the primary predictor to capture the U-shape in a parsimonious way.
@@ -1791,7 +1791,7 @@ ratio_by_cat(
 What can we say? 
 
 - **Key finding**: The ordering of brackets by arrest rate follows (almost) the expected pattern from the diurnal curve: Night \> Evening \> Morning \> Afternoon (approximately), with Night brackets substantially above the global mean.
-- **Comment**: Even during the peak enforcement window in the Late night bracket, the vast majority of interactions (90.6%) still do not result in an arrest. We can argue that, while the relative risk of arrest increases nearly sixfold from the morning commute to the late night, a stop ending in arrest remains a minority event across all examined time frames.
+- **Comment**: Even during the peak enforcement window in the Late night bracket, the vast majority of interactions ($90.6\%$) still do not result in an arrest. We can argue that, while the relative risk of arrest increases nearly sixfold from the morning commute to the late night, a stop ending in arrest remains a minority event across all examined time frames.
 - **Proposed Action**: We choose `time_bracket` as the primary hour-related predictor in the arrest model.
 
 ## Motorist related features
@@ -1803,7 +1803,7 @@ ratio_by_cat(
   vehstops, arrested, age_bracket,
   "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "The 16–24 age bracket and Unknown show the highest arrest rates",
+  subtitle = "The 16-24 age bracket and Unknown show the highest arrest rates",
   label_vjust = 0.5,
 )
 ```
@@ -1817,11 +1817,9 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: This plot shows a clear demographic trend where the arrest rate generally increases as the reported age bracket gets younger. The absolute lowest arrest rate is found within the 65+ demographic at just 3.2%, which also accounts only for 45 arrests (the lowest amount). The highest ratio belongs to the Under 18 bracket, where the arrest rate reaches a peak of 10.9% (424 arrests). On the other hand, the highest amount of arrests comes from 25-34 bracket, whose 5% accounts for 3561 arrests. Following the underage bracket, the unknown label shows the second highest arrest rate of 7.1% (630 arrests), and in third place, we find the 18–24 bracket at 6.3% (2493 arrests).
+- **Key finding**: This plot shows a clear demographic trend where the arrest rate generally increases as the reported age bracket gets younger. The absolute lowest arrest rate is found within the $65+$ demographic at just $3.2\%$, which also accounts only for $45$ arrests (the lowest amount). The highest ratio belongs to the Under $18$ bracket, where the arrest rate reaches a peak of $10.9\%$ ($424$ arrests). On the other hand, the highest amount of arrests comes from $25-34$ bracket, whose $5\%$ accounts for $3561$ arrests. Following the underage bracket, the unknown label shows the second highest arrest rate of $7.1\%$ ($630$ arrests), and in third place, we find the $18-24$ bracket at $6.3\%$ ($2493$ arrests).
 - **Interpretation**: The data demonstrates a near-monotonic progression where younger operators face a higher conditional probability of arrest upon being stopped.
 - **Proposed Action**: We want to include `age_bracket` as a predictor in our models instead of just using `age`.
-
-In fact,
 
 ### Reported Sex
 
@@ -1843,7 +1841,7 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: This highlights a clear disparity in arrest rates across reported sex categories for two-wheels vehicle stops. Female drivers (`F`) experience the lowest arrest rate at 2.7% (191 arrests), followed by the unknown or unrecorded category (`U`) at 3.8% (with just 38 arrests). Male drivers (`M`) are subject to the highest rate, with 5.7% of their total stops resulting in an arrest. In fact, the total Male drivers arrests are 10331.
+- **Key finding**: This highlights a clear disparity in arrest rates across reported sex categories for two-wheels vehicle stops. Female drivers (`F`) experience the lowest arrest rate at $2.7\%$ ($191$ arrests), followed by the unknown or unrecorded category (`U`) at $3.8\%$ (with just $38$ arrests). Male drivers (`M`) are subject to the highest rate, with $5.7\%$ of their total stops resulting in an arrest. In fact, the total Male drivers arrests are $10331$.
 - **Interpretation**: The ratio of arrest, given a stop, **is more than twice as high for male drivers compared to female** drivers. This variation affects our current analysis by suggesting that reported sex is another key predictor that needs to be included in our statistical models.
 - **Comment**: The higher arrest rate among male drivers might align with the broader demographic trends in traffic violations, where they are associated with risky driving behaviors. Interestingly, the Unknown category is not even, suggesting that incomplete data entry might be randomly distributed or slightly skewed toward cases that did not escalate to a full arrest.
 - **Proposed Action**: We will try to understand the importance of this component, because the low association with the target and the imbalance nature of this feature may become tricky in the modeling phase.
@@ -1868,7 +1866,7 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: Hispanic motorists represent the largest slice with $90,250$ total stops and the highest absolute number of arrests at $6,533$ ($7.24\%$). Black motorists experience the second-highest escalation rate with $2,686$ arrests out of $39,130 stops$ ($6.86\%$). In contrast, White motorists account for $18,494$ stops and $597$ arrests ($3.23\%$). Finally, Asian / Pacific Islander, Other, and Unknown categories maintain the lowest arrest rates, all remaining near or below $2.0\%$.
+- **Key finding**: Hispanic motorists represent the largest slice with $90,250$ total stops and the highest absolute number of arrests at $6,533$ ($7.24\%$). Black motorists experience the second-highest escalation rate with $2,686$ arrests out of $39,130$ stops ($6.86\%$). In contrast, White motorists account for $18,494$ stops and $597$ arrests ($3.23\%$). Finally, Asian / Pacific Islander, Other, and Unknown categories maintain the lowest arrest rates, all remaining near or below $2.0\%$.
 - **Interpretation**: The probability of a stop resulting in an arrest is more than twice as high for Black and Hispanic motorists compared to White motorists. The rates are calculated from a large sample, indicating they are highly stable and unlikely to be the result of small-sample variance.
 - **Proposed Action**: This imbalance indicates that reported ethnicity is a critical factor that must be included in our models.
 
