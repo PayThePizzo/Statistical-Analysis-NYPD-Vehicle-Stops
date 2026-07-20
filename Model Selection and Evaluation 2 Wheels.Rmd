@@ -2018,36 +2018,38 @@ cat(sprintf(
 ```
 
 ```{r knn-scale}
-# Dummy-encode (same columns as ridge/lasso X matrices)
-X_knn_tr_raw <- model.matrix(f_final, data = train_knn_raw)[, -1]
-X_knn_te_raw <- model.matrix(f_final, data = test)[, -1]
+# 1. Align and clean missing values using model.frame
+mm_knn_train <- model.frame(f_final, data = train_knn_raw, na.action = na.omit)
+X_knn_tr_raw <- model.matrix(f_final, data = mm_knn_train)[, -1]
+y_knn_train  <- mm_knn_train$arrested
 
-# Scale with train statistics; guard against zero-variance and NA sds
+mm_knn_test  <- model.frame(f_final, data = test, na.action = na.omit)
+X_knn_te_raw <- model.matrix(f_final, data = mm_knn_test)[, -1]
+y_knn_test   <- mm_knn_test$arrested
+
+# 2. Scale with train statistics (Keep your existing scaling logic here)
 tr_means <- colMeans(X_knn_tr_raw, na.rm = TRUE)
 tr_sds   <- apply(X_knn_tr_raw, 2, sd, na.rm = TRUE)
-tr_sds[is.na(tr_sds) | tr_sds == 0] <- 1  # constant columns get sd=0 or NA
+tr_sds[is.na(tr_sds) | tr_sds == 0] <- 1
 
 X_knn_tr <- scale(X_knn_tr_raw, center = tr_means, scale = tr_sds)
 X_knn_te <- scale(X_knn_te_raw, center = tr_means, scale = tr_sds)
 
-# Replace any residual NaN (e.g. new factor levels in test not seen in train)
 X_knn_tr[!is.finite(X_knn_tr)] <- 0
 X_knn_te[!is.finite(X_knn_te)] <- 0
 
-# Sanitise column names (model.matrix can produce names with spaces/brackets)
 colnames(X_knn_tr) <- make.names(colnames(X_knn_tr), unique = TRUE)
 colnames(X_knn_te) <- make.names(colnames(X_knn_te), unique = TRUE)
 
-# Attach response for kknn formula interface; must be a factor for classification mode
-# (integer response triggers regression mode and suppresses the $prob matrix)
+# 3. Attach the correctly aligned response vectors
 resp_levels <- c("0", "1")
 df_knn_tr <- as.data.frame(X_knn_tr)
-df_knn_tr$arrested <- factor(train_knn_raw$arrested, levels = resp_levels)
+df_knn_tr$arrested <- factor(y_knn_train, levels = resp_levels) # <-- Fixed
+
 df_knn_te <- as.data.frame(X_knn_te)
-df_knn_te$arrested <- factor(test$arrested, levels = resp_levels)
+df_knn_te$arrested <- factor(y_knn_test, levels = resp_levels)   # <-- Fixed
 
 f_knn <- arrested ~ .
-
 cat("KNN feature matrix:", nrow(X_knn_tr), "×", ncol(X_knn_tr), "\n")
 ```
 
@@ -2102,11 +2104,13 @@ knn_fit <- kknn::kknn(
 pos_col  <- which(colnames(knn_fit$prob) == "1")
 if (length(pos_col) == 0) pos_col <- ncol(knn_fit$prob)
 prob_knn  <- as.numeric(knn_fit$prob[, pos_col])
-roc_knn   <- pROC::roc(test$arrested, prob_knn, quiet = TRUE)
+
+# CHANGE test$arrested TO y_knn_test TO MATCH COV-MATRIX ROWS
+roc_knn   <- pROC::roc(y_knn_test, prob_knn, quiet = TRUE) # <-- Fixed
 auc_knn   <- as.numeric(pROC::auc(roc_knn))
 thr_knn   <- best_thresh(roc_knn)
 class_knn <- as.integer(prob_knn >= thr_knn)
-met_knn   <- class_metrics(test$arrested, class_knn)
+met_knn   <- class_metrics(y_knn_test, class_knn)          # <-- Fixed
 
 cat(sprintf(
   "AUC: %.4f  |  Threshold (Youden): %.4f\nSensitivity: %.3f  |  Specificity: %.3f  |  Balanced accuracy: %.3f\n",
@@ -2115,12 +2119,12 @@ cat(sprintf(
 ```
 
 ```{r knn-cm-plot, fig.width=4, fig.height=3.5}
-plot_cm(test$arrested, class_knn,
+plot_cm(y_knn_test, class_knn,
         title = sprintf("KNN (k = %d) — Confusion Matrix (Youden threshold)", best_k))
 ```
 
 ```{r knn-metrics-table}
-compute_metrics(test$arrested, prob_knn, sprintf("KNN (k = %d)", best_k)) %>%
+compute_metrics(y_knn_test, prob_knn, sprintf("KNN (k = %d)", best_k)) %>%
   kbl(
     caption   = sprintf("KNN (k = %d) — full evaluation metrics (test set, Youden threshold)", best_k),
     col.names = c("Model","AUC","PR-AUC","Log-Loss","Brier",
@@ -2130,7 +2134,7 @@ compute_metrics(test$arrested, prob_knn, sprintf("KNN (k = %d)", best_k)) %>%
 ```
 
 ```{r knn-eval-plots, fig.width=10, fig.height=8}
-eval_quad_plot(test$arrested, prob_knn, sprintf("KNN (k = %d)", best_k))
+eval_quad_plot(y_knn_test, prob_knn, sprintf("KNN (k = %d)", best_k))
 ```
 
 ---
@@ -2258,7 +2262,7 @@ bind_rows(
   compute_metrics(y_test,        prob_ridge,     "Ridge (λ.min)"),
   compute_metrics(y_test,        prob_lasso_min, "LASSO λ.min"),
   compute_metrics(y_test,        prob_lasso_1se, "LASSO λ.1se"),
-  compute_metrics(test$arrested, prob_knn,       sprintf("KNN (k = %d)", best_k)),
+  compute_metrics(y_knn_test, prob_knn,       sprintf("KNN (k = %d)", best_k)),
   compute_metrics(test$arrested, prob_gam,       "GAM")
 ) %>%
   kbl(
