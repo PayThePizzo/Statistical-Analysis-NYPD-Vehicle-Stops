@@ -459,7 +459,7 @@ p1 <- plot_binary_bar(
 row1 <- p1
 
 row1 + 
-plot_annotation(title = "Distribution of Car Stops by Arrested") &
+plot_annotation(title = "Distribution of Arrests for Cars Stopped in NYC") &
 theme(legend.position = "bottom") 
 ```
 
@@ -485,7 +485,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = area, 
   X_LABEL = "Area", 
-  TITLE = "Distribution of Car Stops by Area (Sorted by Count Desc)",
+  TITLE = "Distribution of Car Stops by Area in NYC",
   SUBTITLE = "Brooklyn is where the most amount of vehicles are stopped",
   order_by = "freq"
 )
@@ -505,7 +505,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = boro, 
   X_LABEL = "Borough", 
-  TITLE = "Distribution of Car Stops by Borough (Sorted by Count Desc)",
+  TITLE = "Distribution of Car Stops by Borough in NYC",
   SUBTITLE = "A more fine-grained bracketing of areas shows that Brookly (South) and Bronx dominate for amount of stops"
 )
 ```
@@ -549,7 +549,7 @@ ggplot() +
   coord_sf(xlim = c(-74.26, -73.71), ylim = c(40.48, 40.92)) +
   theme_minimal() +
   theme(panel.grid = element_blank()) +
-  labs(title = "Heatmap of Cars Stops Density - 100 Bins", x = "Longitude", y = "Latitude")
+  labs(title = "Heatmap of Cars Stops Density in NYC - 100 Bins", x = "Longitude", y = "Latitude")
 ```
 
 ```{r, include=FALSE}
@@ -593,7 +593,7 @@ vehstops %>%
     ) +
   labs(
     title = "Annual Volume of Stops for Cars in NYC",
-    subtitle = "In 3 Years the Total Volume Increased by ... Times",
+    subtitle = "TODO",
     x = "Year", y = "Count of Stops"
     )
 ```
@@ -755,7 +755,7 @@ plot_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Volume of Stops for Cars: Hot Season vs. Off Season",
+    title = "Volume of Stops for Cars in NYC: Hot Season vs. Off Season",
     subtitle = "While Overall Volume Increase, Percentages slightly Drift Towards Hot Season",
     x = NULL,
     y = "Count of Stops"
@@ -792,7 +792,7 @@ vehstops %>%
     plot.title = element_text(size = 14),
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
-  labs(title = "Volume of Stops by Day of the Month (1-31) for Cars",
+  labs(title = "Volume of Stops for Cars, by Day of the Month (1-31), in NYC",
        subtitle = "The drop towards 30-31 indicates it is not a behavior, but depends on the month!",
        x = "Day of the Month", y = "Count of Stops")
 ```
@@ -817,7 +817,7 @@ plot_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Volume of Stops by Day of the Year (1-365) for Cars",
+    title = "Volume of Stops for Cars, by Day of the Year (1-365), in NYC",
     subtitle = "TODO",
     x = "Period", 
     y = "Count of Stops"
@@ -845,7 +845,7 @@ vehstops %>%
     plot.title = element_text(size = 14),
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
-  labs(title = "Volume of Stops by Day of the Year (1-365) for Cars",
+  labs(title = "Volume of Stops for Cars, by Day of the Year (1-365), in NYC",
        subtitle = "TODO",
        x = "Day of Year", y = "Count of Stops")
 ```
@@ -880,7 +880,7 @@ vehstops %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Daily Volume of Stops for Cars",
+    title = "Daily Volume of Stops for Cars in NYC",
     subtitle = "TODO",
     x = "Day of the Week", 
     y = "Count of Stops"
@@ -931,7 +931,7 @@ ggplot() +
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Hourly Volume of Stops for Cars",
+    title = "Hourly Volume of Stops for Cars in NYC",
     subtitle = "TODO",
     x = "Hour of Day (0-23)", 
     y = "Count of Stops"
@@ -987,7 +987,7 @@ ggplot() +
     strip.text = element_text(size = 11)
   ) +
   labs(
-    title = "Hourly Volume of Stops, by Year, for Cars",
+    title = "Hourly Volume of Stops, by Year, for Cars in NYC",
     subtitle = "TODO",
     x = "Hour of Day (0-23)", 
     y = "Count of Stops"
@@ -1049,7 +1049,7 @@ ggplot() +
     strip.text = element_text(size = 12)
   ) +
   labs(
-    title = "Hourly Cycle of Enforcement: Hot Season vs. Off Season",
+    title = "Hourly Cycle of Enforcement for Cars in NYC: Hot Season vs. Off Season",
     subtitle = "TODO",
     x = "Hour of Day (0-23)", 
     y = "Count of Stops"
@@ -1074,7 +1074,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = time_bracket, 
   X_LABEL = "Time Bracket", 
-  TITLE = "Distribution of Time Brackets for Cars",
+  TITLE = "Distribution of Time Brackets for Cars in NYC",
   SUBTITLE = "TODO"
 )
 ```
@@ -1099,7 +1099,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = age_bracket, 
   X_LABEL = "Age Bracket", 
-  TITLE = "Distribution of Car Stops by Age Bracket (Sorted by Count Desc)",
+  TITLE = "Distribution of Car Stops in NYC by Age Bracket",
   SUBTITLE = "TODO"
 )
 ```
@@ -1141,7 +1141,7 @@ ggplot(age_data, aes(x = age, fill = age_group)) +
     strip.text = element_text(size = 11)
   ) +
   labs(
-    title = "Age Distribution of Car Drivers by Target Bracket",
+    title = "Age Distribution of Stopped Car Drivers in NYC by Target Bracket",
     subtitle = "TODO",
     x = "Driver Age", 
     y = "Count of Stops",
@@ -1206,7 +1206,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = sex, 
   X_LABEL = "Reported Sex", 
-  TITLE = "Distribution of Car Stops by Reported Sex (Sorted by Count Desc)",
+  TITLE = "Distribution of Car Stops in NYC by Reported Sex",
   SUBTITLE = "TODO",
   order_by = "freq"
 )
@@ -1226,7 +1226,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = ethnicity, 
   X_LABEL = "Reported Ethnicity", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Reported Ethnicity (Sorted by Count Desc)",
+  TITLE = "Distribution of Car Stops in NYC by Reported Ethnicity",
   SUBTITLE = "Hispanic drivers seem to account for the plurality of stops",
   order_by = "freq"
 )
