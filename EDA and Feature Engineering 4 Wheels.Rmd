@@ -1088,7 +1088,7 @@ What can we say?
 
 Also, we are going to drop minute as its level of granularity cannot be properly included in the dataset.
 
-## driver related predictors
+## Driver related predictors
 
 ### Reported Age
 
@@ -1294,7 +1294,12 @@ corrplot(cor_matrix, method = "color", type = "upper",
          mar = c(0, 0, 2, 0))
 ```
 
-What can we say? The target has no particularly important numerical correlation with any of the numerical predictors.
+What can we say?
+
+- **Key finding**: The Pearson correlation matrix shows that our binary target `arrested` has a negligible linear relationship with all continuous numerical features. The strongest standalone linear relationship with the target appears in `age` ($-0.07$), which indicates a very slight negative trend, followed by `hour` ($0.03$). Calendar features like `month`, `doy` (day of year), `year`, `dow` (day of week), and `day` all show absolute correlation coefficients of $0.01$ or lower, pointing to a complete absence of direct global linear relationships. Additionally, a perfect linear correlation of $1.00$ exists between `month` and `doy`.
+- **Interpretation**: The near-zero linear correlations across the board demonstrate that the probability of an arrest cannot be effectively modeled or predicted using standard linear relationships on raw numerical predictors. The perfect $1.00$ relationship between `month` and `doy` is expected, since the day of the year is mathematically deterministic based on the calendar month, creating total structural redundancy. The slight negative value for `age` implies that older stopped individuals have a marginally lower baseline likelihood of being arrested, but this tells us nothing about potential non-linear shifts within intermediate age ranges.
+- **Comment**: When comparing these outcomes to our previous two-wheeled vehicle analysis, we observe a shared statistical reality. Linear correlation metrics are fundamentally ill-suited for capturing the dynamics of this dataset because both the features (like cyclical hours or seasonal months) and the target variable (`arrested`) operate non-linearly. A value of $0.03$ for `hour` does not mean time of day is irrelevant. Instead, it simply means that the bimodal rush-hour distributions we discovered earlier cancel each other out when compressed into a single global linear trend line.
+- **Proposed Action**: We must avoid using raw linear models like standard un-penalized linear regression, as they will completely fail to extract predictive signals from these continuous variables. To handle the perfect collinearity between calendar features, we will drop `month` and retain `doy` or convert them into seasonal categories. Furthermore, we must explicitly map the continuous predictors using non-linear modeling frameworks, such as incorporating polynomial expansions, utilizing Generalized Additive Models (GAMs) with smoothing splines for `age` and `hour`, or relying on tree-based architectures like Random Forests that naturally capture non-monotonic step functions.
 
 ## Geospatial Features
 
@@ -1303,10 +1308,10 @@ What can we say? The target has no particularly important numerical correlation 
 ```{r area-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, area,
-  "Area", "Arrest Rate (%)", "Arrest Ratio by Area",
+  "Area", "Arrest Rate (%)", "Arrest Ratio by Area for Cars Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?",
   target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio in Low Volume Areas",
+  subtitle = "TODO",
   label_vjust = 0.5,
   bar_width = 0.6,  
   text_size = 2.5,
@@ -1323,22 +1328,22 @@ vehstops %>%
   mutate(percentage = count / sum(count))
 ```
 
-What can we say? Remember that Staten Island and Bronx are the areas with the least volume of stops.
+What can we say?
 
-- **Key finding**: This plot reveals a noticeable disparity in the proportions of vehicle stops that culminate in arrests for two-wheeled vehicles across New York City boroughs. The arrest rate ranges from a minimum of $3.2\%$ in Manhattan to a maximum of $12.1\%$ in the Bronx. This represents nearly a 4x increase in the relative probability of an arrest depending on the location of the encounter. Also, low-volume areas (Staten Island, Bronx) show arrest rates above the citywide average, while high-volume areas (Brooklyn, Queens) are closer to the global mean.
-- **Interpretation**: For the Bronx ($N = 29,874$), the $12.1\%$ arrest rate is calculated from the 3,628 arrests, proving that the elevated rate is a robust signal. However, the $8.5\%$ arrest rate in Staten Island is derived from only 125 events ($n = 125$ out of $N = 1,477$), meaning our parameter estimation (for this area) will have a wider confidence interval and higher susceptibility to sampling noise. For the remaining areas, we have more stable signals.
-- **Comment**: While the absolute majority of stops do not end in an arrest anywhere, the relative jump to a $12.1\%$ arrest rate in the Bronx is statistically and socially salient. The plot, together with this table, add critical context to the narrative. It reveals that the areas with the fewest total stops (Staten Island and the Bronx) yield the highest relative proportions of arrests. It highlights an interesting paradox where high-density, high-volume areas like Manhattan experience a massive volume of stops ($50,928$) but maintain a minimal arrest incidence. This could confirm that police behavior **vary** by territory.
-- **Proposed Action**: We include `area` as a candidate predictor in our models, but also test `boro` as a finer-grained alternative. We are going to stratify this aspect of the data too.
+- **Key finding**: The plot reveals a comparatively narrower yet statistically significant disparity in the proportions of four-wheeled vehicle stops that culminate in an arrest across New York City areas. The arrest rate ranges from a minimum of $2.5\%$ in Queens to a maximum of $4.8\%$ in the Bronx. This represents nearly a 2x increase in the conditional probability of an arrest depending purely on where the stop occurs. While the absolute majority of stops do not result in arrests across all territories, the Bronx consistently maintains the highest conversion rate, followed by Brooklyn at $3.5\%$, Staten Island at $3.0\%$, and Manhattan at $2.8\%$.
+- **Interpretation**: The variance in four-wheeled vehicle arrest rates across geography is structurally less volatile than what was observed in the two-wheel dataset. Because four-wheeled vehicles represent a massive overall sample size across all NYC boroughs, even small percentage fluctuations like the difference between $2.5\%$ in Queens and $4.8\%$ in the Bronx represent highly robust statistical signals with minimal exposure to sampling noise or wide confidence intervals. This confirms that geographic territory exerts a stable, persistent main effect on the target variable.
+- **Comment**: When contrasted against the two-wheeled vehicle analysis, where arrest rates skyrocketed up to $12.1\%$ in the Bronx, four-wheeled vehicle stops demonstrate a much tighter distribution window. The multi-fold spikes seen in two-wheelers were highly localized anomalies, likely tied to aggressive enforcement of specific delivery or unregistered vehicle regulations. For standard cars, the spatial distribution is smoother, yet it confirms that police behavior and the baseline threshold for making an arrest continue to vary systematically by borough. The Bronx remains the clear operational peak for arrest probability across both analyses.
+- **Proposed Action**: We will include `boro` as a core categorical predictor in our modeling pipeline to capture these geographic baseline shifts. Given that the absolute volumes of four-wheeled stops are massive across all five boroughs, we will not need to group or collapse any regional levels. However, we will ensure that our train-test splits are fully stratified across the geographic blocks to prevent any spatial imbalance from biasing our final parameter estimates for `arrested`.
 
 ### Borough
 
 ```{r boro-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, boro,
-  "Borough", "Arrest Rate (%)", "Arrest Ratio by Borough",
+  "Borough", "Arrest Rate (%)", "Arrest Ratio by Borough for Cars Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?",
   target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it confirms the Increased Arrest Ratio in Low Volume Areas",
+  subtitle = "TODO",
   label_vjust = 0.5,
   bar_width = 0.8,
   text_size = 2.5
@@ -1347,9 +1352,10 @@ ratio_by_cat(
 
 What can we say?
 
-- **Key finding**: Disaggregating (some of) the geographic data into finer regions preserves the overall ranking but reveals a minor intra-borough variance. The Bronx ($12.1\%$) and Staten Island ($8.5\%$) remain the primary "outliers", while the separated regions display a steady gradient ranging from a minimum of $3.0\%$ in Manhattan (South) to a maximum of $6.1\%$ in Brooklyn (South).
-- **Interpretation**: This fine-grained visualization confirms that the macro patterns (observed previously) are robust. Within the boroughs that were split, we observe small localized shifts. This suggests that this predictor could explain even better the association with arrests.
-- **Proposed Action**: We should perform a test on nested logistic models. This aims to see whether a greater division achieves a statistically significant improvement over the simpler area-based model. In case the change is not significant, we will opt for a parsimonious model.
+- **Key finding**: Disaggregating the geographic data into finer operational regions preserves the macro position of the Bronx ($4.8\%$) as the absolute peak but exposes massive intra-borough variance that was previously hidden. While Manhattan as a whole appeared moderately low in our previous chart, this breakdown reveals a steep internal gradient ranging from a citywide minimum of $1.6\%$ in Manhattan (South) to a substantial $3.9\%$ in Manhattan (North). The remaining separated regions display a steady upward slope, with Queens ranging from $2.1\%$ (North) to $2.8\%$ (South), and Brooklyn climbing from $3.3\%$ (South) to $3.7\%$ (North).
+- **Interpretation**: This fine-grained visualization confirms that the macro patterns are heavily influenced by specific administrative zones. The stark divergence within Manhattan is particularly illuminating, as a stop in Manhattan (North) is more than twice as likely to result in an arrest compared to one in Manhattan (South). This strong localized variance suggests that utilizing a finer geographic division will significantly improve the explanatory power of our models, as macro borough-level metrics average out these critical operational differences.
+- **Comment**: When comparing this to the two-wheeled vehicle analysis, the four-wheel data tells a much more localized story. In the two-wheel case, the entire borough of the Bronx was an isolated outlier due to targeted citywide regulations. Here, standard car stops show that police behavior and arrest conversion thresholds are highly dependent on specific command zones within the same borough. The fact that Manhattan (North) rivals the Bronx in arrest probability, while Manhattan (South) remains the absolute lowest, highlights a sharp geographical divide in enforcement outcomes that a coarse analysis would completely obscure.
+- **Proposed Action**: We will perform a likelihood ratio test on nested logistic regression models to formally evaluate whether this high-resolution `Borough` feature achieves a statistically significant improvement in deviance over the simpler macro-area classifier. If the test yields a significant result, we will incorporate the finer regional categories into our final model to capture this localized variance. Conversely, if the additional complexity does not provide sufficient statistical justification, we will favor the simpler, more parsimonious macro feature to prevent overfitting.
 
 We will need to choose between one or the other.
 
@@ -1398,7 +1404,7 @@ ggplot() +
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Spatial Distribution of Arrest Rates - NYC",
+    title = "Spatial Distribution of Arrest Rates for Cars Stopped in NYC",
     subtitle = "Percentage of stops resulting in arrest (Bins with n < 5 removed)",
     x = "Longitude", 
     y = "Latitude"
@@ -1407,8 +1413,10 @@ ggplot() +
 
 What can we say?
 
-- **Key finding**: The visualization displays highly localized hot spots, particularly in the Bronx, southern Brooklyn and northern Staten Island. Here, in fact, some specific bins show arrest rates climbing well above $40\%$ and even reaching up to $80\%$.
-- **Interpretation**: While this highlights a great geographic heterogeneity, it exposes a critical limitation regarding model integration because spatial data violates the assumption of independence.
+- **Key finding**: The spatial visualization exhibits a highly decentralized distribution of arrest rates for standard vehicles, characterized by a predominantly uniform baseline across the city with light yellow to orange shades ($0\%$ to $15\%$). However, isolated high-intensity hot spots are visible as dark purple and black pixels scattered across northern Manhattan, parts of the Bronx, eastern Queens, and central Staten Island, where specific geographic bins show arrest rates spiking above $40\%$.
+- **Interpretation**: While this highlights a localized geographic heterogeneity, it exposes a critical limitation regarding direct model integration because spatial coordinates violate the standard assumption of independent and identically distributed ($i.i.d.$) errors. The presence of isolated high-arrest bins amidst broad fields of low arrest rates suggests these spikes could be driven by micro-level spatial anomalies, localized checkpoints, or sparse sample sizes that survived the $n < 5$ filter but remain highly sensitive to single-event fluctuations.
+- **Comment**: In comparison to the two-wheeled vehicle analysis, which showcased broad and contiguous regional hot spots reflecting targeted borough-wide crackdowns, four-wheeled vehicle enforcement presents a much more fragmented spatial narrative. Standard vehicle stops do not yield massive, sweeping clusters of high arrest rates across entire neighborhoods. Instead, the baseline risk is fairly homogenous across the five boroughs, meaning that the extreme $40\%$ plus spikes are highly localized exceptions rather than representative regional trends.
+- **Proposed Action**: We should avoid feeding raw, high-resolution continuous coordinates directly into a standard generalized linear model due to the risk of spatial autocorrelation distorting our standard errors. Instead, we can extract value from this micro-spatial structure by engineering a regional density feature or by using spatial aggregation methods like K-means clustering to group adjacent bins into cohesive categorical inputs. Alternatively, we can utilize mixed-effects modeling frameworks where geographic zones are treated as random intercepts to isolate the true local variance without breaking our statistical assumptions.
 
 ## Time related features
 
@@ -1452,17 +1460,18 @@ ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
     plot.subtitle = element_text(size = 10, color = "grey50")
   ) +
   labs(
-    title = "Annual Arrest Rate has been Slowly Rising in the last 3 years",
-    subtitle = "The percentage of arrests kept increasing in this period",
+    title = "Annual Arrest Rate has Stabilized in the last 3 years for Cars Stopped in NYC",
+    subtitle = "TODO",
     x = "Year", y = "Arrest Rate (%)"
   )
 ```
 
 What can we say?
 
-- **Key finding**: The line chart displays the trajectory (of the annual arrest rate for two-wheeled vehicles over a three-year period) revealing an upward trend. The proportion of stops resulting in an arrest rose from $4.4\%$ in 2023 to $5.6\%$ in 2024 (a jump of $+1.2$ percentage points), followed by a slighter increase to $6.0\%$ in 2025 (an additional $+0.4$ percentage points).
-- **Interpretation**: From a time related perspective, this demonstrates the probability of an arrest given a stop is evolving over time. In a predictive framework, this upward drift means that older data points (such as those from 2023) may underestimate current arrest probabilities.
-- **Proposed Action**: We should check for an association effect between time and geography by plotting these three-year trends faceted by area/borough to see if the growth is uniform. Furthemore, we may include `year` as a categorical predictor to absorb the yearly trend.
+- **Key finding**: The line chart displays the trajectory of the annual arrest rate for four-wheeled vehicles over a three-year period, revealing an initial rise followed by stabilization. The proportion of stops resulting in an arrest rose from $2.8\%$ in $2023$ to $3.5\%$ in $2024$ (a jump of $+0.7$ percentage points), followed by a marginal contraction to $3.4\%$ in $2025$ (a slight decrease of $-0.1$ percentage points).
+- **Interpretation**: From a time-related perspective, this demonstrates that the probability of an arrest given a stop shifted between $2023$ and $2024$ but has since plateaued. In a predictive framework, this behavior implies that while data from $2023$ might underestimate subsequent enforcement patterns, data points from $2024$ and $2025$ are structurally homogenous. The relative stabilization indicates that the macro baseline threshold for executing an arrest has reached an equilibrium point in the final two years of the window.
+- **Comment**: In comparison to the two-wheeled vehicle analysis, which exhibited a continuous upward drift up to $6.0\%$, four-wheeled vehicle stops show a significantly lower overall arrest conversion rate and a distinct plateauing pattern. The continuous surge in two-wheel arrests was highly representative of evolving micromobility crackdowns and successive regulatory iterations stretching into $2025$. Conversely, standard vehicle enforcement represents a more mature operational environment, where policy shifts yielded a one-time adjustment in $2024$ before returning to a stable baseline.
+- **Proposed Action**: We should check for an association effect between time and geography by plotting these three-year trends faceted by borough to see if the $2024$ peak and subsequent $2025$ stabilization are uniform across the city. Furthermore, we will include `year` as a categorical predictor in our experimental model pipeline to absorb the initial yearly macro trend shift, though we may consider pooling $2024$ and $2025$ if a parsimonious model formulation is desired.
 
 ### Month and Hot Season
 
@@ -1507,8 +1516,8 @@ monthly_arrest_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Monthly Arrest Rate Trend",
-    subtitle = "Aggregated monthly arrest rate, the peak is found in the summer months",
+    title = "Monthly Arrest Rate Trend for Cars Stopped in NYC",
+    subtitle = "Aggregated monthly arrest rate, the peak is found in TODO",
     x = "Month",
     y = "Arrest Rate (%)"
   )
@@ -1516,19 +1525,20 @@ monthly_arrest_data %>%
 
 What can we say?
 
-- **Key finding**: The monthly arrest rate line chart describes a clear intra-year pattern. The arrest rates climb up from March and peak at $6.5\%$ in July and September. Then, they drop sharply during autumn and winter months to a minimum of $4.4\%$ in December.
-- **Interpretation**: The surge in the arrest rate during warmer months indicates that enforcement volume increases along with rider volume, or that specific initiatives are altering the probability of an arrest.
-- **Proposed Action**: We try to encode seasonality using the `hot_season` binary predictor.
+- **Key finding**: The monthly arrest rate line chart describes a highly stable, flat intra-year pattern with slight structural peaks concentrated at the absolute ends of the calendar year. The arrest rate begins at $3.6\%$ in January, drops and plateaus between $3.1\%$ and $3.3\%$ from February through November, and then experiences a slight late-year surge to its annual peak of $3.7\%$ in December ($+0.4$ percentage points).
+- **Interpretation**: From a temporal perspective, the conditional probability of an arrest given a stop is essentially invariant across the spring, summer, and autumn months for four-wheeled vehicles. The slight elevation observed in December and January suggests that seasonal factors, such as holiday-season traffic initiatives, increased checkpoint density, or changes in driving behavior during mid-winter, introduce a minor but distinct uptick in arrest efficiency at the turn of the year.
+- **Comment**: This visualization presents a stark contrast to the two-wheeled vehicle analysis, where arrest rates exhibited a massive sinusoidal curve tied directly to the summer season, peaking at $6.5\%$ in July. For standard automobiles, there is no summer surge, which further underscores that standard vehicle operations maintain a highly predictable, institutional baseline year-round. The minor spikes in December and January are likely driven by citywide holiday enforcement campaigns rather than environmental weather changes, revealing a completely different operational timeline than the two-wheel market.
+- **Proposed Action**: We should avoid relying on the binary `hot_season` feature for the four-wheeled vehicle framework, as the flat summer profile means this indicator will fail to capture any meaningful predictive signal. Instead, we can extract the true seasonal variance by engineering a specialized categorical feature that isolates the holiday transition window, such as a binary indicator for `holiday_season` spanning December and January, or by utilizing `month` as a nominal variable with January or December established as the reference levels in our regression pipeline.
 
 What about `hot_season`?
 
 ```{r hot-season-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, hot_season,
-  "Hot Season", "Arrest Rate (%)", "Arrest Ratio by Season",
+  "Hot Season", "Arrest Rate (%)", "Arrest Ratio by Season for Cars Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?",
   target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio during Hot Months",
+  subtitle = "For Cars it shows Increased Arrest Ratio during TODO",
   label_vjust = 0.5,
   text_size = 2.5,
   bar_width = 0.7
@@ -1537,9 +1547,10 @@ ratio_by_cat(
 
 What can we say?
 
-- **Key finding**: In the cold season, the arrest rate stays at $4.8\%$, whereas during the hot season, the probability of a stop ending in an arrest climbs to $5.9\%$.
-- **Comment**: This visualization acts as a feature engineering verification step, confirming that compressing the 12 calendar months into a simplified variable preserves a robust signal. The $1.1$ percentage point difference, confirms that seasonal enforcement behavior can be captured via a single binary flag.
-- **Proposed Action**: Before committing exclusively to this binary feature in our final production model, we should evaluate if this oversimplifies the data.
+- **Key finding**: The visualization shows an extremely narrow variation in the arrest rate between the two seasonal blocks. When the `Hot Season` flag is active ($1$), the proportion of stops culminating in an arrest stands at $3.2\%$, whereas during the off-season ($0$), the conversion rate is marginally higher at $3.4\%$. This represents a negligible difference of only $0.2$ percentage points between the two operational periods.
+- **Interpretation**: From a feature engineering perspective, compressing the monthly calendar timeline into a binary macro-season variable yields almost zero explanatory return for four-wheeled vehicles. The negligible $0.2$ percentage point shift indicates that the global probability of an arrest given a stop is practically orthogonal to this specific definition of seasonality. This statistical invariance suggests that any predictive signal present in individual months is effectively washed out when aggregated into these broad binary blocks.
+- **Comment**: This outcome stands in sharp contrast to the two-wheeled vehicle analysis, where the hot season triggered a distinct $1.1$ percentage point surge that validated the binary variable design. For two-wheelers, the weather directly governs ridership demographics and specific tactical initiatives. For standard cars, the year-round consistency of traffic composition ensures a stable background rate. Interestingly, the off-season ($0$) actually shows the minor upper hand here, which aligns with our previous monthly finding where the localized holiday spikes in December and January elevated the winter baseline.
+- **Proposed Action**: We will exclude the global binary `hot_season` feature from our final predictive models for four-wheeled vehicles, as it lacks sufficient variance to provide a meaningful coefficient. Instead, we will favor more targeted indicator variables that isolate specific anomalies, such as a dedicated binary flag for the winter holiday months, or utilize a multi-level categorical variable for quarters to capture temporal transitions without oversimplifying the operational reality.
 
 #### Faceted
 
@@ -1591,8 +1602,8 @@ plot_data %>%
     strip.text = element_text(size = 11)
   ) +
   labs(
-    title = "Monthly Arrest Rate, by Year, for 2-Wheels Vehicles in NYC",
-    subtitle = "The seasonal amplitude of the arrest rate appears to widen across the three years",
+    title = "Monthly Arrest Rate, by Year, for Cars in NYC",
+    subtitle = "TODO",
     x = "Month",
     y = "Arrest Rate (%)"
   )
@@ -1600,8 +1611,10 @@ plot_data %>%
 
 What can we say?
 
-- **Key finding**: The faceted line chart breaks down the monthly arrest rates across three consecutive years. It reveals that the seasonal pattern is consistent over time but is shifting vertically. Each panel exhibits the same behavior: a spring increase, a summer peak, a distinct dip in August, and a sharp late-autumn decline.
-- **Comment**: With only three years of data, assessing whether amplitude widening is a genuine trend is difficult. The fact that the August drop appears in all three panels proves that this mid-summer dip is not a random. Instead, it probably represents the consequence of a repeating event tied to the police administration behavior (for instance, police officers being on vacation).
+- **Key finding**: The faceted line chart breaks down the monthly arrest rates for four-wheeled vehicles across three consecutive years, revealing that the internal shape of the seasonal trajectory is fundamentally changing shape over time alongside its vertical shifts. While $2023$ shows a steady upward climb from a minimum of $2.4\%$ in February to a peak of $3.7\%$ in December ($+1.1$ percentage points), $2024$ and $2025$ invert this structure. In $2024$, the year peaks early at $3.9\%$ in January, drops through summer, and builds back to $3.9\%$ in December. By $2025$, the absolute peak occurs in January at $4.1\%$ before experiencing a gradual downward trend that bottoms out in autumn and rises marginally to finish at $3.5\%$ in December.
+- **Interpretation**: From a longitudinal perspective, this evolution demonstrates that the seasonal distribution of the arrest probability is non-stationary. The sharp contrast between the upward trend of $2023$ and the front-loaded, downward-sloping profiles of $2024$ and $2025$ indicates that a fixed, static monthly effect will fail to capture the baseline transition. The data suggests that tactical changes in traffic enforcement strategies or policy mandates implemented between late $2023$ and early $2024$ permanently re-engineered the annual distribution, shifting the highest conditional probability of an arrest to the beginning of the calendar year.
+- **Comment**: When contrasted against the two-wheeled vehicle analysis, which exhibited a highly stable, recurring summer peak across all panels, the four-wheeled data exposes a complete structural transformation. Standard vehicle enforcement is not bound by a predictable meteorological cycle like delivery riders or micromobility users. Instead, the rapid migration of the peak from December ($2023$) to January ($2024$ and $2025$) underscores that administrative, policy-driven behavior dominates this timeline. Rather than a recurring mid-summer dip, standard cars see a sustained, institutional baseline shift where early-winter enforcement has become progressively more efficient at securing arrests over the three-year window.
+- **Proposed Action**: We cannot rely on a simple main effect for month or a static seasonal category in our final predictive architecture, as the shifting intra-year structure violates the assumption of temporal stationarity. To accurately capture how the probability of `arrested` scales across this timeline, we must explicitly include a macro interaction term structured as `month * year` within our model. This formulation will allow the classification framework to adjust the monthly weights dynamically across the three-year horizon, preventing the inverted trends of $2024$ and $2025$ from canceling out the upward trajectory observed in $2023$.
 
 ```{r faceted-hot-season-vs-arrested-ratio}
 plot_data <- vehstops %>%
@@ -1635,8 +1648,8 @@ plot_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate for 2-Wheels Vehicles: Hot Season vs. Off Season",
-    subtitle = "The hot-season arrest rate is consistently higher than the off-season rate",
+    title = "Arrest Rate for Cars in NYC: Hot Season vs. Off Season",
+    subtitle = "TODO",
     x = NULL,
     y = "Arrest Rate (%)"
   )
@@ -1644,9 +1657,10 @@ plot_data %>%
 
 What can we say?
 
-- **Key finding**: In every single year observed, the Hot Season arrest rate is higher than the Off Season rate.
-- **Interpretation**: The data explicitly shows the light blue bars (Hot Season) are taller than the dark blue bars (Off Season) across 2023 ($4.7\%$ vs $3.9\%$), 2024 ($6.0\%$ vs $5.0\%$), and 2025 ($6.4\%$ vs $5.1\%$). Furthermore, looking at the absolute numbers reveals that the Hot Season contains the vast majority of total arrests.
-- **Comment**: The chart confirms our previous finding: warmer months correlate with both a higher volume of absolute arrests and a higher conditional probability of a stop ending in an arrest.
+- **Key finding**: The faceted bar chart reveals that the seasonal relationship with the arrest rate for standard vehicles is weak and varies over time. In $2023$, the Hot Season arrest rate was slightly higher than the Off Season rate ($2.9\%$ vs $2.8\%$), whereas in $2024$ and $2025$, this pattern inverted with the Off Season displaying a higher conditional probability of arrest ($3.7\%$ vs $3.3\%$ in $2024$, and $3.6\%$ vs $3.3\%$ in $2025$).
+- **Interpretation**: The visualization shows the dark blue bars (Off Season) overtaking the light blue bars (Hot Season) in the latter two years. Furthermore, looking at the absolute volumes shows that the Off Season accounts for a massive and expanding portion of the overall arrest count, yielding $11930$ arrests in $2024$ and growing to $13078$ arrests by $2025$. This confirms that our global binary seasonal categorization fails to capture a stable, consistent operational effect for standard vehicle stops.
+- **Comment**: This presents a complete contradiction to the two-wheeled vehicle analysis, where the Hot Season arrest rate was uniformly dominant across all years. For two-wheelers, warmer weather drives the operational volume and targeted enforcement. For four-wheeled vehicles, the data suggests that winter and late-autumn months actually feature more efficient or higher-probability arrest encounters in recent years. This inversion reinforces our previous finding regarding the monthly non-stationarity of standard car stops, proving that seasonal patterns are heavily dependent on yearly administrative or tactical policy changes.
+- **Proposed Action**: We must avoid using the static `hot_season` binary flag as a standalone macro predictor in our final classification models, since its fluctuating direction across the years will dilute the predictive signal. Instead, we should model seasonal trends dynamically by including the interaction term (`hot_season` $\times$ `year`). This approach will allow the model to adjust for the structural shift where the conditional probability of an arrest moved from the warmer months to the colder months after $2023$.
 
 ### Day, Dow and Weekday
 
@@ -1673,8 +1687,8 @@ daily_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Day of the Month (1-31)",
-    subtitle = "Aggregated percentage of stops resulting in arrest across all recorded months",
+    title = "Arrest Rate by Day of the Month (1-31) for Cars Stopped in NYC",
+    subtitle = "The trend seems to be stable across every day",
     x = "Day of the Month",
     y = "Arrest Rate (%)"
   )
@@ -1682,7 +1696,7 @@ daily_arrest_rate %>%
 
 What can we say?
 
-- **Key finding**: Arrest rates are broadly flat across days 1 through 28, showing no meaningful trend. Days 29, 30, and 31 show elevated and highly variable rates, which are consistent with the fact that not all months have these days.
+- **Key finding**: Arrest rates are broadly flat across days 1 through 31, showing no meaningful trend.
 - **Interpretation**: The flat pattern across days 1-28 indicates that the day-of-month variable carries no genuine enforcement signal.
 - **Proposed Action**: Exclude `day` from our models.
 
@@ -1726,8 +1740,8 @@ daily_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Day of the Week for 2-Wheels Vehicles",
-    subtitle = "",
+    title = "Arrest Rate by Day of the Week for Cars Stopped in NYC",
+    subtitle = "TODO",
     x = "Day of the Week",
     y = "Arrest Rate (%)"
   )
@@ -1735,10 +1749,10 @@ daily_arrest_rate %>%
 
 What can we say?
 
-- **Key finding**: The probability of an arrest given a stop peaks first on Tuesday at $5.9\%$ before dipping during mid-week, and then reaches its absolute maximum on Saturday at $6.2\%$, while the lowest arrest probabilities occur on Monday and Thursday at $5.3\%$.
-- **Interpretation**: The overall variation across the week is relatively tight which suggests it is a less powerful predictor with respect to the other time-related ones.
-- **Comment**: Surprisingly, the arrest rate peaks on Saturday ($6.2\%$) while mid-week has the highest stop count (see Univariate) but lower per-stop arrest probability.
-- **Proposed Action**: We should treat the day of the week as a categorical dummy in order to use it in our models.
+- **Key finding**: The line chart displays a gradual, monotonic rise in the weekly arrest rate as we approach the weekend. The probability of an arrest given a stop begins at its minimum on Monday at $3.0\%$, hovers around $3.1\%$ to $3.2\%$ through Thursday, and then experiences a clear upward lift starting on Friday ($3.5\%$) before reaching its absolute maximum on Saturday at $3.8\%$ ($+0.3$ percentage points).
+- **Interpretation**: The overall variation across the week is exceptionally tight, spanning a narrow range of only $0.8$ percentage points between the Monday low and the Saturday peak. From a predictive perspective, this tells us that the day of the week carries a relatively weak standalone signal compared to spatial or hourly features. The stable baseline during the working week suggests that routine commuting days present a highly uniform threshold for arrest conversions.
+- **Comment**: When comparing this trajectory to the two-wheeled vehicle analysis, we notice a shared behavioral shift toward the weekend. Both vehicle types experience an absolute maximum arrest rate on Saturday, which suggests a universal operational pattern where nighttime driving, leisure travel, and weekend enforcement strategies alter the composition of stops. Interestingly, while two-wheelers saw a fluctuating mid-week peak on Tuesday, standard car stops follow a smoother, more predictable ramp-up, highlighting the steady transition from structured weekday traffic to weekend police behaviors.
+- **Proposed Action**: We should treat the day of the week as a categorical factor variable using dummy encoding within our predictive pipeline. Given the narrow global variation, we will evaluate whether collapsing the feature into a simplified binary indicator, such as `is_weekend` (isolating Friday through Sunday), preserves the predictive signal while creating a more parsimonious model structure.
 
 ### Hour and Time Bracket
 
@@ -1768,8 +1782,8 @@ hourly_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Hour of Day for 2-Wheels Vehicles",
-    subtitle = "The hourly arrest rate follows a U-shaped diurnal pattern",
+    title = "Arrest Rate by Hour of Day for Cars Stopped in NYC",
+    subtitle = "TODO",
     x = "Hour of Day (0-23)",
     y = "Arrest Rate (%)"
   )
@@ -1777,38 +1791,39 @@ hourly_arrest_rate %>%
 
 What can we say?
 
-- **Key finding**: The line plot underlines the time-dependent pattern in the arrest rate resulting from stops across a 24-hour cycle. We observe a global minimum at 7:00 (07:00 AM), followed by a steady climb to a minor afternoon peak around 14:00 (02:00 PM). The absolute maximum occurs during the late-night and early-morning hours, specifically peaking at 3:00 (03:00 AM) with an arrest rate of nearly $11\%$.
-- **Interpretation**: This fluctuation suggests that our exploratory data analysis is heavily influenced by variations in driver behavior, law enforcement patterns, or both depending on the hour of the day.
-- **Comment**: The low arrest rates during the morning commute hours (from 6:00 to 10:00) suggest that law enforcement actions during this window might focus on traffic management. On the other hand, the increase in the night might reflect stops related to more severe offenses, such as operating a vehicle under the influence or navigating without proper registration.
-- **Proposed Action**: We may opt for `time_bracket` as the primary predictor to capture the U-shape in a parsimonious way.
+- **Key finding**: The line plot underlines a distinct time-dependent pattern in the arrest rate resulting from stops across a $24$-hour cycle. We observe a global minimum at $7:00$ ($07:00$ AM) where the arrest rate drops to around $0.6\%$, followed by a steady climb to a minor afternoon peak around $14:00$ ($02:00$ PM) near $2.9\%$. The absolute maximum occurs during the late-night and early-morning hours, specifically peaking at $3:00$ ($03:00$ AM) with an arrest rate reaching approximately $5.3\%$.
+- **Interpretation**: This strong diurnal fluctuation suggests that our exploratory data analysis is heavily influenced by variations in driver behavior, law enforcement patterns, or both depending on the hour of the day. The steep descent between $3:00$ and $7:00$ and the rapid ascent between $16:00$ and $19:00$ reveal that the conditional probability of an arrest given a stop is highly dynamic, making the exact time of the encounter a highly informative feature.
+- **Comment**: When comparing this curve to the two-wheeled vehicle analysis, we observe a remarkably similar U-shaped temporal structure, although the four-wheel peak is compressed at a lower absolute maximum ($5.3\%$ versus nearly $11\%$). The low arrest rates during the morning commute hours (from $6:00$ to $10:00$) suggest that law enforcement actions during this window might focus on high-volume traffic management and routing. Conversely, the high plateau maintained from $19:00$ to $3:00$ likely reflects stops related to more severe nighttime offenses, such as operating a vehicle under the influence or criminal contraband stops.
+- **Proposed Action**: We may opt for the engineered `time_bracket` predictor as our primary spatial-temporal input to capture this prominent U-shape in a parsimonious way. However, given the sharp changes visible during the morning drop and evening rise, we will test whether a continuous spline function using `hour` inside a Generalized Additive Model framework fits the non-linear transition thresholds significantly better than discrete categorical buckets.
 
 Let us look at our grouping now
 
 ```{r time-bracket-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, time_bracket,
-  "Time bracket", "Arrest Rate (%)", "Arrest ratio by Custom Time Bracket",
+  "Time bracket", "Arrest Rate (%)", "Arrest ratio by Custom Time Bracket for Cars Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "The night brackets show the highest arrest rate among all"
+  subtitle = "TODO"
 )
 ```
 
 What can we say?
 
-- **Key finding**: The ordering of brackets by arrest rate follows (almost) the expected pattern from the diurnal curve: Night \> Evening \> Morning \> Afternoon (approximately), with Night brackets substantially above the global mean.
-- **Comment**: Even during the peak enforcement window in the Late night bracket, the vast majority of interactions ($90.6\%$) still do not result in an arrest. We can argue that, while the relative risk of arrest increases nearly sixfold from the morning commute to the late night, a stop ending in arrest remains a minority event across all examined time frames.
-- **Proposed Action**: We choose `time_bracket` as the primary hour-related predictor in the arrest model.
+- **Key finding**: The ordering of custom brackets by arrest rate precisely mirrors the expected patterns extracted from the continuous diurnal curve, sorting from lowest to highest conversion probability: Morning commute ($1.0\%$), Early morning ($1.4\%$), Midday ($2.6\%$), Afternoon/evening ($3.6\%$), Late night ($4.9\%$), and Night ($5.1\%$). The nighttime blocks show an arrest probability that stands substantially above the global mean baseline.
+- **Interpretation**: This step-up distribution confirms that our discrete custom buckets act as highly stable aggregators of the underlying hourly timeline. The progression validates that the relative risk of an arrest given a stop increases fivefold from the morning commute minimum to the night maximum, proving that the temporal circumstance of a vehicle stop exerts a powerful structural influence on the target outcome.
+- **Comment**: When comparing these ratios to the two-wheeled vehicle analysis, we note that standard car stops follow the exact same monotonic risk curve as the day progresses, though the values are compressed into a lower range. Even during the peak window in the Night bracket, the absolute majority of interactions ($94.9\%$) still do not result in an arrest. We can argue that, while the relative risk surges significantly during late hours, an encounter ending in an arrest remains a clear minority event across all examined operational blocks.
+- **Proposed Action**: We choose `time_bracket` as the primary hour-related categorical predictor in our final arrest classification models. Because the arrest rate scales linearly across these sequential blocks, this custom categorization will allow our framework to absorb the non-monotonic temporal pattern efficiently while avoiding the excessive degrees of freedom associated with the raw $24$-hour variable.
 
-## driver related features
+## Driver related features
 
 ### Reported Age
 
 ```{r age-bracket-vs-target}
 ratio_by_cat(
   vehstops, arrested, age_bracket,
-  "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket",
+  "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket for Cars Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "The 16-24 age bracket and Unknown show the highest arrest rates",
+  subtitle = "TODO",
   label_vjust = 0.5,
 )
 ```
@@ -1822,18 +1837,19 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: This plot shows a clear demographic trend where the arrest rate generally increases as the reported age bracket gets younger. The absolute lowest arrest rate is found within the $65+$ demographic at just $3.2\%$, which also accounts only for $45$ arrests (the lowest amount). The highest ratio belongs to the Under $18$ bracket, where the arrest rate reaches a peak of $10.9\%$ ($424$ arrests). On the other hand, the highest amount of arrests comes from $25-34$ bracket, whose $5\%$ accounts for $3561$ arrests. Following the underage bracket, the unknown label shows the second highest arrest rate of $7.1\%$ ($630$ arrests), and in third place, we find the $18-24$ bracket at $6.3\%$ ($2493$ arrests).
-- **Interpretation**: The data demonstrates a near-monotonic progression where younger operators face a higher conditional probability of arrest upon being stopped.
-- **Proposed Action**: We want to include `age_bracket` as a predictor in our models instead of just using `age`.
+- **Key finding**: This plot shows a clear demographic trend where the arrest rate generally increases as the reported age bracket gets younger, reaching its absolute peak in the $25–34$ cohort. The lowest arrest rate is found within the $65+$ demographic at approximately $0.66\%$ (specifically $520$ arrests). The highest ratio belongs to the $25–34$ bracket, where the arrest rate reaches $4.57\%$, which also accounts for the absolute highest volume of individuals arrested with $28821$ instances. The $18–24$ group closely follows with a $4.38\%$ arrest rate ($14380$ arrests). Unlike the 2-wheeled vehicle case where the Under $18$ bracket was the distinct peak, for 4-wheeled vehicles, the under $18$ cohort sits at a lower rate of $2.99\%$ ($278$ arrests), while the Unknown category shows a $1.93\%$ arrest rate ($2291$ arrests).
+- **Interpretation**: The data demonstrates a non-linear but highly pronounced age effect where young adults (ages $18$ to $34$) face the highest conditional probability of arrest upon being stopped in a 4-wheeled vehicle. This differs notably from the 2-wheeled analysis where minors (Under $18$) exhibited the highest vulnerability to arrest, suggesting that the dynamics of vehicle ownership, licensing compliance, or enforcement behavior shift considerably between vehicle classes.
+- **Comment**: When we look qualitatively at these findings, the contrast between the two analyses is striking. For 2-wheeled vehicles, the younger brackets (especially minors) were heavily penalized, whereas for cars, the risk concentrates heavily on young adults in their prime driving years. The sheer volume of stops and arrests in the $25–34$ bracket highlights that this group dominates the absolute impact on the judicial system. The lower relative arrest rate for minors in 4-wheeled vehicles might reflect stricter initial barriers to entry for driving cars compared to scooters or motorcycles, which yields a different subset of interactions with law enforcement.
+- **Proposed Action**: We want to include `age_bracket` as a predictor in our classification models instead of just using the raw continuous `age` feature. Given the structural differences in how age interacts with the target variable across vehicle types, we should also explore an interaction term between `age_bracket` and vehicle type or build separate stratified models to preserve these distinct behavioral patterns.
 
 ### Reported Sex
 
 ```{r sex-vs-target, fig.width=6}
 ratio_by_cat(
   vehstops, arrested, sex,
-  "Reported sex", "Arrest Rate (%)", "Arrest Ratio by Reported sex",
+  "Reported sex", "Arrest Rate (%)", "Arrest Ratio by Reported sex for Cars Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "Male drivers are subject to higher arrest rates, followed by Unknown category",
+  subtitle = "TODO",
 )
 ```
 
@@ -1846,19 +1862,19 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: This highlights a clear disparity in arrest rates across reported sex categories for two-wheels vehicle stops. Female drivers (`F`) experience the lowest arrest rate at $2.7\%$ ($191$ arrests), followed by the unknown or unrecorded category (`U`) at $3.8\%$ (with just $38$ arrests). Male drivers (`M`) are subject to the highest rate, with $5.7\%$ of their total stops resulting in an arrest. In fact, the total Male drivers arrests are $10331$.
-- **Interpretation**: The ratio of arrest, given a stop, **is more than twice as high for male drivers compared to female** drivers. This variation affects our current analysis by suggesting that reported sex is another key predictor that needs to be included in our statistical models.
-- **Comment**: The higher arrest rate among male drivers might align with the broader demographic trends in traffic violations, where they are associated with risky driving behaviors. Interestingly, the Unknown category is not even, suggesting that incomplete data entry might be randomly distributed or slightly skewed toward cases that did not escalate to a full arrest.
-- **Proposed Action**: We will try to understand the importance of this component, because the low association with the target and the imbalance nature of this feature may become tricky in the modeling phase.
+- **Key finding**: This highlights a clear disparity in arrest rates across reported sex categories for 4-wheeled vehicle stops. Female drivers (`F`) experience the lowest arrest rate at $1.51\%$ ($5966$ arrests), followed by the unknown or unrecorded category (`U`) at $2.06\%$ (with $276$ arrests). Male drivers (`M`) are subject to the highest rate, with $3.70\%$ of their total stops resulting in an arrest. In fact, the total Male driver arrests stand heavily at $64333$, which represents the vast majority of the overall arrest volume.
+- **Interpretation**: The ratio of arrest, given a stop, **is more than twice as high for male drivers compared to female** drivers. This variation affects our current analysis by demonstrating that the proportional gap observed in the 2-wheeled analysis persists strongly in the 4-wheeled domain, confirming that reported sex remains a key predictor that needs to be included in our statistical models.
+- **Comment**: The higher arrest rate among male drivers across both vehicle types aligns with broader demographic trends in traffic violations, where they are statistically associated with riskier driving behaviors or more severe infractions. Interestingly, the relative arrest rates are generally lower across all categories for 4-wheeled vehicles than for 2-wheeled vehicles (e.g., $3.70\%$ vs $5.7\%$ for males), but the sheer volume of 4-wheeled stops means that the absolute impact on law enforcement resources is driven entirely by cars. The Unknown category continues to show an intermediate rate, which suggests that incomplete data entry might behave differently depending on the specific circumstances of the encounter.
+- **Proposed Action**: We will try to understand the importance of this component, because the low overall baseline association with the target and the heavily imbalanced nature of this feature (especially with the dominant volume of male drivers) may become tricky in the modeling phase. We should consider evaluating feature importance metrics or using techniques like downsampling to ensure our models do not over-rely on the dominant demographic class.
 
 ### Reported Ethnicity
 
 ```{r ethnicity-vs-target, fig.width=6}
 ratio_by_cat(
   vehstops, arrested, ethnicity,
-  "Reported ethnicity", "Arrest Rate (%)", "Escalation ratio by Reported Ethnicity",
+  "Reported ethnicity", "Arrest Rate (%)", "Escalation ratio by Reported Ethnicity for Cars Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
-  subtitle = "Hispanic and Black drivers have the highest arrest rates and account for most arrests",
+  subtitle = "TODO",
 )
 ```
 
@@ -1871,9 +1887,10 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: Hispanic drivers represent the largest slice with $90,250$ total stops and the highest absolute number of arrests at $6,533$ ($7.24\%$). Black drivers experience the second-highest escalation rate with $2,686$ arrests out of $39,130$ stops ($6.86\%$). In contrast, White drivers account for $18,494$ stops and $597$ arrests ($3.23\%$). Finally, Asian / Pacific Islander, Other, and Unknown categories maintain the lowest arrest rates, all remaining near or below $2.0\%$.
-- **Interpretation**: The probability of a stop resulting in an arrest is more than twice as high for Black and Hispanic drivers compared to White drivers. The rates are calculated from a large sample, indicating they are highly stable and unlikely to be the result of small-sample variance.
-- **Proposed Action**: This imbalance indicates that reported ethnicity is a critical factor that must be included in our models.
+- **Key finding**: Black drivers represent the largest slice with $656109$ total stops and the highest absolute number of arrests at $32954$ ($5.02\%$). Hispanic drivers experience the second highest escalation rate with $26330$ arrests out of $565531$ stops ($4.66\%$). In contrast, White drivers account for $426594$ stops and $4912$ arrests ($1.15\%$). Finally, Asian / Pacific Islander, Other, and Unknown categories maintain the lowest arrest rates, all remaining near or below $1.51\%$.
+- **Interpretation**: The conditional probability of a stop resulting in an arrest is more than four times higher for Black and Hispanic drivers compared to White drivers. These rates are calculated from a massive sample size exceeding two million total records, indicating they are highly stable statistical patterns and completely isolated from small sample variance.
+- **Comment**: When comparing these results to the 2-wheeled vehicle case, we observe a noticeable structural shift in volume and magnitude, though the relative disparity remains stark. For 2-wheeled vehicles, Hispanic operators faced the absolute highest arrest rate ($7.24\%$), whereas in the 4-wheeled domain, Black drivers experience both the highest total stop volume and the highest escalation rate ($5.02\%$). While the overall baseline arrest rates are lower for cars than for 2-wheelers across all demographics, the proportional gap between minority groups and White drivers has actually widened significantly from roughly a two fold difference to a four fold difference, signaling a distinct operational dynamic in how car stops escalate.
+- **Proposed Action**: This severe imbalance indicates that reported ethnicity is a critical factor that must be included in our models. Due to the high disparity and potential proxy correlations with geographic factors, we should assess downstream model fairness using demographic parity metrics to understand how including `ethnicity` impacts predictive equity across different vehicle classes.
 
 ------------------------------------------------------------------------
 
