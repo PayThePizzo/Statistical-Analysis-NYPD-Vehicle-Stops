@@ -465,7 +465,7 @@ p1 <- plot_binary_bar(
 row1 <- p1
 
 row1 + 
-plot_annotation(title = "Distribution of 2-Wheels Vehicles Stops by Arrested") &
+plot_annotation(title = "Distribution of Arrests for 2-Wheels Vehicles Stopped in NYC") &
 theme(legend.position = "bottom") 
 ```
 
@@ -489,7 +489,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = area, 
   X_LABEL = "Area", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Area (Sorted by Count Desc)",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Area in NYC",
   SUBTITLE = "Brooklyn is where the most amount of vehicles are stopped",
   order_by = "freq"
 )
@@ -509,7 +509,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = boro, 
   X_LABEL = "Borough", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Borough (Sorted by Count Desc)",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops by Borough in NYC",
   SUBTITLE = "A more fine-grained bracketing of areas shows that North Queens dominates for amount of stops"
 )
 ```
@@ -553,7 +553,7 @@ ggplot() +
   coord_sf(xlim = c(-74.26, -73.71), ylim = c(40.48, 40.92)) +
   theme_minimal() +
   theme(panel.grid = element_blank()) +
-  labs(title = "Heatmap of 2-Wheels Vehicles Stops Density - 100 Bins", x = "Longitude", y = "Latitude")
+  labs(title = "Heatmap of 2-Wheels Vehicles Stops Density in NYC - 100 Bins", x = "Longitude", y = "Latitude")
 ```
 
 ```{r, include=FALSE}
@@ -759,7 +759,7 @@ plot_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Volume of Stops for 2-Wheels Vehicles: Hot Season vs. Off Season",
+    title = "Volume of Stops for 2-Wheels Vehicles in NYC: Hot Season vs. Off Season",
     subtitle = "While Overall Volume Increase, Percentages slightly Drift Towards Hot Season",
     x = NULL,
     y = "Count of Stops"
@@ -795,7 +795,7 @@ vehstops %>%
     plot.title = element_text(size = 14),
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
-  labs(title = "Volume of Stops by Day of the Month (1-31) for 2-Wheels Vehicles",
+  labs(title = "Volume of Stops by Day of the Month (1-31) for 2-Wheels Vehicles in NYC",
        subtitle = "The drop towards 30-31 indicates it is not a behavior, but depends on the month!",
        x = "Day of the Month", y = "Count of Stops")
 ```
@@ -820,7 +820,7 @@ plot_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Volume of Stops by Day of the Year (1-365) for 2-Wheels Vehicles",
+    title = "Volume of Stops by Day of the Year (1-365) for 2-Wheels Vehicles in NYC",
     subtitle = "Continuous time series shows that there might be a pattern drifting towards a bell centered in August",
     x = "Period", 
     y = "Count of Stops"
@@ -848,7 +848,7 @@ vehstops %>%
     plot.title = element_text(size = 14),
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
-  labs(title = "Volume of Stops by Day of the Year (1-365) for 2-Wheels Vehicles",
+  labs(title = "Volume of Stops by Day of the Year (1-365) for 2-Wheels Vehicles in NYC",
        subtitle = "The extreme jitter confirms this feature is too noisy to predict, but the trend favors hot months",
        x = "Day of Year", y = "Count of Stops")
 ```
@@ -883,7 +883,7 @@ vehstops %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Daily Volume of Stops for 2-Wheels Vehicles",
+    title = "Daily Volume of Stops for 2-Wheels Vehicles in NYC",
     subtitle = "Daily volume and day-over-day growth/decline show high stop counts during mid-week",
     x = "Day of the Week", 
     y = "Count of Stops"
@@ -933,7 +933,7 @@ ggplot() +
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Hourly Volume of Stops for 2-Wheels Vehicles",
+    title = "Hourly Volume of Stops for 2-Wheels Vehicles in NYC",
     subtitle = "The count of stops climbs up by the hour until the 19:00 peak",
     x = "Hour of Day (0-23)", 
     y = "Count of Stops"
@@ -987,7 +987,7 @@ ggplot() +
     strip.text = element_text(size = 11)
   ) +
   labs(
-    title = "Hourly Volume of Stops, by Year, for 2-Wheels Vehicles",
+    title = "Hourly Volume of Stops, by Year, for 2-Wheels Vehicles in NYC",
     subtitle = "Faceting the count of stops by year, reveals that by 2025 the climb becomes very steep",
     x = "Hour of Day (0-23)", 
     y = "Count of Stops"
@@ -1048,7 +1048,7 @@ ggplot() +
     strip.text = element_text(size = 12)
   ) +
   labs(
-    title = "Hourly Cycle of Enforcement: Hot Season vs. Off Season",
+    title = "Hourly Cycle of Enforcement for 2-Wheels Vehicles Stopped in NYC: Hot Season vs. Off Season",
     subtitle = "Hot season months is where the most volume is focused and changes rapidly",
     x = "Hour of Day (0-23)", 
     y = "Count of Stops"
@@ -1072,7 +1072,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = time_bracket, 
   X_LABEL = "Time Bracket", 
-  TITLE = "Distribution of Time Brackets",
+  TITLE = "Distribution of Time Brackets for 2-Wheels Vehicles Stopped in NYC",
   SUBTITLE = "Enforcement is heavily skewed toward the latter half of the day (16-23)"
 )
 ```
@@ -1096,7 +1096,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = age_bracket, 
   X_LABEL = "Age Bracket", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Age Bracket (Sorted by Count Desc)",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops in NYC by Age Bracket",
   SUBTITLE = "Enforcement volume is highly concentrated in the demographic (18-44)"
 )
 ```
@@ -1137,7 +1137,7 @@ ggplot(age_data, aes(x = age, fill = age_group)) +
     strip.text = element_text(size = 11)
   ) +
   labs(
-    title = "Age Distribution of Drivers by Target Bracket",
+    title = "Age Distribution of Drivers by Target Bracket for 2-Wheels Vehicles Stopped in NYC",
     subtitle = "Enforcement volume is confirmed to be concentrated in 20-45 age range",
     x = "Driver Age", 
     y = "Count of Stops",
@@ -1199,7 +1199,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = sex, 
   X_LABEL = "Reported Sex", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Reported Sex (Sorted by Count Desc)",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops in NYC by Reported Sex",
   SUBTITLE = "The vast majority of stopped bikers are males",
   order_by = "freq"
 )
@@ -1219,7 +1219,7 @@ plot_univariate_cat(
   DF = vehstops, 
   FEATURE = ethnicity, 
   X_LABEL = "Reported Ethnicity", 
-  TITLE = "Distribution of 2-Wheels Vehicles Stops by Reported Ethnicity (Sorted by Count Desc)",
+  TITLE = "Distribution of 2-Wheels Vehicles Stops, by Reported Ethnicity, in NYC",
   SUBTITLE = "Hispanic drivers seem to account for the plurality of stops",
   order_by = "freq"
 )
@@ -1297,10 +1297,10 @@ What can we say? The target has no particularly important numerical correlation 
 ```{r area-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, area,
-  "Area", "Arrest Rate (%)", "Arrest Ratio by Area",
+  "Area", "Arrest Rate (%)", "Arrest Ratio by Area for 2-Wheels Vehicles Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?",
   target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio in Low Volume Areas",
+  subtitle = "This shows Increased Arrest Ratio in Low Volume Areas",
   label_vjust = 0.5,
   bar_width = 0.6,  
   text_size = 2.5,
@@ -1329,10 +1329,10 @@ What can we say? Remember that Staten Island and Bronx are the areas with the le
 ```{r boro-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, boro,
-  "Borough", "Arrest Rate (%)", "Arrest Ratio by Borough",
+  "Borough", "Arrest Rate (%)", "Arrest Ratio by Borough for 2-Wheels Vehicles Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?",
   target_labels = c("No", "Yes"),
-  subtitle = "For 2-Wheels Vehicles it confirms the Increased Arrest Ratio in Low Volume Areas",
+  subtitle = "This confirms the Increased Arrest Ratio in Low Volume Areas",
   label_vjust = 0.5,
   bar_width = 0.8,
   text_size = 2.5
@@ -1392,7 +1392,7 @@ ggplot() +
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Spatial Distribution of Arrest Rates - NYC",
+    title = "Spatial Distribution of Arrest Rates for 2-Wheels Vehicles Stopped in NYC",
     subtitle = "Percentage of stops resulting in arrest (Bins with n < 5 removed)",
     x = "Longitude", 
     y = "Latitude"
@@ -1446,7 +1446,7 @@ ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
     plot.subtitle = element_text(size = 10, color = "grey50")
   ) +
   labs(
-    title = "Annual Arrest Rate has been Slowly Rising in the last 3 years",
+    title = "Annual Arrest Rate has been Slowly Rising in the last 3 years for 2-Wheels Vehicles Stopped in NYC",
     subtitle = "The percentage of arrests kept increasing in this period",
     x = "Year", y = "Arrest Rate (%)"
   )
@@ -1501,7 +1501,7 @@ monthly_arrest_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Monthly Arrest Rate Trend",
+    title = "Monthly Arrest Rate Trend for 2-Wheels Vehicles Stopped in NYC",
     subtitle = "Aggregated monthly arrest rate, the peak is found in the summer months",
     x = "Month",
     y = "Arrest Rate (%)"
@@ -1519,7 +1519,7 @@ What about `hot_season`?
 ```{r hot-season-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, hot_season,
-  "Hot Season", "Arrest Rate (%)", "Arrest Ratio by Season",
+  "Hot Season", "Arrest Rate (%)", "Arrest Ratio by Season for 2-Wheels Vehicles Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?",
   target_labels = c("No", "Yes"),
   subtitle = "For 2-Wheels Vehicles it shows Increased Arrest Ratio during Hot Months",
@@ -1630,7 +1630,7 @@ plot_data %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate for 2-Wheels Vehicles: Hot Season vs. Off Season",
+    title = "Arrest Rate for 2-Wheels Vehicles in NYC: Hot Season vs. Off Season",
     subtitle = "The hot-season arrest rate is consistently higher than the off-season rate",
     x = NULL,
     y = "Arrest Rate (%)"
@@ -1668,7 +1668,7 @@ daily_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Day of the Month (1-31)",
+    title = "Arrest Rate by Day of the Month (1-31) for 2-Wheels Vehicles Stopped in NYC",
     subtitle = "Aggregated percentage of stops resulting in arrest across all recorded months",
     x = "Day of the Month",
     y = "Arrest Rate (%)"
@@ -1721,8 +1721,8 @@ daily_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Day of the Week for 2-Wheels Vehicles",
-    subtitle = "",
+    title = "Arrest Rate by Day of the Week for 2-Wheels Vehicles in NYC",
+    subtitle = "TODO",
     x = "Day of the Week",
     y = "Arrest Rate (%)"
   )
@@ -1763,7 +1763,7 @@ hourly_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Hour of Day for 2-Wheels Vehicles",
+    title = "Arrest Rate by Hour of Day for 2-Wheels Vehicles for 2-Wheels Vehicles Stopped in NYC",
     subtitle = "The hourly arrest rate follows a U-shaped diurnal pattern",
     x = "Hour of Day (0-23)",
     y = "Arrest Rate (%)"
@@ -1782,7 +1782,7 @@ Let us look at our grouping now
 ```{r time-bracket-vs-arrested-ratio}
 ratio_by_cat(
   vehstops, arrested, time_bracket,
-  "Time bracket", "Arrest Rate (%)", "Arrest ratio by Custom Time Bracket",
+  "Time bracket", "Arrest Rate (%)", "Arrest ratio by Custom Time Bracket for 2-Wheels Vehicles Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
   subtitle = "The night brackets show the highest arrest rate among all"
 )
@@ -1801,7 +1801,7 @@ What can we say?
 ```{r age-bracket-vs-target}
 ratio_by_cat(
   vehstops, arrested, age_bracket,
-  "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket",
+  "Reported Age Bracket", "Arrest Rate (%)", "Arrest Ratio by Reported Age Bracket for 2-Wheels Vehicles Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
   subtitle = "The 16-24 age bracket and Unknown show the highest arrest rates",
   label_vjust = 0.5,
@@ -1826,7 +1826,7 @@ What can we say?
 ```{r sex-vs-target, fig.width=6}
 ratio_by_cat(
   vehstops, arrested, sex,
-  "Reported sex", "Arrest Rate (%)", "Arrest Ratio by Reported sex",
+  "Reported sex", "Arrest Rate (%)", "Arrest Ratio by Reported sex for 2-Wheels Vehicles Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
   subtitle = "Male drivers are subject to higher arrest rates, followed by Unknown category",
 )
@@ -1851,7 +1851,7 @@ What can we say?
 ```{r ethnicity-vs-target, fig.width=6}
 ratio_by_cat(
   vehstops, arrested, ethnicity,
-  "Reported ethnicity", "Arrest Rate (%)", "Escalation ratio by Reported Ethnicity",
+  "Reported ethnicity", "Arrest Rate (%)", "Escalation ratio by Reported Ethnicity for 2-Wheels Vehicles Stopped in NYC",
   style = "stack", legend_title = "Stop ended in arrest?", target_labels = c("No", "Yes"),
   subtitle = "Hispanic and Black Motorists have the highest arrest rates and account for most arrests",
 )
