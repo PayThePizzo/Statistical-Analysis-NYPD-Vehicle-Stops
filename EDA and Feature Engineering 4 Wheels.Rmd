@@ -47,6 +47,10 @@ Under these premises, we will plot many aspects of the data. Therefore, the way 
 
 Note that we do not always include all four points.
 
+## Important Note
+
+We will, sometimes, cut short of the commentary when we make similar discovery with respect to the 2-wheels analysis. This is needed not to repeat ourselves if we go down the same conclusions. In this case, we will omit to elaborate.
+
 ------------------------------------------------------------------------
 
 # Environment
@@ -473,8 +477,8 @@ What can we say?
 
 - **Key finding**: The dataset for 4-wheels vehicles **exhibits extreme class imbalance** that is even more pronounced than what we observed in the 2-wheels analysis. Arrests are highly sparse, representing only approximately $3.3\%$ of the outcomes ($70,600$ "Yes" out of $2,157,445$ total records) compared to the $5.6\%$ rate found in 2-wheeled vehicle stops.
 - **Interpretation**: The target variable constitutes a rare event when we contemplate the stops of 4-wheels vehicles. While the overall volume of stops is drastically higher for 4-wheels vehicles, an arrest remains an infrequent occurrence with respect to the total volume of police stops.
-- **Comment**: The high class disparity *makes accuracy a limiting metric* for our models' evaluation. This is due to the fact a predictive model aiming for accuracy could achieve a high score of $96.7\%$ by simply classifying every stop as "No". Therefore, it completely fails to capture what characterizes an arrest after a stop. This is also sub-optimal for our research, as capturing the true patterns is what drives our investigation towards enforcement bias. The fact that the positive class is even rarer here means our models will face a higher risk of failing to learn the underlying patterns of the minority class.
-- **Proposed Action**: Although we could employ cost-sensitive learning models, this is outside the scope of the course. As an alternative, we will **employ stratified down-sampling of the majority class** ("No") to create a balanced training set, ensuring compatibility across all models (LDA, QDA, KNN, etc...). For the **GLM-based models** (Logistic, Lasso, Ridge), we will specifically **utilize observation weighting within the likelihood function** to account for the class disparity. Finally, we will move away from the default $0.5$ classification threshold, **optimizing the decision boundary based on the Precision-Recall curve** to ensure our model maintains sensitivity to the minority class ("Yes").
+- **Comment**: The high class disparity *makes accuracy a limiting metric* for our models' evaluation, here too.
+- **Proposed Action**: Same as the 2-wheels analysis.
 
 ## Geospatial predictors
 
@@ -493,10 +497,10 @@ plot_univariate_cat(
 
 What can we say?
 
-- **Key finding**: There is a high variance in the volume of stops across areas, though the overall scale is massively larger for 4-wheels vehicles. We observe two clear "high-volume" areas (Brooklyn with over $640$k stops and Queens with over $550$k stops) followed by two "medium-volume" areas (Manhattan with $418$k and the Bronx with $381$k) and a distinct "low-volume" area (Staten Island, $166$k).
-- **Interpretation**: The distribution is highly non-uniform, or better, uneven. However, compared to the 2-wheels analysis where Staten Island was a tiny outlier ($1.5$k), here it holds a substantial sample size ($166$k). The shifting proportions, particularly the rise of the Bronx into a solid medium-volume category, suggests that geographic location could be a strong predictor of the probability of being stopped (in case the targets' ratio distributed by area follows a specific pattern).
-- **Comment**: From a modeling perspective, this introduces a risk of **overfitting to the high-volume areas**. Since some of the available models (especially KNN or QDA) rely on local neighborhood data or global likelihoods, they will naturally prioritize minimizing errors in the areas with the most observations. Unlike the 2-wheels context where the extreme sparsity of Staten Island risked high variance in parameter estimates, the 4-wheels data provides ample observations across all levels, which will stabilize our coefficients. The visualization succeeds in highlighting a pattern, but it leaves the causal mechanisms open to speculation.
-- **Proposed Action**: We still need to check its association with subject-related predictors. Also, we still want to explore the finer-grained version of this geographical predictor (`boro`), which may achieve better results in the models. If using **Lasso or Ridge regression**, we will carefully tune the penalty parameter ($\lambda$) to ensure that the "Area" coefficients are not inflated/suppressed due to the sample size difference.
+- **Key finding**: Since the bars are distributed by volume, in descending order, we can clearly observe a "ladder" trend in volume. We still have variance, but thanks to the volume we now have a more balanced case. We observe two clear "high-volume" areas (Brooklyn with over $640$k stops and Queens with over $550$k stops) followed by two "medium-volume" areas (Manhattan with $418$k and the Bronx with $381$k) and a distinct "low-volume" area (Staten Island, $166$k).
+- **Interpretation**: Compared to the 2-wheels analysis where Staten Island was a tiny outlier ($1.5$k), here it holds a substantial sample size ($166$k). The shifting proportions, particularly the rise of the Bronx into a solid medium-volume category, suggests that geographic location could be a strong predictor of the probability of being stopped (in case the targets' ratio distributed by area follows a specific pattern).
+- **Comment**: Unlike the 2-wheels analysis, Staten Island is not anymore a very rare label, even if the distribution is the lowest among the 5 areas. We have a slightly lower risk of overfitting here, but it is still to early to explore this aspect. 
+- **Proposed Action**: Same as the 2-wheels analysis.
 
 ### Borough
 
@@ -512,10 +516,10 @@ plot_univariate_cat(
 
 What can we say?
 
-- **Key finding**: The comparison reveals that while "Staten Island" and "Bronx" remain single units, boroughs like "Brooklyn", "Queens", and "Manhattan" are split into internally heterogeneous sub-regions. The granular bracketing shows that "Brooklyn (South)" dominates with $398,062$ stops, closely followed by the "Bronx" at $381,239$ stops, whereas in the 2-wheels analysis "North Queens" was the dominant category.
-- **Interpretation**: If the arrest rate in "Brooklyn (South)" (the highest-volume area) is statistically distinct from "Brooklyn (North)", the `area` variable acts as a source of **aggregation bias**. By averaging these rates into a single parent borough, we lose the model’s ability to differentiate between high-risk and low-risk zones within the same borough (potentially obscuring patterns of excessive enforcement). On the other hand, because every single granular category in this 4-wheels dataset contains a massive amount of observations (ranging from $166,627$ in Staten Island to nearly $400$k in South Brooklyn), we do not run the risk encountered in the 2-wheels context where low-frequency categories caused high variance and wide confidence intervals in our parameter estimates.
-- **Comment**: Discarding granularity prematurely is a risk. If a specific sub-borough has a disproportionately higher event rate than its parent borough, the model will fail to capture that specific hotspot. We should not treat granularity as "noise" until we have empirical evidence that the target ratios are homogeneous within the boroughs. In fact, if the target ratio differs significantly between "Brooklyn (South)" and "Brooklyn (North)", aggregating them would indeed "wash out" a genuine, predictive signal, resulting in an under-fitted model. Given the substantial sample sizes across all subdivisions here, the statistical power to detect localized differences is significantly elevated.
-- **Proposed Action**: As previously stated, we wish to plot the arrest rate for each borough level, as well for the areas. Then, based on our observations, we could train two alternative versions of the same model using `area` and `boro`. In fact, we could employ means of model comparison (for instance, Stratified K-fold Cross Validation) and, in case the granular version yields lower CV error, we may be able to discard the hypothesis of introducing noise/variability.
+- **Key finding**: The granular bracketing shows that "Brooklyn (South)" dominates with $398,062$ stops, closely followed by the "Bronx" at $381,239$ stops, whereas in the 2-wheels analysis "North Queens" was the dominant category. Except the top-two volume boroughs, the remaining boroughs seem to have an almost uniform (decreasing) distribution ranging between $166$k - $276$k.
+- **Interpretation**: For what concerns granularity, we can draw the same conclsions as the 2-wheels case. On the other hand, since every category contains a massive amount of observations, we probably do not run the risk encountered in the 2-wheels context where low-frequency categories caused high variance and wide confidence intervals in our parameter estimates.
+- **Comment**: Same as the 2-wheels analysis.
+- **Proposed Action**: Same as the 2-wheels analysis.
 
 ### Latitude and Longitude for Stop Density
 
@@ -558,10 +562,9 @@ rm(grid_sum, nyc_map, bins, lat_breaks, lon_breaks)
 
 What can we say?
 
-- **Key finding**: The heatmap reveals a highly heterogeneous spatial distribution, characterized by distinct high-density hotspots that cover a much wider and denser geographic layout across the city compared to the 2-wheels analysis. We observe large clusters of dense activity (reaching values up to $1\text{e}+04$ on the $\log_{10}$ scale) spreading across major sections of Manhattan, Brooklyn, Queens, and the Bronx, while Staten Island shows more dispersed, lower-density tiles.
-- **Interpretation**: This spatial clustering indicates that police enforcement is not randomly distributed but it is likely to be following the major traffic arteries and commercial hubs. The extensive coverage of high-density tiles reflects the ubiquitous nature of 4-wheeled transportation in the urban grid, meaning that spatial coordinates share a high amount of mutual information with the overall distribution of traffic volume.
-- **Comment**: When we look at this from a qualitative perspective, mapping continuous geographic coordinates directly into predictive models introduces a serious risk of memorizing spatial noise. Since our goal is to isolate systematic enforcement bias rather than building a geographical positioning system for police presence, treating latitude and longitude as raw predictors could cause the models to proxy localized demographic variations implicitly. This is problematic because it can create a false sense of predictive accuracy while failing to capture the structural variables that actually drive the `arrest_made` target.
-- **Proposed Action**: To prevent data leakage we cannot just include them in the models. These two predictors will be later removed. Instead of relying on raw coordinates, we will rely on the administrative categorical boundaries (such as `boro` or `area`) which aggregate these spatial patterns into structurally meaningful units for the classification models.
+- **Key finding**: The heatmap reveals that, with respect to the 2-wheels case, the hotspots are the same, although the increase in volume is notable.
+- **Interpretation**: Same as the 2-wheels analysis.
+- **Proposed Action**: Same as the 2-wheels analysis.
 
 ## Time-related predictors
 
@@ -600,10 +603,10 @@ vehstops %>%
 
 What can we say?
 
-- **Key finding**: There has been a steady, multi-year increase in the volume of police stops involving 4-wheeled vehicles, with the absolute number of encounters expanding from $611,734$ in $2023$ to $799,853$ in $2025$.
+- **Key finding**: There has been a steady, multi-year increase in the volume of police stops involving 4-wheeled vehicles, with the absolute number of encounters expanding from $611,734$ in $2023$ to $799,853$ in $2025$. Overall, the volume of stops does not show a very unbalanced distribution among the three years.
 - **Interpretation**: The growth trajectory is non-linear but far more stable than the explosive surge seen in the 2-wheels analysis. The $21.9\%$ jump between $2023$ and $2024$ represents a significant upward trend, which is suggesting a broader intensification of traffic enforcement across the city. On the other hand, the $7.2\%$ increase in 2025 indicates that while the absolute volume of activity is still rising, the rate of acceleration is starting to stabilize.
-- **Comment**: The visualization clearly demonstrates that the absolute "public exposure" to these stops is vast, operating on a scale nearly ten times larger than that of 2-wheeled vehicles. However, since the dataset analyzed represents the foundational baseline of standard automotive traffic, this moderate growth likely reflects institutional shifts in overall city-wide policing strategy rather than highly specific, hyper-targeted campaigns. Plus, 3 years is not a sufficient time span for us to deliver some substantial proof regarding long-term structural trends.
-- **Proposed Action**: From a modeling perspective, we need to ensure that the temporal variable `year` does not introduce confounding effects when evaluating our target variable. We will include `year` as a categorical factor or dummy variable in our classification models to control for these shifting annual baselines. Furthermore, we must check if the arrest rate remained stable during this expansion or if the influx of new stops diluted the proportion of `arrest_made` outcomes, which we can verify by plotting the conditional probability of arrests over time.
+- **Comment**: Same as the 2-wheels analysis.
+- **Proposed Action**: Same as the 2-wheels analysis.
 
 ### Month
 
@@ -631,11 +634,11 @@ month_data %>%
   theme(
     panel.grid.major.x = element_blank(),
     plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10) # Styled as requested
+    plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
     title = "Monthly Volume of Stops for Cars in NYC",
-    subtitle = "Over 3 Years, Most Vehicles are Stopped between June and October",
+    subtitle = "Over 3 Years, Summer is when the Least Amount of Stops take place",
     x = "Month",
     y = "Count of Stops"
   )
@@ -647,10 +650,10 @@ rm(month_data)
 
 What can we say?
 
-- **Key finding**: The data exhibits a highly distinct monthly pattern for 4-wheels vehicles, contrasting sharply with the June to October summer plateau observed for bikers. Here, stop volumes peak in the early months of the year, reaching an absolute maximum in March at $208,661$ stops, before experiencing a notable multi-month contraction that bottoms out in September at $154,192$ stops (a $-7.4\%$ drop from August).
-- **Interpretation**: Unlike 2-wheeled vehicles, 4-wheeled vehicles operate year-round regardless of harsh winter conditions, explaining the high volume baseline maintained in January ($204,603$) and February ($200,831$). The steady downward trajectory into June ($-16.4\%$) and July indicates that warm weather does not drive an increase in 4-wheels encounters, suggesting instead that shifting law enforcement administrative cycles, fiscal year targets, or changing city-wide patrol strategies dictate the distribution of these stops.
-- **Comment**: It would be easy to state that the decline in stops during late summer and early autumn is likely due to structural shifts in commuter behavior rather than a change in police behavior. However, both mechanisms are not distinguishable from the data alone. What is qualitatively vital here is that the peaks and troughs run almost completely counter-cyclical to the 2-wheels distribution, proving that the underlying operational mechanics driving police encounters for standard automobiles are entirely decoupled from seasonal weather dependencies.
-- **Proposed Action**: Given this clear monthly pattern, we ensure our predictive models include this time-related feature. We will incorporate `month` as a categorical factor to capture these cyclical baseline variations across the calendar year. Furthermore, to verify if these volume shifts alter the underlying target probability, we will test for interaction terms between `month` and the vehicle type during downstream classification tasks to see if seasonal variation modulates the likelihood of the `arrest_made` outcome.
+- **Key finding**: The data exhibits a highly distinct monthly pattern for 4-wheels vehicles, contrasting sharply with the June to October summer plateau observed for bikers. Here, stop volumes peak in the early months of the year, reaching an absolute maximum in March at $208,661$ stops, before experiencing a plateau, starting in June, that bottoms out in September at $154,192$ stops (a $-7.4\%$ drop from August).
+- **Interpretation**: Unlike 2-wheeled vehicles, **4-wheeled vehicles are stopped regardless of the season and the related weather conditions**. This explains the high volume baseline maintained in January ($204,603$) and February ($200,831$). The steady downward trajectory into June ($-16.4\%$) and July may suggest a shift in enforcement.
+- **Comment**: Most of the conclusions we can make here come from the 2-wheels analysis. The interesting aspect is that the peaks are almost completely counter-cyclical to the 2-wheels plot. This may suggest that, for standard automobiles, the police behavior shows a mechanic that is entirely independent from seasonal weather. If this was true, we could not compare fairly the two datasets.
+- **Proposed Action**: Same as the 2-wheels analysis.
 
 Let us see this with respect to the year
 
@@ -670,7 +673,7 @@ plot_data <- vehstops %>%
     label_text = case_when(
       month == 1 ~ comma(n), 
       is_max ~ paste0(comma(n), "\n(", ifelse(pct_max > 0, "+", ""), pct_max, "%)"),
-      month == 12 ~ paste0(comma(n), "\n(", pct_dec, "%)"), # Dec is usually negative, so '-' is automatic
+      month == 12 ~ paste0(comma(n), "\n(", pct_dec, "%)"),
       TRUE ~ ""
     )
   )
@@ -710,10 +713,10 @@ rm(plot_data)
 
 What can we say?
 
-- **Key finding**: There is a pronounced shifting trend in the intra-year volume distribution over the three-year period. In $2023$, the annual maximum occurred early in March ($64,991$, an $11\%$ increase from January) followed by a sharp drop to December ($38,193$, a $-41\%$ decline). By $2025$, the behavior changes markedly, as the year begins at a much higher baseline peak in January ($81,793$), experiences a steep mid-year contraction through summer, and finishes with a late-year resurgence that leads to a much softer winter decline by December ($62,748$, a $-23\%$ drop from the annual maximum).
-- **Interpretation**: The data indicates that enforcement patterns for 4-wheels vehicles are undergoing structural adjustments over time. The widening gap between the high-volume peaks and the low-volume troughs seen in the 2-wheels context does not apply here. Instead, the "off-season" drop in December is becoming significantly less severe, moving from $-41\%$ in $2023$ to $-23\%$ in $2025$, which implies a stabilization of late-year policing activities.
-- **Comment**: It clearly shows that while the baseline (January) is rising substantially over the years, the *shape* of the annual trend is shifting from a spring-centric peak to a bimodal distribution with a prominent winter surge. This qualitative shift confirms that seasonal vehicle usage is not the primary mechanism driving these 4-wheels encounters, pointing instead toward evolving, multi-year administrative directives or policy shifts within the police department.
-- **Proposed Action**: Rather than creating a static binary indicator for a warm season as we did for 2-wheels vehicles, we will **include interaction terms between `year` and `month**` in our classification framework. This will allow our GLM and distance-based models to capture the changing seasonal dynamics and prevent the model from assuming a fixed monthly effect across the entire $2023$ to $2025$ timeline.
+- **Key finding**: There is a pronounced shifting trend in the intra-year volume distribution over the three-year period. In $2023$, the annual maximum occurred early in March ($64,991$, an $11\%$ increase from January) followed by a sharp drop to December ($38,193$, a $-41\%$ decline). In $2024$ the monthly amount of stops follows a slightly decreasing trend. By $2025$, the behavior changes, as the year begins at a much higher baseline peak in January ($81,793$). Then it shows a steep mid-year contraction through summer, and it ends with a surge (in October) that leads to a much softer winter decline by December ($62,748$, a $-23\%$ drop from the annual maximum).
+- **Interpretation**: The data indicates that enforcement patterns for 4-wheels vehicles are having structural adjustments over the years, although the overall volume keeps increasing. The widening gap between the high-volume peaks and the low-volume troughs seen in the 2-wheels context does not apply here. Instead, the "off-season" drop in December is becoming significantly less severe, moving from $-41\%$ in $2023$ to $-23\%$ in $2025$, which implies a stabilization of late-year policing activities.
+- **Comment**: The plot clearly shows that while the baseline (January) is rising substantially over the years. Furthermore, we notice that the *shape* of the annual trend is shifting from looking like a spring, to a 2-phase distribution with a notable winter increase. This shift confirms our hypothesis that seasonal **vehicle usage is not the primary factor** for stops. Instead, this is probably due to the policy shifts within the police department.
+- **Proposed Action**: Here is impossible to include the same `hot_season` factor, as we would like to restrict the focus months over the June-September period.
 
 ### Checking out `hot_season`
 
@@ -731,7 +734,7 @@ plot_data <- vehstops %>%
   filter(!is.na(year) & !is.na(month)) %>%
   mutate(
     is_hot_season = ifelse(month %in% 4:10, "Hot Season", "Off Season"),
-    is_hot_season = factor(is_hot_season, levels = c("Hot Season", "Off Season"))
+    is_hot_season = factor(is_hot_season, levels = c("Off Season", "Hot Season"))
   ) %>%
   count(year, is_hot_season) %>%
   group_by(year) %>%
@@ -872,7 +875,7 @@ vehstops %>%
   geom_text(aes(label = label_text), vjust = -1, size = 3, lineheight = 0.8) +
   scale_y_continuous(labels = comma, 
                      limits = c(0, NA), 
-                     expand = expansion(mult = c(0, 0.4))) + # Extra room for labels
+                     expand = expansion(mult = c(0, 0.4))) +
   theme_minimal() +
   theme(
     panel.grid.major.x = element_blank(),
@@ -1450,7 +1453,7 @@ ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
   geom_text(aes(label = label_text), vjust = -0.8, size = 3.5, lineheight = 0.8) +
   scale_y_continuous(
     labels = scales::percent, 
-    limits = c(0, max(arrest_trends$rate) * 1.3), # Extra room for labels
+    limits = c(0, max(arrest_trends$rate) * 1.3),
     expand = expansion(mult = c(0, 0.1))
   ) +
   theme_minimal() +
