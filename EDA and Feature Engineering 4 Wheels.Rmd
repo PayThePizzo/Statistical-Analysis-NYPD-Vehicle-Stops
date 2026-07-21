@@ -716,65 +716,7 @@ What can we say?
 - **Key finding**: There is a pronounced shifting trend in the intra-year volume distribution over the three-year period. In $2023$, the annual maximum occurred early in March ($64,991$, an $11\%$ increase from January) followed by a sharp drop to December ($38,193$, a $-41\%$ decline). In $2024$ the monthly amount of stops follows a slightly decreasing trend. By $2025$, the behavior changes, as the year begins at a much higher baseline peak in January ($81,793$). Then it shows a steep mid-year contraction through summer, and it ends with a surge (in October) that leads to a much softer winter decline by December ($62,748$, a $-23\%$ drop from the annual maximum).
 - **Interpretation**: The data indicates that enforcement patterns for 4-wheels vehicles are having structural adjustments over the years, although the overall volume keeps increasing. The widening gap between the high-volume peaks and the low-volume troughs seen in the 2-wheels context does not apply here. Instead, the "off-season" drop in December is becoming significantly less severe, moving from $-41\%$ in $2023$ to $-23\%$ in $2025$, which implies a stabilization of late-year policing activities.
 - **Comment**: The plot clearly shows that while the baseline (January) is rising substantially over the years. Furthermore, we notice that the *shape* of the annual trend is shifting from looking like a spring, to a 2-phase distribution with a notable winter increase. This shift confirms our hypothesis that seasonal **vehicle usage is not the primary factor** for stops. Instead, this is probably due to the policy shifts within the police department.
-- **Proposed Action**: Here is impossible to include the same `hot_season` factor, as we would like to restrict the focus months over the June-September period.
-
-### Checking out `hot_season`
-
-Let us proceed with this intuition
-
-```{r add-hot-season}
-vehstops <- vehstops %>%
-  mutate(hot_season = ifelse(month %in% 4:10, 1, 0))
-```
-
-Now, for plotting
-
-```{r year-hot-season-distribution}
-plot_data <- vehstops %>%
-  filter(!is.na(year) & !is.na(month)) %>%
-  mutate(
-    is_hot_season = ifelse(month %in% 4:10, "Hot Season", "Off Season"),
-    is_hot_season = factor(is_hot_season, levels = c("Off Season", "Hot Season"))
-  ) %>%
-  count(year, is_hot_season) %>%
-  group_by(year) %>%
-  mutate(
-    year_total = sum(n),
-    pct = n / year_total,
-    label_text = paste0(comma(n), "\n(", round(pct * 100, 1), "%)")
-  )
-
-plot_data %>%
-  ggplot(aes(x = is_hot_season, y = n, fill = is_hot_season)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~year, nrow = 1) +
-  geom_text(aes(label = label_text), vjust = -0.5, size = 3.5, lineheight = 0.8) +
-  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.2))) +
-  scale_fill_brewer(palette = "Paired") +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title = "Volume of Stops for Cars in NYC: Hot Season vs. Off Season",
-    subtitle = "While Overall Volume Increase, Percentages slightly Drift Towards Hot Season",
-    x = NULL,
-    y = "Count of Stops"
-  )
-```
-
-```{r, include=FALSE}
-rm(plot_data)
-```
-
-What can we say?
-
-- **Key finding**: Total enforcement volume is surging but, more importantly, the enforcement pattern is slowly becoming **increasingly concentrated** in the "Off Season" rather than the "Hot Season." In fact, while the hot season accounted for $55.8\%$ of stops in $2023$ ($341,205$ stops), its share slightly drifted downward to $54.5\%$ in $2025$ ($436,037$ stops) as off-season stops climbed from $44.2\%$ to $45.5\%$ ($363,816$ stops).
-- **Interpretation**: The growth in stops is not uniform throughout the year. The declining percentage of hot season stops indicates that the "Off Season" (Nov-March) is becoming a slightly faster driver of the expanding annual stop totals year-over-year, which runs in complete opposition to the 2-wheels concentration behavior. However, the $3$ year span of the data does not make this minor drift definite.
-- **Comment**: This plot confirms that while a "Hot Season" vs "Off Season" division captures a clear baseline volume gap, it behaves fundamentally differently for 4-wheeled vehicles. The structural shift toward a higher off-season proportion highlights that winter months are not a deterrent for automotive policing, indicating that standard vehicle enforcement is sustained at massive scales regardless of weather shifts. On the other hand, this marginal percentage drift cannot be just inferred by looking at the year.
-- **Proposed Action**: Because the seasonal proportions are shifting across the years in a distinct pattern, we will **include the interaction between** `year` **and our seasonal features** during model training. This will allow our classification algorithms to properly evaluate if the probability of the `arrest_made` target is being modulated by these changing volume dynamics rather than assuming a fixed seasonal weight over time.
+- **Proposed Action**: Here is impossible to include the same `hot_season` factor, as we would like to restrict the focus months over the June-September period. Therefore, we skip it.
 
 ### Dow/Weekday, Day and Doy
 
@@ -1008,68 +950,6 @@ What can we say?
 - **Comment**: When comparing these distributions to our previous two-wheeled vehicle analysis, we notice a much more rigid and traditional bimodal rush hour structure here. While two-wheelers saw a drastic tripling of evening volume due to changing delivery dynamics or specific late evening crackdowns, four-wheeled vehicle enforcement aligns more closely with standard standard NYC commuting hours. The sustained plateau between $16:00$ and $20:00$ in $2025$ indicates an overall expansion of police activity during the entire evening transition period rather than a targeted tactical shift.
 - **Proposed Action**: For our downstream predictive modeling of `arrest_made`, we should engineer a categorical feature capturing these distinct diurnal periods, such as defining an explicit evening rush window from $16:00$ to $20:00$. Because the hourly volume distribution shapes remain fairly consistent across years while absolute counts grow, we should include `hour` as a non-linear effect using a generalized additive framework or a tree-based classifier to properly map how the probability of an arrest scales during peak traffic hours.
 
-Now let us see if the hot season might shift this cycle
-
-```{r hour-hot-season}
-plot_data_full <- vehstops %>%
-  mutate(
-    hot_season = ifelse(month %in% 4:10, 1, 0),
-    hot_season_label = factor(hot_season, levels = c(0, 1), 
-                              labels = c("Off Season (Nov-Mar)", "Hot Season (Apr-Oct)"))
-  ) %>%
-  filter(!is.na(hour))
-
-full_data <- plot_data_full %>%
-  count(hot_season_label, hour)
-
-hours_to_show <- c(0, 4, 8, 12, 16, 20, 23)
-
-highlight_data <- full_data %>%
-  filter(hour %in% hours_to_show) %>%
-  group_by(hot_season_label) %>%
-  arrange(hour) %>%
-  mutate(
-    pct_change = (n - lag(n)) / lag(n) * 100,
-    label_text = ifelse(is.na(pct_change), 
-                        comma(n), 
-                        paste0(comma(n), "\n(", ifelse(pct_change > 0, "+", ""), round(pct_change, 1), "%)"))
-  )
-
-ggplot() +
-  geom_line(data = full_data, aes(x = hour, y = n), color = "grey85", linewidth = 0.8) +
-  geom_point(data = highlight_data, aes(x = hour, y = n), color = "steelblue", size = 2) +
-  geom_text(data = highlight_data, aes(x = hour, y = n, label = label_text), 
-            vjust = -0.7, size = 2.5, lineheight = 0.8) +
-  facet_wrap(~hot_season_label, nrow = 1) +
-  scale_x_continuous(breaks = c(0, 4, 8, 12, 16, 20, 23)) +
-  scale_y_continuous(labels = comma, limits = c(0, NA), expand = expansion(mult = c(0, 0.4))) +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10),
-    strip.text = element_text(size = 12)
-  ) +
-  labs(
-    title = "Hourly Cycle of Enforcement for Cars in NYC: Hot Season vs. Off Season",
-    subtitle = "TODO",
-    x = "Hour of Day (0-23)", 
-    y = "Count of Stops"
-  )
-```
-
-```{r, include=FALSE}
-rm(plot_data_full, hours_to_show, full_data, highlight_data)
-```
-
-What can we say?
-
-- **Key finding**: The fundamental bimodal shape of traffic enforcement remains remarkably stable across both periods, peaking consistently at $16:00$ in both the Off Season ($70134$ stops) and the Hot Season ($74820$ stops). However, the Hot Season exhibits a significantly higher baseline volume throughout the entire day, particularly at midnight ($66252$ stops compared to $49057$ in the Off Season) and during the evening hours, where volume remains elevated at $20:00$ ($72847$ stops) before tapering off.
-- **Interpretation**: Unlike two-wheeled vehicles where seasonal shifts completely migrate the peak hour, four-wheeled vehicle enforcement seems governed by stable, year-round commuting infrastructures that anchor the primary peak at $16:00$. The primary seasonal effect is volume-based rather than structural, meaning that warmer weather expands the absolute quantity of nighttime and evening stops without disrupting the daytime baseline trends. The sharp drop to the daily minimum at $4:00$ is universal, which reflects a systemic low in overall vehicular activity regardless of the season.
-- **Comment**: This presents a contrasting narrative to the two-wheel case. While two-wheelers are heavily dependent on weather conditions for their operational viability (which explains why their enforcement curve shifts dramatically with the "Sun and Temperature" cycle), four-wheeled vehicles operate constantly across all seasons. The data suggests that police deployment strategies for standard vehicles track general traffic density trends, though they take advantage of increased nighttime activity during the warmer months to sustain higher enforcement levels late into the evening.
-- **Proposed Action**: For our classification framework targeting `arrest_made`, we should model season as an interaction term with hour rather than just a standalone main effect. Since the peak hours do not shift but the late-night volumes change significantly, an interaction term like `hour * season` will allow the model to capture whether a stop made at $20:00$ or $0:00$ carries a different conditional probability of arrest depending on the time of year.
-
 Let us check the time brackets previously built.
 
 ```{r time-bracket-distribution}
@@ -1255,7 +1135,7 @@ Because of how the `table()` function works in R, we can also include integer pr
 ```{r categorical-correlation-heatmap}
 # Excluding doy (redundant) and dow (we use weekday instead)
 columns <- c(
-  "year", "month", "hot_season", "weekday", 
+  "year", "month", "weekday", 
   "hour", "time_bracket",
   "area", "boro", 
   "sex", "ethnicity", "age", "age_bracket",
@@ -1476,7 +1356,7 @@ What can we say?
 - **Comment**: In comparison to the two-wheeled vehicle analysis, which exhibited a continuous upward drift up to $6.0\%$, four-wheeled vehicle stops show a significantly lower overall arrest conversion rate and a distinct plateauing pattern. The continuous surge in two-wheel arrests was highly representative of evolving micromobility crackdowns and successive regulatory iterations stretching into $2025$. Conversely, standard vehicle enforcement represents a more mature operational environment, where policy shifts yielded a one-time adjustment in $2024$ before returning to a stable baseline.
 - **Proposed Action**: We should check for an association effect between time and geography by plotting these three-year trends faceted by borough to see if the $2024$ peak and subsequent $2025$ stabilization are uniform across the city. Furthermore, we will include `year` as a categorical predictor in our experimental model pipeline to absorb the initial yearly macro trend shift, though we may consider pooling $2024$ and $2025$ if a parsimonious model formulation is desired.
 
-### Month and Hot Season
+### Month
 
 ```{r month-vs-arrested-ratio}
 monthly_arrest_data <- vehstops %>%
@@ -1532,28 +1412,6 @@ What can we say?
 - **Interpretation**: From a temporal perspective, the conditional probability of an arrest given a stop is essentially invariant across the spring, summer, and autumn months for four-wheeled vehicles. The slight elevation observed in December and January suggests that seasonal factors, such as holiday-season traffic initiatives, increased checkpoint density, or changes in driving behavior during mid-winter, introduce a minor but distinct uptick in arrest efficiency at the turn of the year.
 - **Comment**: This visualization presents a stark contrast to the two-wheeled vehicle analysis, where arrest rates exhibited a massive sinusoidal curve tied directly to the summer season, peaking at $6.5\%$ in July. For standard automobiles, there is no summer surge, which further underscores that standard vehicle operations maintain a highly predictable, institutional baseline year-round. The minor spikes in December and January are likely driven by citywide holiday enforcement campaigns rather than environmental weather changes, revealing a completely different operational timeline than the two-wheel market.
 - **Proposed Action**: We should avoid relying on the binary `hot_season` feature for the four-wheeled vehicle framework, as the flat summer profile means this indicator will fail to capture any meaningful predictive signal. Instead, we can extract the true seasonal variance by engineering a specialized categorical feature that isolates the holiday transition window, such as a binary indicator for `holiday_season` spanning December and January, or by utilizing `month` as a nominal variable with January or December established as the reference levels in our regression pipeline.
-
-What about `hot_season`?
-
-```{r hot-season-vs-arrested-ratio}
-ratio_by_cat(
-  vehstops, arrested, hot_season,
-  "Hot Season", "Arrest Rate (%)", "Arrest Ratio by Season for Cars Stopped in NYC",
-  style = "stack", legend_title = "Stop ended in arrest?",
-  target_labels = c("No", "Yes"),
-  subtitle = "For Cars it shows Increased Arrest Ratio during TODO",
-  label_vjust = 0.5,
-  text_size = 2.5,
-  bar_width = 0.7
-)
-```
-
-What can we say?
-
-- **Key finding**: The visualization shows an extremely narrow variation in the arrest rate between the two seasonal blocks. When the `Hot Season` flag is active ($1$), the proportion of stops culminating in an arrest stands at $3.2\%$, whereas during the off-season ($0$), the conversion rate is marginally higher at $3.4\%$. This represents a negligible difference of only $0.2$ percentage points between the two operational periods.
-- **Interpretation**: From a feature engineering perspective, compressing the monthly calendar timeline into a binary macro-season variable yields almost zero explanatory return for four-wheeled vehicles. The negligible $0.2$ percentage point shift indicates that the global probability of an arrest given a stop is practically orthogonal to this specific definition of seasonality. This statistical invariance suggests that any predictive signal present in individual months is effectively washed out when aggregated into these broad binary blocks.
-- **Comment**: This outcome stands in sharp contrast to the two-wheeled vehicle analysis, where the hot season triggered a distinct $1.1$ percentage point surge that validated the binary variable design. For two-wheelers, the weather directly governs ridership demographics and specific tactical initiatives. For standard cars, the year-round consistency of traffic composition ensures a stable background rate. Interestingly, the off-season ($0$) actually shows the minor upper hand here, which aligns with our previous monthly finding where the localized holiday spikes in December and January elevated the winter baseline.
-- **Proposed Action**: We will exclude the global binary `hot_season` feature from our final predictive models for four-wheeled vehicles, as it lacks sufficient variance to provide a meaningful coefficient. Instead, we will favor more targeted indicator variables that isolate specific anomalies, such as a dedicated binary flag for the winter holiday months, or utilize a multi-level categorical variable for quarters to capture temporal transitions without oversimplifying the operational reality.
 
 #### Faceted
 
@@ -1618,52 +1476,6 @@ What can we say?
 - **Interpretation**: From a longitudinal perspective, this evolution demonstrates that the seasonal distribution of the arrest probability is non-stationary. The sharp contrast between the upward trend of $2023$ and the front-loaded, downward-sloping profiles of $2024$ and $2025$ indicates that a fixed, static monthly effect will fail to capture the baseline transition. The data suggests that tactical changes in traffic enforcement strategies or policy mandates implemented between late $2023$ and early $2024$ permanently re-engineered the annual distribution, shifting the highest conditional probability of an arrest to the beginning of the calendar year.
 - **Comment**: When contrasted against the two-wheeled vehicle analysis, which exhibited a highly stable, recurring summer peak across all panels, the four-wheeled data exposes a complete structural transformation. Standard vehicle enforcement is not bound by a predictable meteorological cycle like delivery riders or micromobility users. Instead, the rapid migration of the peak from December ($2023$) to January ($2024$ and $2025$) underscores that administrative, policy-driven behavior dominates this timeline. Rather than a recurring mid-summer dip, standard cars see a sustained, institutional baseline shift where early-winter enforcement has become progressively more efficient at securing arrests over the three-year window.
 - **Proposed Action**: We cannot rely on a simple main effect for month or a static seasonal category in our final predictive architecture, as the shifting intra-year structure violates the assumption of temporal stationarity. To accurately capture how the probability of `arrested` scales across this timeline, we must explicitly include a macro interaction term structured as `month * year` within our model. This formulation will allow the classification framework to adjust the monthly weights dynamically across the three-year horizon, preventing the inverted trends of $2024$ and $2025$ from canceling out the upward trajectory observed in $2023$.
-
-```{r faceted-hot-season-vs-arrested-ratio}
-plot_data <- vehstops %>%
-  filter(!is.na(year), !is.na(month), !is.na(arrested)) %>%
-  mutate(
-    is_hot_season = ifelse(month %in% 4:10, "Hot Season", "Off Season"),
-    is_hot_season = factor(is_hot_season, levels = c("Hot Season", "Off Season"))
-  ) %>%
-  group_by(year, is_hot_season) %>%
-  summarise(
-    total_stops = n(),
-    arrests = sum(arrested == 1),
-    arrest_rate = arrests / total_stops,
-    .groups = "drop"
-  ) %>%
-  mutate(
-    label_text = paste0(scales::percent(arrest_rate, accuracy = 0.1), "\n(", comma(arrests), " arrests)")
-  )
-
-plot_data %>%
-  ggplot(aes(x = is_hot_season, y = arrest_rate, fill = is_hot_season)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~year, nrow = 1) +
-  geom_text(aes(label = label_text), vjust = -0.5, size = 3, lineheight = 0.8) +
-  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.2))) +
-  scale_fill_brewer(palette = "Paired") +
-  theme_minimal() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10)
-  ) +
-  labs(
-    title = "Arrest Rate for Cars in NYC: Hot Season vs. Off Season",
-    subtitle = "TODO",
-    x = NULL,
-    y = "Arrest Rate (%)"
-  )
-```
-
-What can we say?
-
-- **Key finding**: The faceted bar chart reveals that the seasonal relationship with the arrest rate for standard vehicles is weak and varies over time. In $2023$, the Hot Season arrest rate was slightly higher than the Off Season rate ($2.9\%$ vs $2.8\%$), whereas in $2024$ and $2025$, this pattern inverted with the Off Season displaying a higher conditional probability of arrest ($3.7\%$ vs $3.3\%$ in $2024$, and $3.6\%$ vs $3.3\%$ in $2025$).
-- **Interpretation**: The visualization shows the dark blue bars (Off Season) overtaking the light blue bars (Hot Season) in the latter two years. Furthermore, looking at the absolute volumes shows that the Off Season accounts for a massive and expanding portion of the overall arrest count, yielding $11930$ arrests in $2024$ and growing to $13078$ arrests by $2025$. This confirms that our global binary seasonal categorization fails to capture a stable, consistent operational effect for standard vehicle stops.
-- **Comment**: This presents a complete contradiction to the two-wheeled vehicle analysis, where the Hot Season arrest rate was uniformly dominant across all years. For two-wheelers, warmer weather drives the operational volume and targeted enforcement. For four-wheeled vehicles, the data suggests that winter and late-autumn months actually feature more efficient or higher-probability arrest encounters in recent years. This inversion reinforces our previous finding regarding the monthly non-stationarity of standard car stops, proving that seasonal patterns are heavily dependent on yearly administrative or tactical policy changes.
-- **Proposed Action**: We must avoid using the static `hot_season` binary flag as a standalone macro predictor in our final classification models, since its fluctuating direction across the years will dilute the predictive signal. Instead, we should model seasonal trends dynamically by including the interaction term (`hot_season` $\times$ `year`). This approach will allow the model to adjust for the structural shift where the conditional probability of an arrest moved from the warmer months to the colder months after $2023$.
 
 ### Day, Dow and Weekday
 
@@ -1906,7 +1718,7 @@ We re-order the features for better display
 ```{r re-order-dataset}
 vehstops_ord <- vehstops %>%
   select(
-    year, month, hot_season, weekday,
+    year, month, weekday,
     hour, time_bracket,
     area, boro,
     sex, ethnicity, 
