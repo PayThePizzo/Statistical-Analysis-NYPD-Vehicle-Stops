@@ -636,7 +636,7 @@ month_data %>%
   theme(
     panel.grid.major.x = element_blank(),
     plot.title = element_text(size = 14),
-    plot.subtitle = element_text(color = "grey50", size = 10) # Styled as requested
+    plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
     title = "Monthly Volume of Stops for 2-Wheels Vehicles in NYC",
@@ -675,7 +675,7 @@ plot_data <- vehstops %>%
     label_text = case_when(
       month == 1 ~ comma(n), 
       is_max ~ paste0(comma(n), "\n(", ifelse(pct_max > 0, "+", ""), pct_max, "%)"),
-      month == 12 ~ paste0(comma(n), "\n(", pct_dec, "%)"), # Dec is usually negative, so '-' is automatic
+      month == 12 ~ paste0(comma(n), "\n(", pct_dec, "%)"),
       TRUE ~ ""
     )
   )
@@ -876,7 +876,7 @@ vehstops %>%
   geom_text(aes(label = label_text), vjust = -1, size = 3, lineheight = 0.8) +
   scale_y_continuous(labels = comma, 
                      limits = c(0, NA), 
-                     expand = expansion(mult = c(0, 0.4))) + # Extra room for labels
+                     expand = expansion(mult = c(0, 0.4))) +
   theme_minimal() +
   theme(
     panel.grid.major.x = element_blank(),
@@ -1437,7 +1437,7 @@ ggplot(arrest_trends, aes(x = factor(year), y = rate, group = 1)) +
   geom_text(aes(label = label_text), vjust = -0.8, size = 3.5, lineheight = 0.8) +
   scale_y_continuous(
     labels = scales::percent, 
-    limits = c(0, max(arrest_trends$rate) * 1.3), # Extra room for labels
+    limits = c(0, max(arrest_trends$rate) * 1.3),
     expand = expansion(mult = c(0, 0.1))
   ) +
   theme_minimal() +
