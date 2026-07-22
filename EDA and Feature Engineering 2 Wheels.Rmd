@@ -948,7 +948,8 @@ rm(hours_to_show, full_data, highlight_data)
 What can we say? In our opinion this looks like a "sine wave broken by a bridge". To be more precise:
 
 - **Key finding**: Enforcement volume is characterized by a "fractured" daily cycle. It follows a predictable overnight decline and morning ascent ($0:00-12:00$), but is interrupted by a distinct midday plateau ($12:00-15:00$) before reaching an aggressive evening peak at $19:00$.
-- **Interpretation**: This suggests that the enforcement cycle is divided into two distinct operational phases: the **Morning Phase** (likely commuter-driven) and the **Evening Phase** (likely delivery/service-driven). The plateau is the "bridge" between these two. the variability during $10:00$ to $15:00$ is limited because the amount of vehicles on the road remains stable, as well as the police work.
+- **Interpretation**: This suggests that the enforcement cycle is divided into two distinct operational phases: the **Morning Phase** (likely commuter-driven) and the **Evening Phase** (likely delivery/service-driven), while the plateau is the "bridge" between these two. The variability during $10:00$ to $15:00$ is limited because the amount of vehicles on the road probably remains stable, as well as the police work.
+- **Proposed Action**: We will maintain `hour` as a temporal feature in our predictive framework. As an alternative, we *could* try to properly capture this pattern. For instance, we could **transform the continuous hour variable using a periodic basis function**, so that it becomes a continuous feature.
 
 Before anything else, let us see whether this cycle changed throughout the years.
 
@@ -1107,6 +1108,7 @@ What can we say?
 - **Key finding**: A part from, what we decided to put into the subtitle, the "Unknown" age category represents a significant enough portion of the distribution.
 - **Interpretation**: The data reflects a clear operational focus on younger drivers, which represent the majority of bikers. There are very few observation for the 65+ bin, which may be considered outliers.
 - **Comment**: We do not treat the "Unknown" category as garbage data to be discarded.
+- **Proposed Action**: We will retain the "Unknown" category as a level within our `age_bracket` feature rather than using imputation.
 
 And now, let us see how this looks when looking at the full distribution
 
@@ -1266,7 +1268,7 @@ What can we say?
   - the geographic and temporal blocks `area`/`boro` $\leftrightarrow$ `hour` / `time_bracket` (Cramer's V of $0.08$),
   - between `ethnicity` $\leftrightarrow$ `area`/`boro` ($0.17$ to $0.19$), and
   - between `ethnicity` $\leftrightarrow$ `sex` ($0.16$).
-- **Interpretation**: Temporal and spatial circumstances carry the strongest individual impact when predicting an arrest, while motorist demographics are less informative as standalone predictors. However, the $0.08$ association between the main spatial and temporal features indicates the volume of stops are non-uniformly distributed across time and space. In other words, this suggests an underlying interaction between these two classes of predictors.
+- **Interpretation**: Temporal and spatial signals carry the strongest single impact when predicting an arrest, while motorist demographics are less informative as standalone predictors. However, the $0.08$ association between the main spatial and temporal features indicates the volume of stops are non-uniformly distributed across time and space. In other words, this suggests an underlying interaction between these two classes of predictors.
 - **Comment**: Because **no single predictor strongly correlates** with `arrested`, **models relying purely on main effects will likely underfit** the data. The intersection of geography and time is where the true narrative of police behavior resides, as patrol priorities and ridership composition (such as delivery workers vs. overnight riders) change depending on the borough and hour. Surfacing patterns of excessive enforcement requires us to model these blocks conditionally rather than treating them as entirely independent factors.
 - **Proposed Action**: We will focus our predictive models on the spatial and temporal axes by retaining `area` and `time_bracket` as our primary drivers. Possibly, we can try to capture the interaction term (`area` $\times$ `time_bracket`) in our logistic regression. This approach will allow us to test if the probability of arrest spikes during specific hours in specific areas.
 
@@ -1350,7 +1352,7 @@ We will need to choose between one or the other.
 
 ### Latitude and Longitude for Stop Rate
 
-```{r}
+```{r stop-ratio-density}
 nyc_map <- counties(state = "NY", cb = TRUE) %>%
   filter(NAME %in% c("Bronx", "Kings", "New York", "Queens", "Richmond"))
 
@@ -1723,7 +1725,7 @@ daily_arrest_rate %>%
   ) +
   labs(
     title = "Arrest Rate by Day of the Week for 2-Wheels Vehicles in NYC",
-    subtitle = "TODO",
+    subtitle = "Arrest rate remains pretty much stable throughout the week",
     x = "Day of the Week",
     y = "Arrest Rate (%)"
   )
