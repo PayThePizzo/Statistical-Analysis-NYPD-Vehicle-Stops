@@ -1058,6 +1058,10 @@ vehiclestops <- vehiclestops %>%
   select(-age_unknown, -ethnicity_unknown, -sex_unknown)
 ```
 
+```{r, include=FALSE}
+rm(stops_bin)
+```
+
 ------------------------------------------------------------------------
 
 # Final touches
