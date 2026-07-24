@@ -1322,9 +1322,9 @@ vehstops %>%
 
 What can we say? Remember that Staten Island and Bronx are the areas with the least volume of stops.
 
-- **Key finding**: This plot reveals a noticeable disparity in the proportions of vehicle stops that culminate in arrests for two-wheeled vehicles across New York City boroughs. The arrest rate ranges from a minimum of $3.2\%$ in Manhattan to a maximum of $12.1\%$ in the Bronx. This represents nearly a 4x increase in the relative probability of an arrest depending on the location of the encounter. Also, low-volume areas (Staten Island, Bronx) show arrest rates above the citywide average, while high-volume areas (Brooklyn, Queens) are closer to the global mean.
+- **Key finding**: This plot reveals a noticeable disparity in the proportions of vehicle stops that end up in arrests for two-wheeled vehicles across New York City. The arrest rate ranges from a minimum of $3.2\%$ in Manhattan to a maximum of $12.1\%$ in the Bronx. This represents nearly a 4x increase in the relative probability of an arrest depending on the location of the encounter. Also, low-volume areas (Staten Island, Bronx) show arrest rates above the citywide average, while high-volume areas (Brooklyn, Queens) are closer to the global mean.
 - **Interpretation**: For the Bronx ($N = 29,874$), the $12.1\%$ arrest rate is calculated from the 3,628 arrests, proving that the elevated rate is a robust signal. However, the $8.5\%$ arrest rate in Staten Island is derived from only 125 events ($n = 125$ out of $N = 1,477$), meaning our parameter estimation (for this area) will have a wider confidence interval and higher susceptibility to sampling noise. For the remaining areas, we have more stable signals.
-- **Comment**: While the absolute majority of stops do not end in an arrest anywhere, the relative jump to a $12.1\%$ arrest rate in the Bronx is statistically and socially salient. The plot, together with this table, add critical context to the narrative. It reveals that the areas with the fewest total stops (Staten Island and the Bronx) yield the highest relative proportions of arrests. It highlights an interesting paradox where high-density, high-volume areas like Manhattan experience a massive volume of stops ($50,928$) but maintain a minimal arrest incidence. This could confirm that police behavior **vary** by territory.
+- **Comment**: While the absolute majority of stops do not end in an arrest anywhere, the relative jump to a $12.1\%$ arrest rate in the Bronx is statistically and socially relevant. The plot reveals that the areas with the fewest total stops (Staten Island and the Bronx) yield the highest relative proportions of arrests. It highlights an interesting paradox where high-density, high-volume areas like Manhattan experience a massive volume of stops ($50,928$) but maintain a minimal arrest incidence. This could confirm that police behavior **vary** by territory.
 - **Proposed Action**: We include `area` as a candidate predictor in our models, but also test `boro` as a finer-grained alternative. We are going to stratify this aspect of the data too.
 
 ### Borough
@@ -1342,9 +1342,16 @@ ratio_by_cat(
 )
 ```
 
+```{r confirm-borough-vs-arrested-ratio}
+vehstops %>%
+  group_by(boro, arrested) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(percentage = count / sum(count))
+```
+
 What can we say?
 
-- **Key finding**: Disaggregating (some of) the geographic data into finer regions preserves the overall ranking but reveals a minor intra-borough variance. The Bronx ($12.1\%$) and Staten Island ($8.5\%$) remain the primary "outliers", while the separated regions display a steady gradient ranging from a minimum of $3.0\%$ in Manhattan (South) to a maximum of $6.1\%$ in Brooklyn (South).
+- **Key finding**: Disaggregating (some of) the geographic data into finer regions preserves the overall ranking but reveals a minor intra-borough variance. The Bronx ($12.1\%$, $3628$ arrests) and Staten Island ($8.5\%$, $125$ arrests) remain the primary "outliers", while the separated regions display a steady gradient ranging from a minimum of $3.0\%$ in Manhattan (South) to a maximum of $6.1\%$ in Brooklyn (South).
 - **Interpretation**: This fine-grained visualization confirms that the macro patterns (observed previously) are robust. Within the boroughs that were split, we observe small localized shifts. This suggests that this predictor could explain even better the association with arrests.
 - **Proposed Action**: We should perform a test on nested logistic models. This aims to see whether a greater division achieves a statistically significant improvement over the simpler area-based model. In case the change is not significant, we will opt for a parsimonious model.
 
@@ -1791,6 +1798,13 @@ ratio_by_cat(
 )
 ```
 
+```{r confirm-time-bracket-vs-target-ratio}
+vehstops %>%
+  group_by(time_bracket, arrested) %>%
+  summarise(count = n(), .groups = "drop_last") %>%
+  mutate(percentage = count / sum(count))
+```
+
 What can we say? 
 
 - **Key finding**: The ordering of brackets by arrest rate follows (almost) the expected pattern from the diurnal curve: Night \> Evening \> Morning \> Afternoon (approximately), with Night brackets substantially above the global mean.
@@ -1821,7 +1835,7 @@ vehstops %>%
 What can we say?
 
 - **Key finding**: This plot shows a clear demographic trend where the arrest rate generally increases as the reported age bracket gets younger. The absolute lowest arrest rate is found within the $65+$ demographic at just $3.2\%$, which also accounts only for $45$ arrests (the lowest amount). The highest ratio belongs to the Under $18$ bracket, where the arrest rate reaches a peak of $10.9\%$ ($424$ arrests). On the other hand, the highest amount of arrests comes from $25-34$ bracket, whose $5\%$ accounts for $3561$ arrests. Following the underage bracket, the unknown label shows the second highest arrest rate of $7.1\%$ ($630$ arrests), and in third place, we find the $18-24$ bracket at $6.3\%$ ($2493$ arrests).
-- **Interpretation**: The data demonstrates a near-monotonic progression where younger operators face a higher conditional probability of arrest upon being stopped.
+- **Interpretation**: The data shows a monotonic increase where younger motorists face a higher probability of arrest upon being stopped.
 - **Proposed Action**: We want to include `age_bracket` as a predictor in our models instead of just using `age`.
 
 ### Reported Sex
