@@ -500,7 +500,7 @@ What can we say?
 - **Key finding**: There is a high variance in the volume of stops across areas. We observe three "high-volume" areas (Brooklyn, Queens, and Manhattan) with comparable stop counts (ranging between $50$k and $56$k), one "medium-volume" area (Bronx, $30$k), and a distinct "low-volume" area (Staten Island, $1.5$ k).
 - **Interpretation**: The distribution is highly non-uniform, or better, uneven. The lower frequency of stops in the Bronx and Staten Island suggests that geographic location could be a strong predictor of the probability of being stopped (in case the targets' ratio distributed by area follows a specific pattern).
 - **Comment**: From a modeling perspective, this introduces a risk of **overfitting to the high-volume areas**. Since some of the available models (especially KNN or QDA) rely on local neighborhood data or global likelihoods, they will naturally prioritize minimizing errors in the areas with the most observations. Furthermore, the extreme sparsity of the Staten Island group may lead to high variance in the parameter estimates for that specific categorical level, potentially skewing the coefficients for the area predictor. The visualization succeeds in highlighting a pattern, but it leaves the causal mechanisms open to speculation.
-- **Proposed Action**: We still need to check its association with subject-related predictors. Also, we still want to explore the finer-grained version of this geographical predictor (`boro`), which may achieve better results in the models. If using **Lasso or Ridge regression**, we will carefully tune the penalty parameter ($\lambda$) to ensure that the "Area" coefficients are not inflated/suppressed due to the sample size difference.
+- **Proposed Action**: We still need to check its association with demographic predictors. Also, we still want to explore the finer-grained version of this geographical predictor (`boro`), which may achieve better results in the models. If using **Lasso or Ridge regression**, we will carefully tune the penalty parameter ($\lambda$) to ensure that the "Area" coefficients are not inflated/suppressed due to the sample size difference.
 
 ### Borough
 
@@ -1239,7 +1239,7 @@ What can we say?
 
 # Bivariate EDA
 
-## Association of Binary Response vs. Categorical Predictors
+## Categorical Association of Binary Response vs. Categorical Predictors
 
 When dealing with a dataset of this size, traditional p-values from chi-squared tests become meaningless. To get around this, we use Cramer’s V to measure effect size (association).
 

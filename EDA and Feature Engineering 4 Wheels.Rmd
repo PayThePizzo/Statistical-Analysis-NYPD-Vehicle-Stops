@@ -1121,7 +1121,7 @@ What can we say?
 
 # Bivariate EDA
 
-## Association of Binary Response vs. Categorical Predictors
+## Categorical Association of Binary Response vs. Categorical Predictors
 
 When dealing with a dataset of this size, traditional p-values from chi-squared tests become meaningless. To get around this, we use Cramer’s V to measure effect size (association).
 
