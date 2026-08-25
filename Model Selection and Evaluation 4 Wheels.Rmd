@@ -47,7 +47,7 @@ requirements <- c(
   "stringr", "plyr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
   "timeDate", "timechange", "tzdb", "hms", "readr",
   "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor",
-  "sf", "ggplot2", "patchwork", "pROC", "kableExtra", "mgcv", "kknn"
+  "sf", "ggplot2", "patchwork", "pROC", "kableExtra", "mgcv"
 )
 ```
 
@@ -71,6 +71,277 @@ for (req in requirements){
 
 ```{r remove-vars, include=FALSE}
 rm(requirements, req)
+```
+
+## Plot Functions
+
+```{r}
+check_prop <- function(var, label) {
+  tr <- prop.table(table(train[[var]]))
+  te <- prop.table(table(test[[var]]))
+  tibble(
+    level    = names(tr),
+    train    = as.numeric(tr),
+    test     = as.numeric(te),
+    diff_ppt = round((as.numeric(te) - as.numeric(tr)) * 100, 2)
+  ) %>%
+    mutate(variable = label) %>%
+    relocate(variable)
+}
+```
+
+```{r}
+cv_auc <- function(formula, data, folds_vec) {
+  k <- max(folds_vec)
+
+  auc_vals <- parallel::mclapply(seq_len(k), function(i) {
+    tr  <- data[folds_vec != i, ]
+    te  <- data[folds_vec == i, ]
+
+    fit <- tryCatch(
+      glm(formula, family = binomial, data = tr),
+      error = function(e) NULL
+    )
+    if (is.null(fit)) return(NA_real_)
+
+    prob <- tryCatch(
+      predict(fit, newdata = te, type = "response"),
+      error = function(e) rep(NA_real_, nrow(te))
+    )
+
+    tryCatch(
+      as.numeric(pROC::auc(te$arrested, prob, quiet = TRUE)),
+      error = function(e) NA_real_
+    )
+  }, mc.cores = parallel::detectCores() - 1)
+
+  mean(unlist(auc_vals), na.rm = TRUE)
+}
+
+# Shared fold assignment — same folds used for every model
+set.seed(2026)
+cv_folds <- sample(rep(1:10, length.out = nrow(train)))
+```
+
+```{r}
+# ── Threshold and confusion-matrix helpers ───────────────────────────────────
+
+best_thresh <- function(roc_obj) {
+  pROC::coords(roc_obj, "best", ret = "threshold", best.method = "youden",
+               quiet = TRUE)$threshold
+}
+
+conf_tib <- function(actual, predicted) {
+  tibble(
+    Actual    = factor(actual,    levels = c(0, 1)),
+    Predicted = factor(predicted, levels = c(0, 1))
+  ) %>% count(Actual, Predicted)
+}
+
+plot_cm <- function(actual, predicted, title = "Confusion Matrix") {
+  conf_tib(actual, predicted) %>%
+    ggplot(aes(Predicted, Actual, fill = n)) +
+    geom_tile(colour = "white") +
+    geom_text(aes(label = scales::comma(n)), size = 5.5, fontface = "bold") +
+    scale_fill_gradient(low = "#e8f4f8", high = "#2c7bb6", guide = "none") +
+    scale_x_discrete(labels = c("0" = "No arrest", "1" = "Arrest")) +
+    scale_y_discrete(labels = c("0" = "No arrest", "1" = "Arrest")) +
+    labs(title = title, x = "Predicted", y = "Actual") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid = element_blank())
+}
+
+class_metrics <- function(actual, predicted, pos = 1) {
+  tp <- sum(actual == pos & predicted == pos)
+  tn <- sum(actual != pos & predicted != pos)
+  fp <- sum(actual != pos & predicted == pos)
+  fn <- sum(actual == pos & predicted != pos)
+  sens <- tp / (tp + fn)
+  spec <- tn / (tn + fp)
+  list(
+    sensitivity  = sens,
+    specificity  = spec,
+    balanced_acc = (sens + spec) / 2,
+    ppv          = tp / (tp + fp),
+    npv          = tn / (tn + fn)
+  )
+}
+
+# ── Probability-based metrics and evaluation plots ───────────────────────────
+
+# Full metrics tibble (one row per model)
+compute_metrics <- function(actual, prob, model_name = "Model") {
+  valid  <- !is.na(actual) & !is.na(prob)
+  actual <- actual[valid]; prob <- prob[valid]
+  roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
+  auc_val <- as.numeric(pROC::auc(roc_obj))
+  thr     <- best_thresh(roc_obj)
+  pred_cl <- as.integer(prob >= thr)
+
+  tp <- sum(actual == 1 & pred_cl == 1); tn <- sum(actual == 0 & pred_cl == 0)
+  fp <- sum(actual == 0 & pred_cl == 1); fn <- sum(actual == 1 & pred_cl == 0)
+  sens <- if ((tp+fn) == 0) NA_real_ else tp / (tp+fn)
+  spec <- if ((tn+fp) == 0) NA_real_ else tn / (tn+fp)
+  prec <- if ((tp+fp) == 0) NA_real_ else tp / (tp+fp)
+  f1   <- if (is.na(prec) || is.na(sens) || (prec+sens) == 0) NA_real_ else
+            2 * prec * sens / (prec + sens)
+  mcc_den <- sqrt(as.numeric(tp+fp) * as.numeric(tp+fn) *
+                  as.numeric(tn+fp) * as.numeric(tn+fn))
+  mcc_val <- if (mcc_den == 0) NA_real_ else (tp*tn - fp*fn) / mcc_den
+
+  eps     <- 1e-15
+  logloss <- -mean(actual * log(pmax(prob, eps)) + (1-actual) * log(pmax(1-prob, eps)))
+  brier   <- mean((prob - actual)^2)
+
+  # PR-AUC via trapezoid rule over pROC coords
+  pr_raw <- pROC::coords(roc_obj, "all",
+                          ret = c("sensitivity", "precision"),
+                          transpose = FALSE, drop = FALSE)
+  names(pr_raw)[names(pr_raw) == "sensitivity"] <- "recall"
+  pr_raw <- pr_raw %>%
+    filter(!is.nan(precision), !is.na(precision), !is.nan(recall)) %>%
+    arrange(recall)
+  pr_auc_val <- if (nrow(pr_raw) >= 2)
+    sum(diff(pr_raw$recall) *
+          (head(pr_raw$precision, -1) + tail(pr_raw$precision, -1)) / 2)
+  else NA_real_
+
+  tibble(
+    Model       = model_name,
+    AUC         = round(auc_val, 4),
+    PR_AUC      = round(pr_auc_val, 4),
+    Log_Loss    = round(logloss, 4),
+    Brier       = round(brier, 4),
+    Threshold   = round(thr, 4),
+    Sensitivity = round(sens, 3),
+    Specificity = round(spec, 3),
+    Precision   = round(prec, 3),
+    F1          = round(f1, 3),
+    MCC         = round(mcc_val, 3),
+    Bal_Acc     = round(if (!is.na(sens) && !is.na(spec)) (sens+spec)/2
+                        else NA_real_, 3)
+  )
+}
+
+# ROC curve (single model)
+plot_roc_single <- function(actual, prob, title = "ROC Curve") {
+  roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
+  auc_lbl <- paste0("AUC = ", round(as.numeric(pROC::auc(roc_obj)), 4))
+  pROC::ggroc(roc_obj, colour = "#2c7bb6", linewidth = 0.9) +
+    geom_abline(slope = 1, intercept = 1, linetype = "dashed", colour = "grey60") +
+    annotate("text", x = 0.25, y = 0.06, label = auc_lbl,
+             colour = "#2c7bb6", size = 4) +
+    labs(x = "Specificity", y = "Sensitivity", title = title) +
+    theme_minimal(base_size = 11) + theme(panel.grid.minor = element_blank())
+}
+
+# Precision-Recall curve (single model)
+plot_pr_single <- function(actual, prob, title = "Precision-Recall Curve") {
+  roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
+  pr_raw  <- pROC::coords(roc_obj, "all",
+                           ret = c("sensitivity", "precision"),
+                           transpose = FALSE, drop = FALSE)
+  names(pr_raw)[names(pr_raw) == "sensitivity"] <- "recall"
+  pr_df <- pr_raw %>%
+    filter(!is.nan(precision), !is.na(precision)) %>% arrange(recall)
+  pr_auc_lbl <- if (nrow(pr_df) >= 2) {
+    v <- sum(diff(pr_df$recall) *
+               (head(pr_df$precision,-1) + tail(pr_df$precision,-1)) / 2)
+    paste0("PR-AUC = ", round(v, 4))
+  } else "PR-AUC = NA"
+  baseline <- mean(actual)
+  ggplot(pr_df, aes(x = recall, y = precision)) +
+    geom_line(colour = "#d73027", linewidth = 0.9) +
+    geom_hline(yintercept = baseline, linetype = "dashed", colour = "grey55") +
+    annotate("text", x = 0.02, y = baseline + 0.015,
+             label = paste0("No-skill = ", round(baseline, 3)),
+             colour = "grey40", size = 3.2, hjust = 0) +
+    annotate("text", x = 0.55, y = 0.90, label = pr_auc_lbl,
+             colour = "#d73027", size = 4) +
+    scale_x_continuous(limits = c(0, 1)) + scale_y_continuous(limits = c(0, 1)) +
+    labs(x = "Recall", y = "Precision", title = title) +
+    theme_minimal(base_size = 11) + theme(panel.grid.minor = element_blank())
+}
+
+# Calibration (reliability) plot
+plot_calibration_single <- function(actual, prob, title = "Calibration Plot",
+                                    n_bins = 10) {
+  brks  <- unique(quantile(prob, seq(0, 1, length.out = n_bins + 1), na.rm = TRUE))
+  cal_df <- tibble(actual = actual, prob = prob) %>%
+    mutate(bin = cut(prob, breaks = brks, include.lowest = TRUE)) %>%
+    filter(!is.na(bin)) %>%
+    group_by(bin) %>%
+    summarise(mean_pred = mean(prob), mean_obs = mean(actual),
+              n = n(), .groups = "drop")
+  ggplot(cal_df, aes(x = mean_pred, y = mean_obs)) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey55") +
+    geom_line(colour = "#2c7bb6", linewidth = 0.8) +
+    geom_point(aes(size = n), colour = "#2c7bb6", alpha = 0.85) +
+    scale_size_continuous(name = "Count", range = c(2, 9)) +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 0.1)) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 0.1)) +
+    labs(x = "Mean predicted probability", y = "Observed positive rate",
+         title = title,
+         caption = "Size ∝ bin count.  Dashed = perfect calibration.") +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "bottom", panel.grid.minor = element_blank())
+}
+
+# Threshold analysis: sensitivity, specificity, precision, F1 vs threshold
+plot_threshold_single <- function(actual, prob, title = "Threshold Analysis") {
+  roc_obj  <- pROC::roc(actual, prob, quiet = TRUE)
+  thr_data <- pROC::coords(roc_obj, "all",
+                            ret = c("threshold","sensitivity","specificity","precision"),
+                            transpose = FALSE, drop = FALSE) %>%
+    filter(is.finite(threshold), threshold >= 0, threshold <= 1) %>%
+    mutate(f1 = ifelse(!is.nan(precision) & (precision + sensitivity) > 0,
+                       2 * precision * sensitivity / (precision + sensitivity), 0)) %>%
+    pivot_longer(c(sensitivity, specificity, precision, f1),
+                 names_to = "Metric", values_to = "Value") %>%
+    mutate(Metric = recode(Metric,
+      sensitivity = "Sensitivity", specificity = "Specificity",
+      precision   = "Precision",   f1          = "F1 Score"))
+  thr_opt <- best_thresh(roc_obj)
+  ggplot(thr_data, aes(x = threshold, y = Value, colour = Metric)) +
+    geom_line(linewidth = 0.75, na.rm = TRUE) +
+    geom_vline(xintercept = thr_opt, linetype = "dashed",
+               colour = "grey35", linewidth = 0.55) +
+    annotate("text", x = thr_opt, y = 0.04,
+             label = paste0("Youden\n", round(thr_opt, 3)),
+             hjust = -0.08, size = 3, colour = "grey30") +
+    scale_colour_viridis_d(option = "turbo", begin = 0.05, end = 0.92) +
+    scale_y_continuous(limits = c(0, 1)) +
+    labs(x = "Threshold", y = "Metric value", colour = NULL, title = title,
+         caption = "Dashed: Youden's J optimal threshold") +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "bottom", panel.grid.minor = element_blank())
+}
+
+# 2×2 evaluation panel (ROC | PR) / (Calibration | Threshold)
+eval_quad_plot <- function(actual, prob, model_name) {
+  p1 <- plot_roc_single(actual, prob,   paste(model_name, "— ROC"))
+  p2 <- plot_pr_single(actual, prob,    paste(model_name, "— Precision-Recall"))
+  p3 <- plot_calibration_single(actual, prob, paste(model_name, "— Calibration"))
+  p4 <- plot_threshold_single(actual, prob, paste(model_name, "— Threshold Analysis"))
+  (p1 | p2) / (p3 | p4)
+}
+```
+
+```{r}
+# One-row data frame of modal / median values for a set of variable names
+build_modal_row <- function(data, vars) {
+  row_list <- lapply(vars, function(v) {
+    x <- data[[v]]
+    if (is.factor(x)) {
+      factor(names(sort(table(x), decreasing = TRUE))[1], levels = levels(x))
+    } else if (is.numeric(x)) {
+      median(x, na.rm = TRUE)
+    } else {
+      names(sort(table(x), decreasing = TRUE))[1]
+    }
+  })
+  as.data.frame(setNames(row_list, vars))
+}
 ```
 
 ---
@@ -400,6 +671,51 @@ df_a  <- lrt_a[["Df"]][2]
 p_a   <- lrt_a[["Pr(>Chi)"]][2]
 cat(sprintf("LRT (a): χ²(%d) = %.2f,  p = %.4g\n", df_a, chi_a, p_a))
 ```
+
+This likelihood ratio test (LRT) compares two nested logistic regression models:
+
+* **Model 1:** Uses **time_bracket** (a categorical grouping of hours).
+* **Model 2:** Uses **hour** (individual hours) instead of **time_bracket**.
+
+The hypotheses are:
+
+* **H₀:** `time_bracket` explains the data as well as `hour` (the simpler model is sufficient).
+* **H₁:** Using `hour` provides a significantly better fit.
+
+#### Results
+
+* Likelihood ratio statistic: **χ²(18) = 1506.36**
+* Degrees of freedom: **18**
+* **p = 2.05 × 10⁻³⁰⁹** (reported by R as `< 2.2e-16` in the ANOVA table because of printing limits)
+
+#### Interpretation
+
+The LRT is highly significant (**χ²(18) = 1506.36, p < .001**). Therefore, you reject the null hypothesis and conclude that replacing **time_bracket** with the more detailed **hour** variable significantly improves model fit.
+
+The residual deviance decreases from:
+
+* **448,316** (Model 1)
+* to **446,809** (Model 2)
+
+a reduction of **1,506.36**, which is far larger than would be expected by chance.
+
+#### Practical interpretation
+
+Statistically, **hour** captures meaningful variation in arrest probability that is lost when hours are grouped into broader time brackets. This suggests that the relationship between time of day and arrests is more nuanced than the categories in `time_bracket` can represent.
+
+However, because your sample size is extremely large (over **1.7 million observations**), even relatively small improvements in fit can produce extremely small p-values. Therefore, it is also useful to assess whether the improvement is practically meaningful by comparing measures such as:
+
+* **AIC** (lower is better),
+* **BIC** (if model parsimony is important),
+* pseudo-(R^2),
+* or predictive performance (e.g., cross-validated AUC or log loss).
+
+#### Example write-up (APA style)
+
+> A likelihood ratio test was conducted to compare a logistic regression model including **time_bracket** with a model including **hour**. The model with **hour** provided a significantly better fit to the data, **χ²**(18) = **1506.36**, *p* < .001, indicating that modeling the specific hour of the day explains arrest outcomes better than using broader time-of-day categories.
+
+This is an appropriate conclusion if your goal is to justify using `hour` instead of `time_bracket` in the final model.
+
 
 ### CV AUC
 
@@ -1368,121 +1684,15 @@ eval_quad_plot(test$arrested, prob_lda, "LDA")
 
 ---
 
-# iv · QDA
-
-## Assumptions and Setup
-
-Quadratic Discriminant Analysis assumes each class follows a multivariate normal distribution with its own covariance matrix. This assumption is technically violated because our predictors are discrete (factor dummies), but QDA is often robust to this in practice when the sample size is large. Two specific caveats apply here:
-
--   **Class imbalance**: the arrested = 1 class represents ≈ 5.5% of training observations; the class-specific covariance matrix is estimated from this smaller sample.
--   **Dimensionality**: after dummy encoding the final formula produces `r ncol(model.matrix(f_final, train[1,])) - 1` features. The minority class has roughly `r sum(train$arrested)` observations, which exceeds the feature count, so the covariance matrix is full-rank.
-
-```{r load-MASS, include=FALSE}
-if (!requireNamespace("MASS", quietly = TRUE)) install.packages("MASS")
-# Do NOT library(MASS) — it masks dplyr::select; use MASS:: prefix throughout
-```
-
-## Model Fit
-
-```{r fit-qda}
-mod_qda <- MASS::qda(f_final, data = train)
-```
-
-## Prior Probabilities and Group Means
-
-`MASS::qda` reports the estimated prior probabilities (class proportions in the training set) and the within-class means of every dummy variable. The group means reveal which features are most discriminative.
-
-```{r qda-priors}
-cat("Prior probabilities:\n")
-print(mod_qda$prior)
-```
-
-```{r qda-means-plot, fig.width=11, fig.height=5}
-means_df <- as.data.frame(t(mod_qda$means)) %>%
-  tibble::rownames_to_column("feature") %>%
-  rename(arrested_0 = `0`, arrested_1 = `1`) %>%
-  mutate(
-    diff      = arrested_1 - arrested_0,
-    direction = ifelse(diff > 0, "Higher in arrested", "Lower in arrested"),
-    feature   = stringr::str_wrap(feature, 22)
-  ) %>%
-  arrange(desc(abs(diff)))
-
-ggplot(head(means_df, 30), aes(x = diff, y = reorder(feature, diff), fill = direction)) +
-  geom_col(width = 0.7) +
-  geom_vline(xintercept = 0, linewidth = 0.4) +
-  scale_fill_manual(values = c("Higher in arrested" = "#d73027", "Lower in arrested" = "#2c7bb6")) +
-  labs(
-    x     = "Mean difference  (arrested=1) − (arrested=0)",
-    y     = NULL,
-    fill  = NULL,
-    title = "QDA — Top 30 features by within-class mean difference"
-  ) +
-  theme_minimal(base_size = 10) +
-  theme(legend.position = "bottom", panel.grid.minor = element_blank())
-```
-
-## Evaluation on the Test Set
-
-```{r qda-eval}
-pred_qda  <- predict(mod_qda, newdata = test)
-prob_qda  <- pred_qda$posterior[, "1"]
-roc_qda   <- pROC::roc(test$arrested, prob_qda, quiet = TRUE)
-auc_qda   <- as.numeric(pROC::auc(roc_qda))
-thr_qda   <- best_thresh(roc_qda)
-class_qda <- as.integer(prob_qda >= thr_qda)
-met_qda   <- class_metrics(test$arrested, class_qda)
-
-cat(sprintf(
-  "AUC: %.4f  |  Threshold (Youden): %.4f\nSensitivity: %.3f  |  Specificity: %.3f  |  Balanced accuracy: %.3f\n",
-  auc_qda, thr_qda, met_qda$sensitivity, met_qda$specificity, met_qda$balanced_acc
-))
-```
-
-```{r qda-cm-plot, fig.width=4, fig.height=3.5}
-plot_cm(test$arrested, class_qda, title = "QDA — Confusion Matrix (Youden threshold)")
-```
-
-```{r qda-posterior-hist, fig.width=7, fig.height=3.5}
-tibble(prob = prob_qda, actual = factor(test$arrested, levels = c(0,1),
-                                        labels = c("Not arrested","Arrested"))) %>%
-  ggplot(aes(x = prob, fill = actual)) +
-  geom_histogram(bins = 60, position = "identity", alpha = 0.65) +
-  geom_vline(xintercept = thr_qda, linetype = "dashed", colour = "grey30") +
-  scale_fill_viridis_d(option = "mako", begin = 0.3, end = 0.8) +
-  scale_x_log10(labels = scales::label_number(accuracy = 0.001)) +
-  labs(
-    x     = "Predicted probability (log scale)",
-    y     = "Count",
-    fill  = NULL,
-    title = "QDA — Posterior probability distribution by class",
-    caption = "Dashed line: Youden optimal threshold"
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(legend.position = "bottom")
-```
-
-```{r qda-metrics-table}
-compute_metrics(test$arrested, prob_qda, "QDA") %>%
-  kbl(
-    caption   = "QDA — full evaluation metrics (test set, Youden threshold)",
-    col.names = c("Model","AUC","PR-AUC","Log-Loss","Brier",
-                  "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
-  ) %>%
-  kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
-```
-
-```{r qda-eval-plots, fig.width=10, fig.height=8}
-eval_quad_plot(test$arrested, prob_qda, "QDA")
-```
-
----
-
 # v · Naive Bayes
 
 ## Assumptions and Setup
 
-Naive Bayes assumes conditional independence of all features given the class label. For purely categorical predictors it estimates a frequency table per feature–class combination (with optional Laplace smoothing to prevent zero-probability cells). The independence assumption is almost certainly violated—time of day, area, and demographic features are correlated—but Naive Bayes often produces competitive probabilistic rankings even when it is. The Laplace smoothing parameter $k$ is the only tuning knob; it is selected by 10-fold cross-validated AUC on the training set using the same folds as section ii.
+Naive Bayes assumes conditional independence of all features given the class label. 
+
+For purely categorical predictors it estimates a frequency table per feature–class combination (with optional Laplace smoothing to prevent zero-probability cells). 
+
+The independence assumption is almost certainly violated here. In fact, time of day, area, and demographic features are usually correlated. However, Naive Bayes often produces competitive probabilistic rankings even when it is. The Laplace smoothing parameter $k$ is the only tuning knob; it is selected by 10-fold cross-validated AUC on the training set using the same folds as section ii.
 
 ```{r load-e1071, include=FALSE}
 if (!requireNamespace("e1071", quietly = TRUE)) install.packages("e1071")
@@ -1614,142 +1824,6 @@ compute_metrics(test$arrested, prob_nb, "Naive Bayes") %>%
 
 ```{r nb-eval-plots, fig.width=10, fig.height=8}
 eval_quad_plot(test$arrested, prob_nb, "Naive Bayes")
-```
-
----
-
-# vi · Ridge
-
-## Setup
-
-Logistic Ridge penalises the sum of squared coefficient values ($\ell_2$ penalty), which shrinks all coefficients toward zero but never sets them exactly to zero — unlike LASSO there is no implicit variable selection. We use `glmnet` with `family = "binomial"` and `alpha = 0` (pure Ridge). The same model matrix (`X_train`, `X_test`) and fold assignments (`cv_folds`) from the LASSO section are reused for a fair comparison. $\lambda$ is selected by maximising cross-validated AUC.
-
-```{r load-glmnet-ridge, include=FALSE}
-if (!requireNamespace("glmnet", quietly = TRUE)) install.packages("glmnet")
-library(glmnet)
-```
-
-```{r ridge-matrix, include=FALSE}
-mm_train       <- model.frame(f_final, data = train, na.action = na.omit)
-X_train        <- model.matrix(f_final, data = mm_train)[, -1]
-y_train        <- mm_train$arrested
-
-mm_test  <- model.frame(f_final, data = test, na.action = na.omit)
-X_test   <- model.matrix(f_final, data = mm_test)[, -1]
-y_test   <- mm_test$arrested
-```
-
-## Cross-Validated Lambda
-
-```{r fit-ridge-cv, cache=TRUE}
-cv_ridge <- cv.glmnet(
-  X_train, y_train,
-  family       = "binomial",
-  alpha        = 0,
-  nfolds = 10,
-  type.measure = "auc"
-)
-
-cat(sprintf(
-  "λ.min  = %.6f  (CV AUC = %.4f)\nλ.1se  = %.6f  (CV AUC = %.4f)\n",
-  cv_ridge$lambda.min, max(cv_ridge$cvm),
-  cv_ridge$lambda.1se,
-  cv_ridge$cvm[cv_ridge$lambda == cv_ridge$lambda.1se]
-))
-```
-
-```{r ridge-cv-plot, fig.width=7, fig.height=4}
-cv_df_ridge <- tibble(
-  log_lambda = log(cv_ridge$lambda),
-  cvm        = cv_ridge$cvm,
-  cvup       = cv_ridge$cvup,
-  cvlo       = cv_ridge$cvlo
-)
-
-ggplot(cv_df_ridge, aes(x = log_lambda, y = cvm)) +
-  geom_ribbon(aes(ymin = cvlo, ymax = cvup), alpha = 0.15, fill = "#1a9641") +
-  geom_line(colour = "#1a9641") +
-  geom_point(size = 0.8, colour = "#1a9641") +
-  geom_vline(xintercept = log(cv_ridge$lambda.min), linetype = "dashed",
-             colour = "#d73027", linewidth = 0.7) +
-  geom_vline(xintercept = log(cv_ridge$lambda.1se), linetype = "dashed",
-             colour = "#fdae61", linewidth = 0.7) +
-  annotate("text", x = log(cv_ridge$lambda.min), y = min(cv_df_ridge$cvlo),
-           label = "λ.min", colour = "#d73027", hjust = -0.1, size = 3.5) +
-  annotate("text", x = log(cv_ridge$lambda.1se), y = min(cv_df_ridge$cvlo),
-           label = "λ.1se", colour = "#b36200", hjust = -0.1, size = 3.5) +
-  labs(
-    x     = "log(λ)",
-    y     = "10-fold CV AUC",
-    title = "Ridge — Cross-validated AUC vs regularisation strength"
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
-```
-
-## Top Coefficients at λ.min
-
-Unlike LASSO, Ridge retains all predictors. We display the top 30 by absolute coefficient magnitude.
-
-```{r ridge-coef-plot, fig.width=8, fig.height=6}
-cf_ridge <- coef(cv_ridge, s = "lambda.min")
-coef_ridge_df <- tibble(
-  feature  = rownames(cf_ridge)[-1],
-  estimate = as.numeric(cf_ridge[-1])
-) %>%
-  arrange(desc(abs(estimate))) %>%
-  head(30) %>%
-  mutate(
-    direction = ifelse(estimate > 0, "Increases odds", "Decreases odds"),
-    feature   = stringr::str_wrap(feature, 30)
-  )
-
-ggplot(coef_ridge_df, aes(x = estimate, y = reorder(feature, estimate), fill = direction)) +
-  geom_col(width = 0.7) +
-  geom_vline(xintercept = 0, linewidth = 0.4) +
-  scale_fill_manual(values = c("Increases odds" = "#d73027", "Decreases odds" = "#2c7bb6")) +
-  labs(
-    x     = "Ridge coefficient (log-odds scale, λ.min)",
-    y     = NULL,
-    fill  = NULL,
-    title = "Ridge — Top 30 coefficients by absolute magnitude"
-  ) +
-  theme_minimal(base_size = 10) +
-  theme(legend.position = "bottom", panel.grid.minor = element_blank())
-```
-
-## Evaluation on the Test Set
-
-```{r ridge-eval}
-prob_ridge <- as.numeric(predict(cv_ridge, newx = X_test, s = "lambda.min", type = "response"))
-roc_ridge  <- pROC::roc(y_test, prob_ridge, quiet = TRUE)
-auc_ridge  <- as.numeric(pROC::auc(roc_ridge))
-thr_ridge  <- best_thresh(roc_ridge)
-class_ridge <- as.integer(prob_ridge >= thr_ridge)
-met_ridge   <- class_metrics(y_test, class_ridge)
-
-cat(sprintf(
-  "AUC: %.4f  |  Threshold (Youden): %.4f\nSensitivity: %.3f  |  Specificity: %.3f  |  Balanced accuracy: %.3f\n",
-  auc_ridge, thr_ridge, met_ridge$sensitivity, met_ridge$specificity, met_ridge$balanced_acc
-))
-```
-
-```{r ridge-cm-plot, fig.width=4, fig.height=3.5}
-plot_cm(y_test, class_ridge, title = "Ridge — Confusion Matrix (Youden threshold)")
-```
-
-```{r ridge-metrics-table}
-compute_metrics(y_test, prob_ridge, "Ridge (λ.min)") %>%
-  kbl(
-    caption   = "Ridge — full evaluation metrics (test set, Youden threshold)",
-    col.names = c("Model","AUC","PR-AUC","Log-Loss","Brier",
-                  "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
-  ) %>%
-  kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
-```
-
-```{r ridge-eval-plots, fig.width=10, fig.height=8}
-eval_quad_plot(y_test, prob_ridge, "Ridge (λ.min)")
 ```
 
 ---
@@ -1978,167 +2052,6 @@ eval_quad_plot(y_test, prob_lasso_1se, "LASSO (λ.1se)")
 
 ---
 
-# viii · KNN
-
-## Setup
-
-K-Nearest Neighbours classifies each observation by a kernel-weighted vote among its $k$ nearest training neighbours. KNN is non-parametric and distance-based, requiring consistent feature scales. Categorical predictors enter via Gower's distance (via `kknn`), which handles mixed-type inputs without manual dummy encoding; `scale = TRUE` standardises numeric columns internally.
-
-Two choices shape the training data:
-
--   **Class balance**: equal draws from arrested = 0 and arrested = 1 give KNN balanced local neighbourhoods; without this the dominant class drowns minority-class signal.
--   **Size cap (15 000 rows)**: LOO-CV for $k$ selection scales $O(n^2)$ — 15 000 rows makes it tractable.
-
-The test set is evaluated at its original size and class distribution.
-
-```{r load-kknn, include=FALSE}
-if (!requireNamespace("kknn", quietly = TRUE)) install.packages("kknn")
-```
-
-## Balanced Downsample and Scaling
-
-We dummy-encode `f_final` via `model.matrix` (same approach as Ridge/LASSO), then scale using training-set statistics so no test information leaks into the scaling step.
-
-```{r knn-downsample}
-set.seed(2026)
-idx_pos  <- which(train$arrested == 1)
-idx_neg  <- which(train$arrested == 0)
-n_per_cl <- min(floor(15000 / 2), length(idx_pos))
-
-# Raw balanced subsample (factor columns still needed for model.matrix)
-train_knn_raw <- bind_rows(
-  train[sample(idx_pos, n_per_cl), ],
-  train[sample(idx_neg, n_per_cl), ]
-)
-
-cat(sprintf(
-  "KNN training set: %d rows  |  Arrested: %.1f%%  (n_per_class = %d)\n",
-  nrow(train_knn_raw), 100 * mean(train_knn_raw$arrested), n_per_cl
-))
-```
-
-```{r knn-scale}
-# 1. Align and clean missing values using model.frame
-mm_knn_train <- model.frame(f_final, data = train_knn_raw, na.action = na.omit)
-X_knn_tr_raw <- model.matrix(f_final, data = mm_knn_train)[, -1]
-y_knn_train  <- mm_knn_train$arrested
-
-mm_knn_test  <- model.frame(f_final, data = test, na.action = na.omit)
-X_knn_te_raw <- model.matrix(f_final, data = mm_knn_test)[, -1]
-y_knn_test   <- mm_knn_test$arrested
-
-# 2. Scale with train statistics (Keep your existing scaling logic here)
-tr_means <- colMeans(X_knn_tr_raw, na.rm = TRUE)
-tr_sds   <- apply(X_knn_tr_raw, 2, sd, na.rm = TRUE)
-tr_sds[is.na(tr_sds) | tr_sds == 0] <- 1
-
-X_knn_tr <- scale(X_knn_tr_raw, center = tr_means, scale = tr_sds)
-X_knn_te <- scale(X_knn_te_raw, center = tr_means, scale = tr_sds)
-
-X_knn_tr[!is.finite(X_knn_tr)] <- 0
-X_knn_te[!is.finite(X_knn_te)] <- 0
-
-colnames(X_knn_tr) <- make.names(colnames(X_knn_tr), unique = TRUE)
-colnames(X_knn_te) <- make.names(colnames(X_knn_te), unique = TRUE)
-
-# 3. Attach the correctly aligned response vectors
-resp_levels <- c("0", "1")
-df_knn_tr <- as.data.frame(X_knn_tr)
-df_knn_tr$arrested <- factor(y_knn_train, levels = resp_levels) # <-- Fixed
-
-df_knn_te <- as.data.frame(X_knn_te)
-df_knn_te$arrested <- factor(y_knn_test, levels = resp_levels)   # <-- Fixed
-
-f_knn <- arrested ~ .
-cat("KNN feature matrix:", nrow(X_knn_tr), "×", ncol(X_knn_tr), "\n")
-```
-
-## k Tuning via LOO-CV
-
-```{r knn-tune, cache=TRUE}
-set.seed(2026)
-knn_tune <- kknn::train.kknn(
-  f_knn, data  = df_knn_tr,
-  kmax   = 21,
-  kernel = "optimal"
-)
-
-best_k <- knn_tune$best.parameters$k
-cat("Best k:", best_k, "\n")
-```
-
-```{r knn-tune-plot, fig.width=7, fig.height=3.5}
-tibble(
-  k     = seq_len(21),
-  error = as.numeric(knn_tune$MISCLASS[, "optimal"])
-) %>%
-  ggplot(aes(x = k, y = error)) +
-  geom_line(colour = "#2c7bb6") +
-  geom_point(colour = "#2c7bb6", size = 2) +
-  geom_vline(xintercept = best_k, linetype = "dashed", colour = "#d73027") +
-  annotate("text", x = best_k, y = max(as.numeric(knn_tune$MISCLASS[, "optimal"])),
-           label = paste0("k = ", best_k), colour = "#d73027",
-           hjust = -0.15, size = 3.5) +
-  labs(
-    x     = "k (number of neighbours)",
-    y     = "LOO misclassification rate",
-    title = "KNN — LOO-CV misclassification rate vs k (optimal kernel)"
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
-```
-
-## Evaluation on the Test Set
-
-```{r knn-eval}
-knn_fit <- kknn::kknn(
-  f_knn,
-  train     = df_knn_tr,
-  test      = df_knn_te,
-  k         = best_k,
-  kernel    = "optimal",
-  na.action = na.pass
-)
-
-# Positive class column: kknn coerces response to factor; locate "1" level
-pos_col  <- which(colnames(knn_fit$prob) == "1")
-if (length(pos_col) == 0) pos_col <- ncol(knn_fit$prob)
-prob_knn  <- as.numeric(knn_fit$prob[, pos_col])
-
-# CHANGE test$arrested TO y_knn_test TO MATCH COV-MATRIX ROWS
-roc_knn   <- pROC::roc(y_knn_test, prob_knn, quiet = TRUE) # <-- Fixed
-auc_knn   <- as.numeric(pROC::auc(roc_knn))
-thr_knn   <- best_thresh(roc_knn)
-class_knn <- as.integer(prob_knn >= thr_knn)
-met_knn   <- class_metrics(y_knn_test, class_knn)          # <-- Fixed
-
-cat(sprintf(
-  "AUC: %.4f  |  Threshold (Youden): %.4f\nSensitivity: %.3f  |  Specificity: %.3f  |  Balanced accuracy: %.3f\n",
-  auc_knn, thr_knn, met_knn$sensitivity, met_knn$specificity, met_knn$balanced_acc
-))
-```
-
-```{r knn-cm-plot, fig.width=4, fig.height=3.5}
-plot_cm(y_knn_test, class_knn,
-        title = sprintf("KNN (k = %d) — Confusion Matrix (Youden threshold)", best_k))
-```
-
-```{r knn-metrics-table}
-compute_metrics(y_knn_test, prob_knn, sprintf("KNN (k = %d)", best_k)) %>%
-  kbl(
-    caption   = sprintf("KNN (k = %d) — full evaluation metrics (test set, Youden threshold)", best_k),
-    col.names = c("Model","AUC","PR-AUC","Log-Loss","Brier",
-                  "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
-  ) %>%
-  kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
-```
-
-```{r knn-eval-plots, fig.width=10, fig.height=8}
-eval_quad_plot(y_knn_test, prob_knn, sprintf("KNN (k = %d)", best_k))
-```
-
----
-
 # ix · GAM
 
 ## Setup
@@ -2228,12 +2141,9 @@ eval_quad_plot(test$arrested, prob_gam, "GAM")
 roc_list <- list(
   "Logistic"     = roc_logit,
   "LDA"          = roc_lda,
-  "QDA"          = roc_qda,
   "Naive Bayes"  = roc_nb,
-  "Ridge λ.min"  = roc_ridge,
   "LASSO λ.min"  = roc_lasso_min,
   "LASSO λ.1se"  = roc_lasso_1se,
-  "KNN"          = roc_knn,
   "GAM"          = roc_gam
 )
 
@@ -2257,12 +2167,9 @@ pROC::ggroc(roc_list, linewidth = 0.8) +
 bind_rows(
   compute_metrics(test$arrested, prob_logit,     "Logistic"),
   compute_metrics(test$arrested, prob_lda,       "LDA"),
-  compute_metrics(test$arrested, prob_qda,       "QDA"),
   compute_metrics(test$arrested, prob_nb,        "Naive Bayes"),
-  compute_metrics(y_test,        prob_ridge,     "Ridge (λ.min)"),
   compute_metrics(y_test,        prob_lasso_min, "LASSO λ.min"),
   compute_metrics(y_test,        prob_lasso_1se, "LASSO λ.1se"),
-  compute_metrics(y_knn_test, prob_knn,       sprintf("KNN (k = %d)", best_k)),
   compute_metrics(test$arrested, prob_gam,       "GAM")
 ) %>%
   kbl(
@@ -2272,7 +2179,7 @@ bind_rows(
   ) %>%
   kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = TRUE) %>%
   row_spec(
-    which.max(c(as.numeric(pROC::auc(roc_logit)), auc_lda, auc_qda, auc_nb, auc_ridge, auc_lasso_min, auc_lasso_1se, auc_knn, auc_gam)),
+    which.max(c(as.numeric(pROC::auc(roc_logit)), auc_lda, auc_nb, auc_lasso_min, auc_lasso_1se, auc_gam)),
     bold = TRUE, color = "white", background = "#2c7bb6"
     )
 ```
@@ -2424,94 +2331,6 @@ ggplot(lda_scores, aes(x = LD1, fill = arrested, colour = arrested)) +
 ```
 
 Well-separated modes indicate that LD1 alone carries strong discriminative signal. Significant overlap—common when the positive class is rare and the feature space is high-dimensional—explains why AUC is imperfect even when the linear boundary is optimal under Gaussian assumptions.
-
----
-
-## QDA — Posterior Probability Separation
-
-QDA does not produce a single linear score; it estimates class-conditional Gaussians with separate covariance matrices per class and returns posterior probabilities directly. Plotting the distribution of $\hat{P}(\text{arrested} = 1 \mid \mathbf{x})$ by true class reveals whether QDA assigns high confidence to the correct class: a well-calibrated and discriminating model concentrates the positive class near 1 and the negative class near 0.
-
-```{r qda-posterior-density, fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
-qda_post <- data.frame(
-  prob_arrested = predict(mod_qda, newdata = test)$posterior[, "1"],
-  arrested      = factor(test$arrested, levels = c(0, 1),
-                         labels = c("Not arrested (0)", "Arrested (1)"))
-)
-
-ggplot(qda_post, aes(x = prob_arrested, fill = arrested, colour = arrested)) +
-  geom_density(alpha = 0.35, linewidth = 0.8) +
-  scale_fill_manual(values   = c("Not arrested (0)" = "#4575b4",
-                                  "Arrested (1)"     = "#d73027")) +
-  scale_colour_manual(values = c("Not arrested (0)" = "#4575b4",
-                                  "Arrested (1)"     = "#d73027")) +
-  scale_x_continuous(limits = c(0, 1), labels = scales::percent_format()) +
-  labs(
-    x        = expression(hat(P)(arrested == 1 ~ "|" ~ bold(x))),
-    y        = "Density",
-    fill     = NULL, colour = NULL,
-    title    = "QDA — Distribution of posterior P(arrested=1) by true class (test set)",
-    subtitle = "Ideal: negatives pile near 0, positives near 1"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(legend.position = "top", panel.grid.minor = element_blank())
-```
-
-If the two density curves overlap substantially in the middle of the probability axis, QDA is uncertain for many observations—reflecting either genuine noise in the features or a violation of its Gaussian equal-covariance assumption (note: unlike LDA, QDA allows unequal covariances, which gives it more flexibility but also more variance in small samples or with sparse classes).
-
----
-
-## Ridge — Coefficient Paths and CV Deviance vs $\lambda$
-
-The coefficient path shows how each predictor's coefficient shrinks as the $\ell_2$ penalty $\lambda$ increases. Unlike LASSO, Ridge never zeroes out coefficients — all shrink smoothly toward zero. The CV deviance curve (right panel) identifies $\lambda_{\min}$ (lowest CV loss) and $\lambda_{\text{1se}}$ (most regularised model within one standard error).
-
-```{r ridge-diag, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
-# Coefficient path
-ridge_fit   <- cv_ridge$glmnet.fit
-coef_mat_r  <- as.matrix(coef(ridge_fit))[-1, ]   # drop intercept row
-log_lam_r   <- log(ridge_fit$lambda)
-
-coef_path_r <- as.data.frame(t(coef_mat_r)) %>%
-  mutate(log_lambda = log_lam_r) %>%
-  tidyr::pivot_longer(-log_lambda, names_to = "predictor", values_to = "coef")
-
-p_ridge_path <- ggplot(coef_path_r,
-                        aes(x = log_lambda, y = coef, group = predictor)) +
-  geom_line(alpha = 0.35, linewidth = 0.5, colour = "#4575b4") +
-  geom_vline(xintercept = log(cv_ridge$lambda.min), linetype = "dashed",
-             colour = "firebrick", linewidth = 0.7) +
-  geom_vline(xintercept = log(cv_ridge$lambda.1se), linetype = "dotted",
-             colour = "darkorange", linewidth = 0.7) +
-  labs(x = expression(log(lambda)), y = "Coefficient",
-       title = "Ridge — Coefficient shrinkage paths",
-       subtitle = "Red dashed = λ.min · Orange dotted = λ.1se") +
-  theme_minimal(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
-
-# CV deviance curve
-cv_df_r <- data.frame(
-  log_lambda = log(cv_ridge$lambda),
-  cvm        = cv_ridge$cvm,
-  cvup       = cv_ridge$cvup,
-  cvlo       = cv_ridge$cvlo
-)
-
-p_ridge_cv <- ggplot(cv_df_r, aes(x = log_lambda, y = cvm)) +
-  geom_ribbon(aes(ymin = cvlo, ymax = cvup), alpha = 0.15, fill = "#4575b4") +
-  geom_line(colour = "#4575b4", linewidth = 0.9) +
-  geom_vline(xintercept = log(cv_ridge$lambda.min), linetype = "dashed",
-             colour = "firebrick", linewidth = 0.7) +
-  geom_vline(xintercept = log(cv_ridge$lambda.1se), linetype = "dotted",
-             colour = "darkorange", linewidth = 0.7) +
-  labs(x = expression(log(lambda)), y = "CV Binomial Deviance",
-       title = "Ridge — Cross-validated deviance",
-       subtitle = "Ribbon = ±1 SE") +
-  theme_minimal(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
-
-p_ridge_path + p_ridge_cv
-```
-
-Ridge paths confirm that no predictor dominates: all coefficients shrink proportionally, and the flat plateau at large $\lambda$ is expected — Ridge always retains the full predictor set. The CV curve's minimum locates the optimal bias–variance trade-off; if $\lambda_{\min}$ and $\lambda_{\text{1se}}$ are far apart, the model is sensitive to regularisation strength.
 
 ---
 
