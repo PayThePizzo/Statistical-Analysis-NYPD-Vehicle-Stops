@@ -59,11 +59,8 @@ The first to do, is to build a reproducible environment for our project.
 
 ```{r}
 requirements=c( 
-  "remotes", "summarytools", "forcats", "scales", "purrr",
-  "stringr", "plyr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
-  "timeDate", "timechange", "tzdb", "hms", "readr", "tigris", "lsr", "corrplot",
-  "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor", "ggbeeswarm", "emmeans",
-  "sf", "plotly", "ggplot2", "ggmap", "ggdensity", "UpSetR", "patchwork"
+  "remotes", "summarytools", "scales", "dplyr", "tidyr", "tidyselect",
+  "tigris", "corrplot", "RColorBrewer", "viridis", "sf", "ggplot2", "patchwork"
 )
 ```
 
