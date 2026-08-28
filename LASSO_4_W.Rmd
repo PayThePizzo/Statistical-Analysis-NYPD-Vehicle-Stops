@@ -25,16 +25,6 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 ---
 
-TODO:
-
-- [ ] Remove extra functions
-- [ ] Remove extra packages
-- [ ] Modify for 4 wheels
-- [ ] Comment Code
-- [ ] Format Code
-
----
-
 # 0) Environment
 
 ## 0.1) Packages
@@ -722,7 +712,7 @@ Finally, the verification code compares the empirical marginal distributions of 
 $$
 \hat{P}_{train}(X=k)
 =
-\frac{\sum_{i \in \mathcal{D}_{train}}\mathbb{I}(X_i=k)}
+\frac{\sum_{i \in \mathcal{D}_{train}} \mathbb{I}(X_i=k)}
 {|\mathcal{D}_{train}|},
 $$
 
@@ -806,8 +796,6 @@ Here, $\lambda \geq 0$ controls the strength of regularization.
 
 We had to exclude `age` as a predictor, since we had missing values that we labeled as `Unknown` in `age_bracket`. Therefore, this is the final formulation of the model
 
-TODO: Write in latex the formulation
-
 ```{r final-model-formula}
 f_final <- arrested ~ year + month + weekday + hour + boro + sex + ethnicity + age_bracket
 ```
@@ -850,14 +838,23 @@ cv_lasso <- cv.glmnet(
 )
 
 cat(sprintf(
-  "λ.min  = %.6f  (CV AUC = %.4f)\nλ.1se  = %.6f  (CV AUC = %.4f)\n",
-  cv_lasso$lambda.min, max(cv_lasso$cvm),
+  "λ.min  = %.6f  (CV AUC = %.4f, SE = %.6f)\nλ.1se  = %.6f  (CV AUC = %.4f, SE = %.6f)\n",
+  cv_lasso$lambda.min,
+  max(cv_lasso$cvm),
+  cv_lasso$cvsd[cv_lasso$lambda == cv_lasso$lambda.min],
   cv_lasso$lambda.1se,
-  cv_lasso$cvm[cv_lasso$lambda == cv_lasso$lambda.1se]
+  cv_lasso$cvm[cv_lasso$lambda == cv_lasso$lambda.1se],
+  cv_lasso$cvsd[cv_lasso$lambda == cv_lasso$lambda.1se]
 ))
 ```
 
-TODO: Comment (brief, we will se in detail later)
+```{r lasso-coef-tables}
+coef_min <- extract_coefs(cv_lasso, "lambda.min")
+coef_1se <- extract_coefs(cv_lasso, "lambda.1se")
+
+cat("Non-zero coefficients at λ.min:", nrow(coef_min), "\n")
+cat("Non-zero coefficients at λ.1se:", nrow(coef_1se), "\n")
+```
 
 ```{r lasso-cv-plot, fig.width=7, fig.height=4}
 # Replicate the cv.glmnet plot in ggplot2
@@ -866,7 +863,8 @@ cv_df <- tibble(
   cvm = cv_lasso$cvm,
   cvup = cv_lasso$cvup,
   cvlo = cv_lasso$cvlo,
-  nzero = cv_lasso$nzero
+  nzero = cv_lasso$nzero,
+  cvsd = cv_lasso$cvsd
 )
 
 ggplot(cv_df, aes(x = log_lambda, y = cvm)) +
@@ -890,42 +888,37 @@ ggplot(cv_df, aes(x = log_lambda, y = cvm)) +
   theme(panel.grid.minor = element_blank())
 ```
 
-TODO: Comment
+### 5.2.1) Interpretation of the lambda's cross-validation curve
+
+At $\lambda_{\text{min}} = 0.000053$
+
+- The model achieves the maximum cross-validated AUC: $\text{AUC} = 0.7394 \pm 0.002211$
+- And it retains **62** non-zero coefficients.
+
+At $\lambda_{\text{1se}} = 0.000711$
+
+- The model is much more strongly regularised as it retains only 53 non-zero coefficients, 
+- But its CV AUC decreases only slightly: $0.7394 \rightarrow 0.7373$
+
+That's a reduction of only $0.7394 - 0.7373 = 0.0021$ in AUC points at $\lambda_{\text{min}}$.
+
+Meanwhile, the number of coefficients falls from 62 to 53:
+
+$$ \frac{62-53}{62}\approx14.5\%. $$
+
+So we have approximately a $14.5\%$ reduction in model complexity for a small change in cross-validated predictive performance (AUC).
+
+The SE makes the 1-SE choice even more meaningful. The standard errors are:
+
+$$ SE_{\text{min}} = 0.002211 \,\, \text{and} \,\, SE_{\text{1se}} = 0.002265 $$
+
+The difference in AUC is $0.0021$ which is on approximately the same scale as the CV standard error. This supports the interpretation that the *apparent advantage* of $\lambda_{\min}$ is very small relative to the uncertainty in the CV estimate.
+
+**What does this say about the training?** The LASSO model achieves approximately the **same predictive performance with substantially stronger regularisation**. This indicates that stronger regularisation can substantially simplify the model without materially degrading predictive performance. Therefore, $\lambda_{1se}$ is to be preferred as we prioritise interpretability and parsimony are prioritised.
 
 ## 5.3) Specific Analysis and Interpretation
 
-### 5.3.1) Lambda and Interpretation
-
-TODO: Show the lambdas and do a comment like this:
-
-EXAMPLE:
-
-```txt
-Lasso Logistic Regression — Cross-Validation for Lambda Selection (Interpretation)
-
-    λ_min = 0.00150778 (x = -log(λ) = 6.4971)
-        CV binomial deviance = 0.7564 (SE = 0.0148)
-        Model complexity: 16 non-zero coefficients
-        Interpretation: this is the best CV performance (lowest deviance), but keeps more predictors.
-    λ_1se = 0.0140616 (x = -log(λ) = 4.2643)
-        CV binomial deviance = 0.7698 (SE = 0.0145)
-        Model complexity: 8 non-zero coefficients
-        Interpretation: this is the 1-SE rule choice: slightly worse deviance but a much simpler model.
-
-What this tells us
-
-    The deviance improvement from λ_1se to λ_min is 0.7698 − 0.7564 = 0.0134, which is small.
-    In exchange, λ_1se reduces the model from 16 → 8 predictors (about 50% fewer).
-
-Practical decision
-
-    If the goal is maximum predictive performance, choose λ_min.
-    If the goal is interpretability + stability with almost the same performance, choose λ_1se
-```
-
-### 5.3.2) Coefficient Path
-
-TODO: Introduce what this plot means, what it represents
+### 5.3.1) Coefficient Path
 
 ```{r lasso-path-plot, fig.width=9, fig.height=5}
 # Tidy the full coefficient path
@@ -959,19 +952,13 @@ ggplot(path_df, aes(x = log_lambda, y = coef, group = feature,
   theme(panel.grid.minor = element_blank())
 ```
 
-TODO: Comment
+A number of coefficient paths are relatively stable over the region between the two vertical lines. In contrast, some coefficients are much more sensitive to regularisation and approach zero as $\lambda$ increases. Even though increasing regularisation eliminates some predictors, the coefficients of many retained predictors remain sufficiently stable that predictive performance changes very little.
 
-### 5.3.2) Selected Non-Zero Coefficients
+This supports using $\lambda_{\text{1se}}$ since our objective is a simpler, more interpretable model rather than squeezing out the absolute maximum CV AUC.
 
-```{r lasso-coef-tables}
-coef_min <- extract_coefs(cv_lasso, "lambda.min")
-coef_1se <- extract_coefs(cv_lasso, "lambda.1se")
+### 5.3.2) Non-Zero Coefficients ats λ.min
 
-cat("Non-zero coefficients at λ.min:", nrow(coef_min), "\n")
-cat("Non-zero coefficients at λ.1se:", nrow(coef_1se), "\n")
-```
-
-#### 5.3.2.1) Non-Zero Coefficients ats λ.min
+This table is useful for interpreting which variables LASSO retains and the direction/magnitude of their association with `arrested = 1`
 
 ```{r lasso-coef-min-table}
 coef_min %>%
@@ -981,8 +968,6 @@ coef_min %>%
   ) %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
 ```
-
-Path plot of the lasso estimates as a function of $\lambda$ on the logarithm scale
 
 ```{r lasso-coef-min-plot, fig.width=8, fig.height=0.35 * nrow(coef_min) + 1.5}
 coef_min %>%
@@ -1004,11 +989,82 @@ coef_min %>%
   theme(legend.position = "bottom", panel.grid.minor = element_blank())
 ```
 
-TODO: Comment
+#### 5.3.2.1) General Interpretation
 
-#### 5.3.2.2) Non-Zero Coefficients ats λ.1se
+At $\lambda_{\text{min}}$, LASSO retains 62 non-zero coefficients. The coefficient is on the log-odds scale:
 
-TODO:
+$$ \log\left(\frac{P(\text{arrested}=1)}{1-P(\text{arrested}=1)}\right) = \beta_0+\sum_j\beta_jX_j. $$
+
+The corresponding odds ratio is
+
+$$ OR_j=e^{\beta_j}. $$
+
+Therefore:
+
+- $\beta_j > 0$, $OR > 1$: higher estimated odds of `arrested = 1`.
+- $\beta_j < 0$, $OR < 1$: lower estimated odds.
+- $\beta_j \approx 0$, $OR \approx 1$: relatively little contribution after regularisation.
+
+Note that, for categorical variables, each coefficient is relative to the omitted reference category.
+
+#### 5.3.2.2) Specific Interpretation
+
+The strongest coefficients are coming from `hour`, `ethnicity`/`sex` and `boro` predictors (in this order).
+ 
+First of all, for what concerns `hour` we have:
+
+| Feature  | Log-odds |    OR |
+| -------- | -------: | ----: |
+| `hour7`  |   -3.141 | 0.043 |
+| `hour6`  |   -2.329 | 0.097 |
+| `hour8`  |   -1.986 | 0.137 |
+| `hour10` |   -1.779 | 0.169 |
+| `hour9`  |   -1.772 | 0.170 |
+| `hour11` |   -1.333 | 0.264 |
+
+
+*How do we interpret this?* Assuming `hour0` is the reference category, $OR_{\text{hour7}} = 0.043$ means that, **holding the other model variables constant, observations occurring at hour 7 have estimated odds of arrest approximately $95.7\%$ lower than the reference hour**:
+
+$$ 1-0.043=0.957$$
+
+We underline this **does not mean that the probability of arrest is** $95.7\%$ **lower**. The odds ratio and probability ratio are different quantities.
+
+**Conclusions**: 
+
+- The **concentration of large coefficients among the hour variables suggests that time of day is one of the strongest predictive dimensions in this model**.
+- There is also a **clear pattern** rather than one isolated hour. In fact, hours 5–17 are **predominantly negative relative to the reference**, while the **coefficients become much closer to zero later in the evening**.
+
+Then, some of the larger non-time coefficients are:
+
+- `ethnicityOther`: $OR = 0.113$
+- `ethnicityUnknown`: $OR = 0.333$
+- `ethnicityAsian / Pacific Islander`: $OR = 0.495$
+- `ethnicityHispanic`: $OR = 1.776$
+- `ethnicityBlack`: $OR = 1.452$
+- `sexF`: $OR = 0.306$
+
+These should be interpreted only relative to the reference categories `ethnicityWhite` and `sexM`.
+
+*How do we interpret this?* `ethnicityBlack` has an estimated odds ratio of $1.452$, meaning approximately $45.2\%$ higher estimated odds of arrest relative to that reference category (`ethnicityWhite`), conditional on the other variables. 
+
+While it is surely incorrect to say that people who self-reported their ethnicity as black are subject to a higher probability of arrest, we can say that they are "associated with higher predicted odds" of arrest (w.r.t the reference category).
+
+Finally, several borough coefficients are relatively large:
+
+- `boroManhattan (North)`: $OR = 0.335$
+- `boroManhattan (South)`: $OR = 0.347$
+- `boroQueens (North)`: $OR = 0.395$
+- `boroBrooklyn (North)`: $OR = 0.420$
+
+The fact that several geographic categories receive quite large coefficients **suggests that where the vehicle stop occurs contains substantial predictive information about whether an arrest is recorded**.
+
+#### 5.3.2.3) Important Remark
+
+Because only $3-5\%$ of observations are arrests, **some combinations of categorical levels may contain very few positive observations**. Large coefficients (especially for relatively uncommon categories) should therefore not automatically be interpreted as strong underlying effects. In fact, LASSO reduces this instability through shrinkage, but it does not eliminate the underlying data sparsity.
+
+### 5.3.3) Non-Zero Coefficients ats λ.1se
+
+If the same major predictors remain at $\lambda_{\text{1se}}$, while mostly small coefficients disappear, that would provide strong evidence that our main predictive relationships are robust to regularisation.
 
 ```{r lasso-coef-1se-table}
 coef_1se %>%
@@ -1018,8 +1074,6 @@ coef_1se %>%
   ) %>%
   kable_styling(bootstrap_options = c("striped", "condensed"), full_width = FALSE)
 ```
-
-Path plot of the lasso estimates as a function of $\lambda$ on the logarithm scale
 
 ```{r lasso-coef-1se-plot, fig.width=8, fig.height=0.35 * nrow(coef_min) + 1.5}
 coef_1se %>%
@@ -1041,14 +1095,100 @@ coef_1se %>%
   theme(legend.position = "bottom", panel.grid.minor = element_blank())
 ```
 
-TODO: Comment
+#### 5.3.3.1) The strongest effects are largely preserved
+
+This comparison is quite informative:
+
+- At $\lambda_{\text{min}}$, our strongest coefficient is $\text{hour7} = -3.14, \,\, \text{OR} = 0.043$
+- At $\lambda_{\text{1se}}$ we have $\text{hour7} = -1.96, \,\, \text{OR} = 0.141$
+
+So the **coefficient is substantially shrunk toward zero** (as LASSO is designed to do) but it **remains one of the strongest predictors**.
+
+The same happens for the other important hour variables:
+
+| Feature  | OR $\lambda_{\text{min}}$ | OR $\lambda_{\text{1se}}$ |
+| -------- | --------------------: | -------------------: |
+| `hour7`  |                 0.043 |                0.141 |
+| `hour8`  |                 0.137 |                0.234 |
+| `hour6`  |                 0.097 |                0.239 |
+| `hour10` |                 0.169 |                0.262 |
+| `hour9`  |                 0.170 |                0.266 |
+| `hour11` |                 0.264 |                0.380 |
+
+Therefore, the **ranking and direction are remarkably stable**.
+
+
+#### 5.3.3.2) The same happens for geography and demographics
+
+Several variables remain strong under more regularisation:
+
+- `boroManhattan (North)`
+- `boroManhattan (South)`
+- `boroQueens (North)`
+- `boroBrooklyn (North)`
+- `sexF`
+- `ethnicityOther`
+- `ethnicityUnknown`
+- `ethnicityAsian / Pacific Islander`
+- `ethnicityHispanic`
+- `ethnicityBlack`
+- `age_bracketUnder 18`
+
+For example:
+
+- $\text{OR}_{\text{Black}}: 1.452 \rightarrow 1.473$
+- $\text{OR}_{\text{Hispanic}}: 1.776 \rightarrow 1.780$
+
+Interestingly, these two coefficients are **almost unchanged**, despite the much larger $\lambda$.
+
+That suggests their **predictive contribution is sufficiently strong that LASSO continues to retain them under stronger regularisation**.
+
+#### 5.3.3.3) The weaker coefficients are heavily shrunk
+
+This is perhaps the most interesting part of the comparison
+
+At $\lambda_{\text{min}}$, we have several coefficients close to zero:
+
+$$
+\begin{aligned}
+\text{sexU} &: -0.0088\\
+\text{weekdayThursday} &: 0.0201\\
+\text{month8} &: 0.0268\\
+\text{hour1} &: 0.0321\\
+\text{weekdayWednesday} &: 0.0428
+\end{aligned}
+$$
+
+At  $\lambda_{\text{1se}}$, these become even closer to zero:
+
+$$
+\begin{aligned}
+\text{age 18--24} &: 0.0012\\
+\text{hour4} &: -0.0020\\
+\text{weekdaySaturday} &: -0.0042\\
+\text{month10} &: 0.0105\\
+\text{weekdayWednesday} &: 0.0132
+\end{aligned}
+$$
+
+These variables are contributing very little to the linear predictor after regularisation.
+
+This is exactly the expected behaviour from LASSO: **stronger regularisation removes weak predictive contributions while preserving the variables that carry more signal**.
+
+#### 5.3.3.4) Final remarks on `hour`
+
+As we said above, the hour coefficients are not simply "important" individually, rather they form a **structured temporal pattern**. In fact, relative to the reference hour:
+
+- hours 2–3 have positive coefficients;
+- hours 5–13 are mainly negative;
+- hours 14–22 are mostly weakly negative or close to zero;
+- hour 23 is positive.
+
+This suggests that **time of day is an important predictor of arrest probability**, rather than one particular hour being responsible for the model's performance. However, because we encoded `hour` as a categorical variable, the model estimates each hour independently relative to the reference hour. It does **not** assume a smooth temporal relationship.
 
 ## 5.4) Evaluation on Test Set
 
-TODO: Intro of metrics used and why
-
 ```{r lasso-eval}
-# TODO: Move the
 prob_lasso_min <- as.numeric(predict(cv_lasso, newx = X_test, s = "lambda.min", type = "response"))
 prob_lasso_1se <- as.numeric(predict(cv_lasso, newx = X_test, s = "lambda.1se", type = "response"))
 
@@ -1078,8 +1218,6 @@ cat(sprintf(
 ))
 ```
 
-TODO: Comment briefly (we see this again down there)
-
 ### 5.4.1) Confusion Matrix and FN/FP Inspection
 
 ```{r lasso-cm-plots, fig.width=8, fig.height=3.5}
@@ -1089,82 +1227,85 @@ p_cm_1se <- plot_cm(y_test, class_lasso_1se, "LASSO (λ.1se) — Confusion Matri
 p_cm_min | p_cm_1se
 ```
 
-TODO: Comment CM
+The confusion matrices reveal an important point that the CV-AUC alone does not: **the two LASSO models have very similar discrimination, but their classification behaviour at the chosen threshold is different.**
 
-Raw counts of misclassified stops are not directly comparable across groups, since groups differ both in size and in their true prevalence of `arrested`. 
+Let us start from the derived metrics:
 
-We therefore recover the original (non dummy-encoded) covariates for the test rows via `mm_test`'s row names, split the misclassifications into false positives (predicted arrest, no arrest occurred) and false negatives (missed an actual arrest), and summarise them as **rates conditional on the true class**: the miss rate $\text{FN}/(\text{FN}+\text{TP})$ within each group, and the false-alarm rate $\text{FP}/(\text{FP}+\text{TN})$. This is the same logic behind equal-opportunity/predictive-equality style fairness diagnostics, and is directly relevant to the "excessive enforcement" framing of the project: a group with a much higher false-alarm rate is one the model is comparatively more prone to over-flag, a group with a much higher miss rate is one whose arrests the model comparatively under-detects.
+| Metric               	| $\lambda_{\text{min}}$ 	| $\lambda_{\text{1se}}$ 	|
+|----------------------	|------------------------	|------------------------	|
+| Accuracy             	| **65.40%**             	| **62.32%**             	|
+| Sensitivity / Recall 	| **61.82%**             	| **65.54%**             	|
+| Specificity          	| **65.64%**             	| **62.10%**             	|
+| Precision            	| **10.80%**             	| **10.42%**             	|
+| F1                   	| **0.184**              	| **0.180**              	|
+| Balanced Accuracy    	| **63.73%**             	| **63.82%**             	|
 
-```{r lasso-fpfn-build}
-vars_focus <- c("hour", "boro", "sex", "ethnicity", "age_bracket")
+#### 5.4.1.1) Recall improves with λ.1se
 
-# mm_test keeps the original row names of `test`, so this recovers the
-# untransformed covariates for every row scored in X_test/y_test
-test_ids <- rownames(mm_test)
-test_meta <- test[test_ids, vars_focus]
+The 1-SE model identifies more of the actual arrests:
 
-fp_min <- test_meta[y_test == 0 & class_lasso_min == 1, ]
-fn_min <- test_meta[y_test == 1 & class_lasso_min == 0, ]
-fp_1se <- test_meta[y_test == 0 & class_lasso_1se == 1, ]
-fn_1se <- test_meta[y_test == 1 & class_lasso_1se == 0, ]
+- $61.82\% \rightarrow 65.54\%$
+- In absolute terms, $1605 - 1514 = \mathbf{91}$ additional arrests are correctly identified.
 
-cat(sprintf(
-  "λ.min — FP: %d  |  FN: %d\nλ.1se — FP: %d  |  FN: %d\n",
-  nrow(fp_min), nrow(fn_min), nrow(fp_1se), nrow(fn_1se)
-))
-```
+Correspondingly, false negatives decrease $935 \rightarrow 844$
 
-```{r lasso-fpfn-rates, fig.width=13, fig.height=7}
-#' @title Group-wise Miss Rate and False-Alarm Rate
-#'
-#' @description For one grouping variable, computes the miss rate
-#' (FN / (FN+TP)) and false-alarm rate (FP / (FP+TN)) per level, given a set
-#' of true labels and hard predicted classes.
-#'
-#' @param group Factor/character vector of group levels, same length as actual.
-#' @param actual Integer/numeric vector of 0/1 true labels.
-#' @param predicted Integer/numeric vector of 0/1 predicted labels.
-#'
-#' @return A tibble with columns group, n, miss_rate, false_alarm.
-error_rate_by_group <- function(group, actual, predicted) {
-  tibble(group = group, actual = actual, predicted = predicted) %>%
-    group_by(group) %>%
-    summarise(
-      n           = n(),
-      miss_rate   = sum(actual == 1 & predicted == 0) / sum(actual == 1),
-      false_alarm = sum(actual == 0 & predicted == 1) / sum(actual == 0),
-      .groups = "drop"
-    )
-}
+So the stronger regularisation model is actually **better at detecting the minority class at this particular classification threshold**.
 
-error_rates <- purrr::map_dfr(vars_focus, function(v) {
-  bind_rows(
-    error_rate_by_group(test_meta[[v]], y_test, class_lasso_min) %>% mutate(model = "λ.min"),
-    error_rate_by_group(test_meta[[v]], y_test, class_lasso_1se) %>% mutate(model = "λ.1se")
-  ) %>% mutate(variable = v)
-}) %>% relocate(variable, model, group)
+#### 5.4.1.2) But λ.1se does this by producing more false positives
 
-error_rates %>%
-  pivot_longer(c(miss_rate, false_alarm), names_to = "metric", values_to = "rate") %>%
-  mutate(metric = recode(metric, miss_rate = "Miss rate (FN / actual arrests)",
-                          false_alarm = "False-alarm rate (FP / actual non-arrests)")) %>%
-  ggplot(aes(x = group, y = rate, fill = model)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
-  facet_grid(metric ~ variable, scales = "free_x", space = "free_x") +
-  scale_fill_manual(values = c("λ.min" = "#2c7bb6", "λ.1se" = "#fdae61")) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  labs(x = NULL, y = NULL, fill = NULL,
-       title = "LASSO — Miss rate and false-alarm rate by group") +
-  theme_minimal(base_size = 9) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "bottom", panel.grid.minor = element_blank())
-```
+False positives increase from $12,508 \rightarrow 13,795$, that is $1,287$ **additional non-arrests incorrectly classified as arrests**.
 
-A bar noticeably taller than its neighbours within a facet flags a group the model treats asymmetrically relative to its own true-label base rate, not merely a group with more errors in absolute terms. As with the rest of this analysis, `arrested` is self-reported and observational, so these gaps describe how the fitted model behaves on this test split rather than any causal claim about enforcement itself.
+Consequently, specificity decreases $65.64\% \rightarrow 62.10\%$, and precision slightly decreases $10.80\% \rightarrow 10.42\%$
 
-TODO: Comment
+So $\lambda_{\text{1se}}$ is effectively more willing to say **"arrest"**, resulting in:
+
+- $\uparrow \textbf{Recall}$
+- But $\downarrow \textbf{Specficity} \, \text{and} \, \textbf{Precision}$
+
+#### 5.4.1.3) Main result comes from the F1 and balanced accuracy
+
+Despite the different confusion matrices, we focus on more important metrics:
+
+$$ F1_{\text{min}} = 0.184 \quad \text{vs} \quad F1_{1se}=0.180 $$
+And balanced accuracy is almost identical:
+
+$$ (\text{min}) \, 63.73\% \quad \text{vs} \quad (\text{1se}) \, 63.82\% $$
+
+So from the perspective of **balancing performance between the two classes**, the two models are essentially indistinguishable at this threshold.
+
+#### 5.4.1.4) However, the precision is the real weakness
+
+This is probably the most important performance limitation of the model:
+
+- For $\lambda_{\text{min}}$, $Precision = \frac{1514}{1514+12508} = \mathbf{10.8\%}$. Therefore, among observations that the model predicts as arrests, only about **1 in 9 actually corresponds to an arrest**.
+- For $\lambda_{\text{1se}}$, $Precision = \frac{1605}{1605+13795} = \mathbf{10.4\%}$ which is only slightly worse.
+
+The low precision is not surprising given the class imbalance and the large number of false positives. This is due to the fact it is particularly sensitive to the number of false positives.
+
+#### 5.4.1.5) Final Comparison
+
+The overall picture is:
+
+| $\lambda_{\text{min}}$                	| $\lambda_{\text{1se}}$                	|
+|---------------------------------------	|---------------------------------------	|
+| More complex model                    	| Simpler model (9 less coefficients)   	|
+| Slightly higher CV-AUC: **0.7394**    	| Nearly identical CV-AUC: **0.7373**   	|
+| Lower recall                          	| **Higher recall**                     	|
+| **Higher specificity**                	| Lower specificity                     	|
+| **Higher precision**                  	| Slightly lower precision              	|
+| Slightly higher F1                    	| Slightly lower F1                     	|
+| Virtually identical balanced accuracy 	| Virtually identical balanced accuracy 	|
+
+Conclusion: **The stronger-regularised model achieves almost identical discrimination and balanced classification performance while using fewer coefficients and identifying a slightly larger proportion of actual arrests.**
+
+Questions we can answer:
+
+- *Can the model discriminate?* Reasonable discrimination, but far from perfect.
+- *What happens when we use a particular threshold to classify arrests?* And here the model has a fairly poor precision ($\approx 10\%$), despite recall around $62-66\%$.
 
 ### 5.4.2) Performance Analysis
+
+This was partly covered in the previous section, so here we will be focusing on the metrics that we have yet to mention.
 
 ```{r lasso-metrics-table}
 bind_rows(
@@ -1192,75 +1333,123 @@ eval_quad_plot(y_test, prob_lasso_min, "LASSO (λ.min)")
 eval_quad_plot(y_test, prob_lasso_1se, "LASSO (λ.1se)")
 ```
 
-TODO: Comment and Talk about the performances
+#### 5.4.2.1) Overall performance
 
-## 5.5) Diagnostics — Coefficient Paths and CV Deviance vs $\lambda$
+| Metric            | \(\lambda_{\min}\) | \(\lambda_{1se}\) | Interpretation                                 |
+| ----------------- | -----------------: | ----------------: | ---------------------------------------------- |
+| **AUC**           |             0.6869 |            0.6866 | Similar discrimination                         |
+| **PR-AUC**        |             0.1207 |            0.1203 | Similar minority-class performance             |
+| **Log-Loss**      |             0.2254 |        **0.2238** | Slightly better probability estimates for 1-SE |
+| **Brier**         |             0.0576 |            0.0576 | Essentially identical probability accuracy     |
+| Threshold         |             0.0592 |            0.0571 | Both use a low threshold                       |
+| **MCC**           |              0.139 |             0.137 | Weak overall association                       |
+| Balanced Accuracy |              0.637 |         **0.638** | Essentially identical                          |
 
-LASSO's $\ell_1$ penalty induces sparsity: as $\lambda$ grows, predictors are progressively zeroed out. The coefficient path reveals which predictors survive at $\lambda_{\min}$ and which are eliminated at the more parsimonious $\lambda_{\text{1se}}$.
+The main conclusion is very consistent with what we have already seen: **The two LASSO models have almost indistinguishable predictive performance on the test set. The 1-SE model achieves this with fewer coefficients, making it the more parsimonious choice.**
 
-```{r lasso-diag, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
-lasso_fit <- cv_lasso$glmnet.fit
-coef_mat_l <- as.matrix(coef(lasso_fit))[-1, ]
-log_lam_l <- log(lasso_fit$lambda)
+#### 5.4.2.2) AUC
 
-coef_path_l <- as.data.frame(t(coef_mat_l)) %>%
-  mutate(log_lambda = log_lam_l) %>%
-  tidyr::pivot_longer(-log_lambda, names_to = "predictor", values_to = "coef")
+The test-set AUC is $\approx 0.687$. 
 
-p_lasso_path <- ggplot(
-  coef_path_l, aes(x = log_lambda, y = coef, group = predictor)
-  ) +
-  geom_line(alpha = 0.35, linewidth = 0.5, colour = "#d73027") +
-  geom_vline(
-    xintercept = log(cv_lasso$lambda.min), 
-    linetype = "dashed", colour = "firebrick", linewidth = 0.7
-  ) +
-  geom_vline(
-    xintercept = log(cv_lasso$lambda.1se), 
-    linetype = "dotted", colour = "darkorange", linewidth = 0.7
-  ) +
-  labs(
-    x = expression(log(lambda)), y = "Coefficient", 
-    title = "LASSO — Coefficient paths (sparsity)",
-    subtitle = "Red dashed = λ.min · Orange dotted = λ.1se"
-  ) +
-  theme_minimal(base_size = 11) + 
-  theme(panel.grid.minor = element_blank())
+This means that if we randomly select (i) one observation where an arrest occurred, and (ii) one observation where an arrest did not occur, the model assigns a higher predicted probability to the arrest observation about **69% of the time**.
 
-cv_df_l <- data.frame(
-  log_lambda = log(cv_lasso$lambda),
-  cvm = cv_lasso$cvm,
-  cvup = cv_lasso$cvup,
-  cvlo = cv_lasso$cvlo
-)
+> Note: This is a measure of **discrimination**, independent of a particular classification threshold.
 
-p_lasso_cv <- ggplot(
-  cv_df_l, aes(x = log_lambda, y = cvm)
-  ) +
-  geom_ribbon(
-    aes(ymin = cvlo, ymax = cvup),
-    alpha = 0.15, fill = "#d73027"
-  ) +
-  geom_line(colour = "#d73027", linewidth = 0.9) +
-  geom_vline(
-    xintercept = log(cv_lasso$lambda.min),
-    linetype = "dashed", colour = "firebrick", linewidth = 0.7
-  ) +
-  geom_vline(
-    xintercept = log(cv_lasso$lambda.1se),
-    linetype = "dotted", colour = "darkorange", linewidth = 0.7
-  ) +
-  labs(
-    x = expression(log(lambda)), y = "CV Binomial Deviance",
-    title = "LASSO — Cross-validated deviance",
-    subtitle = "Ribbon = ±1 SE"
-  ) +
-  theme_minimal(base_size = 11) +
-  theme(panel.grid.minor = element_blank())
+The important point is that 
 
-p_lasso_path + p_lasso_cv
-```
+$$\text{AUC}_{\text{CV}} = 0.739 \quad \text{vs} \quad \text{AUC}_{\text{test}} = 0.687$$
 
-The point where paths first leave zero marks each predictor's entry into the model. Predictors that survive to $\lambda_{\text{1se}}$ are the most robustly informative signal carriers. A wide flat region in the CV curve indicates that the model is relatively insensitive to $\lambda$ in that range — the bias–variance trade-off is shallow — while a sharp minimum suggests strong sensitivity.
+So there is a **noticeable drop in performance** on the held-out test set. This is probably a consequence of the **non-stratified** CV.
 
-TODO: Comment
+However, the choice between either lambda has **virtually no effect on test-set discrimination**.
+
+#### 5.4.2.3) PR-AUC
+
+This is particularly important given our imbalanced outcome.
+
+Our positive class is rare, so ROC-AUC can sometimes give an overly optimistic impression of performance. **Precision-Recall AUC focuses directly on the positive class**, considering the trade-off between precision and recall.
+
+Here, we obtain:
+
+$$ \text{PR} \text{-} \text{AUC}_{\text{min}} = 0.1207 \quad \text{vs} \quad \text{PR} \text{-} \text{AUC}_{\text{1se}} = 0.1203 $$
+Again, essentially identical.
+
+*But how good is 0.12?* This needs to be interpreted relative to the prevalence of the positive class.
+
+- From our confusion matrix, the test-set arrest prevalence is approximately $\frac{2449}{38851} \approx 0.063$
+- So, for a random classifier, the expected (minimum) PR-AUC is approximately the positive prevalence $\text{PR} \text{-} \text{AUC}_{\text{baseline}} \approx 0.063$
+- And, our model achieves $0.121$
+
+So the PR-AUC is roughly **1.9x the prevalence baseline**. In other words, our model is extracting meaningful information about the rare positive class, but the absolute precision-recall performance remains relatively modest.
+
+#### 5.4.2.4) Log-Loss
+
+> Log-loss evaluates the **quality of the predicted probabilities**, rather than simply stating whether the final classification is correct.
+
+This measure cares about **how confident the model is**. For example, predicting $p=0.51$ for an actual arrest is not treated the same as predicting $p=0.99$. In fact, a highly confident incorrect prediction receives a strong penalty.
+
+In our case:
+
+$$ \text{(min)} \, 0.2254 \quad \text{vs} \quad \text{(1se)} \, 0.2238$$
+
+So $\lambda_{\text{1se}}$ is **slightly better calibrated from a log-loss perspective**, although the difference is small. We can say that they have **essentially equivalent probabilistic performance**.
+
+#### 5.4.2.5) Brier Score
+
+The Brier score is useful here because it evaluates whether the predicted probabilities are close to the observed outcomes, rather than merely whether the model ranks observations correctly.
+
+> Formally, the Brier score measures the squared error of the predicted probabilities (the lower, the better).
+
+We get $0.0576$ for **both models**, meaning that (according to Brier score) there is effectively **no difference whatsoever** between the two LASSO specifications.
+
+Furthermore, a model that simply predicted the prevalence $p \approx 0.063$ (for everyone) would have a Brier score approximately $p (1-p) \approx 0.063 (0.937) \approx 0.059$. Our model reaches $0.0576$, which is a modest improve over the baseline.
+
+Here, we just re-confirm that **the model contains predictive information, but the probability predictions are not exceptionally accurate.**
+
+#### 5.4.2.6) MCC
+
+The **Matthews Correlation Coefficient (MCC)** is particularly useful for imbalanced classification because it incorporates all four components of the confusion matrix:
+
+$$MCC = \frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}} \in [-1, 1]$$
+Where, 
+
+- $1$ = perfect prediction
+- $0$ = no better than random association
+- $-1$ = completely incorrect prediction
+
+Our results are:
+
+$$\text{MCC}_{\text{min}} = 0.139 \quad \text{vs} \quad \text{MCC}_{\text{1se}} = 0.137$$
+
+Thus, there is a **positive but weak association between predictions and actual outcomes**. Simply put:
+
+- The model is doing meaningfully better than random classification;
+- But that its classification performance is limited.
+
+#### 5.4.2.7) Thresholds
+
+The selected thresholds are:
+
+$$ \text{(min)} \, 0.0592 \quad \text{vs} \quad \text{(1se)} \, 0.0571$$
+
+Which are very low compared with the conventional $0.5$ threshold, and similar. However it makes sense, since our threshold is around **6%**, which is close to the observed prevalence of the positive class. This allows the model to recover more arrests, but it inevitably generates many false positives (see the Confusion Matrix for the trade-off).
+
+Therefore, the difference between the two LASSO models is not being driven by radically different classification thresholds.
+
+#### 5.4.2.8) Final Remarks
+
+Let us up the metrics together:
+
+- **Discrimination**, $\text{AUC} \approx 0.687$: The model has **some useful ability to distinguish arrests from non-arrests**, but discrimination is moderate rather than strong.
+- **Rare-class performance**, $\text{PR} \text{-} \text{AUC} \approx 0.121$: The model performs better than the prevalence baseline, but precision remains low.
+- **Probability predictions**, $\text{Brier} \approx 0.058, \,\, \text{LogLoss} \approx 0.224$: The models produce probabilities with **limited but non-negligible predictive information**. The 1-SE model has a marginally lower log-loss, while Brier score is identical.
+- **Classification**, $\text{MCC} \approx 0.14$: The thresholded predictions have only a **weak overall association** with the actual outcome.
+- **Class balance** $\text{ACC}_{\text{Balanced}} \approx 0.638$: The model performs substantially better than chance in balancing sensitivity and specificity, but neither class is classified particularly accurately.
+
+
+Now for the final conclusions:
+
+- The LASSO models demonstrate **moderate discrimination** on the held-out test set (AUC $\approx 0.687$) and improve substantially over the positive-class prevalence baseline in terms of PR-AUC. 
+- However, their threshold-dependent classification performance remains limited, with low precision and an MCC of approximately $0.14$.
+- The Brier score and log-loss also indicate only modest improvement in probabilistic prediction. 
+- Finally, the models exhibit almost identical test-set performance across these metrics. Therefore, the additional complexity of the $\lambda_{\text{min}}$ model provides little evidence of improved predictive performance, favouring the more parsimonious $\lambda_{\text{1se}}$ model.**
