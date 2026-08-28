@@ -1218,7 +1218,7 @@ cat(sprintf(
 ))
 ```
 
-### 5.4.1) Confusion Matrix and FN/FP Inspection
+### 5.4.1) Confusion Matrix
 
 ```{r lasso-cm-plots, fig.width=8, fig.height=3.5}
 p_cm_min <- plot_cm(y_test, class_lasso_min, "LASSO (λ.min) — Confusion Matrix")

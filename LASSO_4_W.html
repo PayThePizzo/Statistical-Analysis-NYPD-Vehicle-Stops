@@ -4745,8 +4745,8 @@ hour independently relative to the reference hour. It does
 <span id="cb40-8"><a href="#cb40-8" tabindex="-1"></a>  met_lasso_1se<span class="sc">$</span>sensitivity, met_lasso_1se<span class="sc">$</span>specificity, met_lasso_1se<span class="sc">$</span>balanced_acc</span>
 <span id="cb40-9"><a href="#cb40-9" tabindex="-1"></a>))</span></code></pre></div>
 <pre><code>## λ.1se — AUC: 0.7340  |  Threshold: 0.0294  |  Sens: 0.757  |  Spec: 0.608  |  Bal.Acc: 0.682</code></pre>
-<div id="confusion-matrix-and-fnfp-inspection" class="section level3">
-<h3>5.4.1) Confusion Matrix and FN/FP Inspection</h3>
+<div id="confusion-matrix" class="section level3">
+<h3>5.4.1) Confusion Matrix</h3>
 <div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a>p_cm_min <span class="ot">&lt;-</span> <span class="fu">plot_cm</span>(y_test, class_lasso_min, <span class="st">&quot;LASSO (λ.min) — Confusion Matrix&quot;</span>)</span>
 <span id="cb42-2"><a href="#cb42-2" tabindex="-1"></a>p_cm_1se <span class="ot">&lt;-</span> <span class="fu">plot_cm</span>(y_test, class_lasso_1se, <span class="st">&quot;LASSO (λ.1se) — Confusion Matrix&quot;</span>)</span>
 <span id="cb42-3"><a href="#cb42-3" tabindex="-1"></a></span>
