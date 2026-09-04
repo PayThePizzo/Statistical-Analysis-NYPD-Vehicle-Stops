@@ -23,7 +23,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 These `.Rmd` files represent the project submission for the course [Statistical Inference and Learning](https://www.unive.it/data/course/521944) by Professor [Cristiano Varin](https://www.unive.it/data/people/5592728) at [Ca' Foscari University of Venice](https://www.unive.it/) for the year 2025/2026.
 
----
+------------------------------------------------------------------------
 
 # 0) Environment
 
@@ -605,7 +605,7 @@ extract_coefs <- function(cv_fit, s_name) {
 }
 ```
 
----
+------------------------------------------------------------------------
 
 # 1) Data Loading and Preparation
 
@@ -670,23 +670,19 @@ vehstop <- vehstop %>%
 
 ## 1.3) Stratified Train / Test Split
 
-For the train/test split, a **stratified sampling approach** is used to ensure that the training and test sets have comparable distributions of the outcome variable (`arrested`) and relevant contextual variables. 
+For the train/test split, a **stratified sampling approach** is used to ensure that the training and test sets have comparable distributions of the outcome variable (`arrested`) and relevant contextual variables.
 
-This is particularly important because the target variable is imbalanced, with arrested cases representing only a small proportion of all observations. Rather than stratifying only on `arrested`, the code constructs a **joint stratification variable** from `arrested`, `area`, `sex`, `ethnicity`, and `hour` using `interaction()`. Thus, each observation is assigned to a stratum corresponding to a particular combination of these variables. 
+This is particularly important because the target variable is imbalanced, with arrested cases representing only a small proportion of all observations. Rather than stratifying only on `arrested`, the code constructs a **joint stratification variable** from `arrested`, `area`, `sex`, `ethnicity`, and `hour` using `interaction()`. Thus, each observation is assigned to a stratum corresponding to a particular combination of these variables.
 
 Formally, the strata can be represented as
 
-$$
-S_i = (\text{arrested}_i,\text{area}_i,\text{sex}_i,\text{ethnicity}_i,\text{hour}_i),
-$$
+$$S_i = (\text{arrested}_i,\text{area}_i,\text{sex}_i,\text{ethnicity}_i,\text{hour}_i),$$
 
 where $S_i$ denotes the stratum to which observation $i$ belongs. The objective is to sample approximately 80% of observations within each stratum for the training set and retain the remaining 20% for testing:
 
-$$
-P(i \in \mathcal{D}_{train} \mid S_i=s) \approx 0.8,
+$$P(i \in \mathcal{D}_{train} \mid S_i=s) \approx 0.8,
 \qquad
-P(i \in \mathcal{D}_{test} \mid S_i=s) \approx 0.2.
-$$
+P(i \in \mathcal{D}_{test} \mid S_i=s) \approx 0.2.$$
 
 ```{r stratified-split}
 set.seed(2026)
@@ -710,31 +706,25 @@ vehstop <- vehstop %>% dplyr::select(-.strat)
 
 In the code, `group_by(.strat) %>% slice_sample(prop = 0.8)` performs this within-stratum sampling, while the observations not selected for training form the test set. This approach aims to preserve not only the overall prevalence of the outcome,
 
-$$
-P_{\text{train}}(\text{arrested}=1) \approx P_{\text{test}}(\text{arrested}=1),
-$$
+$$P_{\text{train}}(\text{arrested}=1) \approx P_{\text{test}}(\text{arrested}=1),$$
 
-but also the composition of the data across geographic, demographic, and temporal characteristics. This is desirable because differences in these characteristics could otherwise introduce an unintended distributional difference between the training and test sets. The temporary `.strat` variable is removed after the split because it is used solely to define the sampling groups and is not intended to be used as a predictor in the subsequent modelling. 
+but also the composition of the data across geographic, demographic, and temporal characteristics. This is desirable because differences in these characteristics could otherwise introduce an unintended distributional difference between the training and test sets. The temporary `.strat` variable is removed after the split because it is used solely to define the sampling groups and is not intended to be used as a predictor in the subsequent modelling.
 
 Finally, the verification code compares the empirical marginal distributions of `arrested`, `area`, `sex`, and `ethnicity` in the two datasets. For a variable $X$ and level $k$, the proportion in each dataset is calculated as
 
-$$
-\hat{P}_{train}(X=k)
+$$\hat{P}_{train}(X=k)
 =
 \frac{\sum_{i \in \mathcal{D}_{train}} \mathbb{I}(X_i=k)}
-{|\mathcal{D}_{train}|},
-$$
+{|\mathcal{D}_{train}|},$$
 
 and analogously for the test set. The difference is then reported in **percentage points**:
 
-$$
-\Delta_k =
+$$\Delta_k =
 100\left[
 \hat{P}_{test}(X=k)
 -
 \hat{P}_{train}(X=k)
-\right].
-$$
+\right].$$
 
 Small values of $\Delta_k$ indicate that the corresponding characteristic is similarly represented in the two datasets. The final summary additionally compares the number of observations and the proportion of arrested cases in the training and test sets, providing a direct check that the intended approximately 80/20 split and the class distribution have been maintained.
 
@@ -766,6 +756,8 @@ The maximum absolute discrepancy between the two sets is on the order of fractio
 
 ## 1.4) Numerical Conversion
 
+In order to be usable, `hour` and `age` must be integers, so we just add two newly converted versions of the same predictors.
+
 ```{r num-conv-train-test}
 train <- train %>%
   mutate(
@@ -780,37 +772,42 @@ test <- test %>%
   )
 ```
 
+Finally, we remove unused data.
+
 ```{r remove-vehstop-train-test}
 # Remove vehstop, train, test for memory purposes
 rm(vehstop, train_rows)
 ```
 
----
+------------------------------------------------------------------------
 
 # 6) GAM
 
-**Why did we choose this model?** TODO
+A Generalized Additive Model (GAM) extends a generalized linear model by allowing the effect of selected predictors to be represented through **flexible smooth functions** rather than assuming a strictly linear relationship.
 
-**Modus Operandi:** TODO
+For binary classification, GAMs can be formulated as an extension of logistic regression:
+
+$$Y = \beta_0 + f_1(X_1) + f_2(X_2) + \cdots + f_p(X_p) + \epsilon$$
+
+where $Y \in \left\{ 0, 1 \right\}$ and each $f_j(\cdot)$ is a smooth function estimated from the data, commonly using penalized regression splines.
+
+**Why did we choose this model?** This flexibility is useful when predictors such as age, time of day, or other continuous variables may have non-linear relationships with the probability of arrest.
 
 ## 6.1) Assumptions and Setup
 
-A Generalized Additive Model (GAM) extends logistic regression by allowing selected continuous predictors to enter through smooth functions rather than linear terms.
-
 ### 6.1.2) New Formulation — Adding Splines for `hour` and `age`
 
-TODO: introduce why we add splines for these metrics, just discussive
-
-Two continuous predictors receive data-driven smooth terms:
--   `s(hour_num, bs = "cc", k = 10)`: a **cyclic cubic spline** for hour-of-day (hours 23 and 0 are adjacent on the clock). The EDA showed a non-linear enforcement cycle across the day that a linear slope or fixed brackets cannot fully capture.
--   `s(age_num, bs = "cr", k = 6)`: a **cubic regression spline** for driver age. The EDA found a non-monotone age–arrest relationship (elevated under-18 and over-65 rates) that neither a linear slope nor an arbitrary bracket optimally represents.
-
-All other predictors (`year`, `month`, `weekday`, `sex`, `ethnicity`, `boro`) remain parametric factors, matching the selected predictor forms from section ii.
+We formulate the model as follows:
 
 ```{r f-gam-model}
-# TODO: Move fit_gam here
 f_gam <- arrested ~ year + month + weekday + s(hour_num, bs = 'cc', k = 10) + boro + sex + ethnicity + s(age_num, bs = 'cr', k = 6)
 ```
+
+The specification `s(hour_num, bs = "cc", k = 10)` uses a **cyclic cubic regression spline**, which is appropriate for hour of day because the beginning and end of the 24-hour cycle are connected. In fact, the EDA showed a non-linear enforcement cycle across the day that a linear slope or fixed brackets cannot fully capture.
+
+Similarly we use `s(age_num, bs = "cr", k = 6)`, a cubic regression spline with a relatively modest maximum basis dimension. The reason for this is that the EDA revealed a non-monotone age-arrest relationship that neither a linear slope nor an arbitrary bracket optimally represents.
+
+All other predictors (`year`, `month`, `weekday`, `sex`, `ethnicity`, `boro`) remain factors.
 
 ## 6.2) Model Fit
 
@@ -820,21 +817,100 @@ We fit with `mgcv::gam` using `family = binomial` and REML smoothness selection.
 mod_gam <- mgcv::gam(f_gam, family = binomial, data = train, method = "REML")
 ```
 
-TODO: Summary and briefly comment
-
-**What does this say about the training?** TODO
-
 ## 6.3) Specific Analysis and Interpretation
-
-### 6.3.1) Coefficients
 
 ```{r summary-gam}
 summary(mod_gam)
 ```
 
-### 6.3.2) Smooth Term and Plots
+The model summary indicates that there are nonlinear effects for `hour_num` and `age_num` (we will see later).
 
-Estimated smooth effects on the log-odds scale, centred at zero. Shaded bands are 2 SE pointwise confidence intervals. Effective degrees of freedom (edf) reported in the summary — values above 1 indicate non-linearity.
+The model explains approximately $9.61\%$ ($R^{2} = 0.0391$) of the variation of the post-stop arrests in NY during the period 2023-2025. These values indicate that the **included variables explain only a limited proportion of the overall variation in arrest outcomes**. This is not unexpected for a rare binary outcome such as `arrested`, where many determinants of an arrest may not be represented by these predictor
+
+### 6.3.1) Coefficients
+
+#### 6.3.1.1) General Interpretation
+
+The fitted GAM models the conditional probability of arrest using a binomial distribution with a logit link:
+
+$$\log\left(\frac{P(\text{arrested}=1)}{1-P(\text{arrested}=1)}\right)
+=
+\beta_0 + \mathbf{X}\boldsymbol{\beta}
++ f_1(\text{hour})
++ f_2(\text{age}),$$
+
+All parametric coefficients are expressed on the **log-odds scale**.
+
+Exponentiating a coefficient gives the corresponding **odds ratio (OR)** $OR=e^\beta$. An $OR>1$ indicates higher odds of arrest relative to the reference category, while $OR<1$ indicates lower odds, holding all other variables constant.
+
+#### 6.3.1.2) Specific Interpretation — Coefficients
+
+The **intercept** is $-2.962$, corresponding to baseline odds of $e^{-2.962}\approx0.052$, or a probability of approximately $4.9\%$.
+
+- However, the intercept should not be interpreted as the unconditional arrest rate. It refers to an **observation belonging to all categorical reference groups while the centered smooth effects are equal to zero**.
+
+For the remaining coefficients, interpretations are conditional on all other predictors in the model.
+
+Let us see the significant (at $5\%$) *time-related* coefficients first.
+
+| Effect | Estimate | OR | Interpretation |
+|------------------|-----------------:|-----------------:|-------------------|
+| `year2024` | 0.135 | 1.144 | Approximately **14% higher odds** of arrest than 2023 |
+| `year2025` | 0.209 | 1.232 | Approximately **23% higher odds** than 2023 |
+| `month4` | 0.146 | 1.157 | April has approximately **16% higher odds** than January |
+| `month5` | 0.143 | 1.153 | May has approximately **15% higher odds** than January |
+| `month6` | 0.137 | 1.147 | June has approximately **15% higher odds** than January |
+| `month7` | 0.210 | 1.234 | July has approximately **23% higher odds** than January |
+| `month9` | 0.231 | 1.260 | September has approximately **26% higher odds** than January |
+| `month10` | 0.146 | 1.157 | October has approximately **16% higher odds** than January |
+| `weekdayTuesday` | 0.123 | 1.131 | Tuesday has approximately **13% higher odds** than Monday |
+| `weekdayFriday` | -0.129 | 0.879 | Friday has approximately **12% lower odds** than Monday |
+| `weekdaySunday` | -0.132 | 0.876 | Sunday has approximately **12% lower odds** than Monday |
+
+As it is easy to see, there are other month and weekday coefficients but they are not "statistically different from their corresponding reference categories at the conventional $5\%$ level".
+
+In particular,
+
+- February, March, August, November and December do not differ significantly from January;
+
+- Wednesday and Thursday similarly do not differ significantly from Monday, while Saturday shows weak evidence ($p=0.082$).
+
+The coefficients from `boro` are all statistically significant at the same level:
+
+| Borough category  | Estimate |    OR | Relative odds |
+|-------------------|---------:|------:|--------------:|
+| Brooklyn (North)  |   -0.878 | 0.416 | **58% lower** |
+| Brooklyn (South)  |   -0.539 | 0.583 | **42% lower** |
+| Manhattan (North) |   -1.120 | 0.326 | **67% lower** |
+| Manhattan (South) |   -1.073 | 0.342 | **66% lower** |
+| Queens (North)    |   -0.980 | 0.375 | **63% lower** |
+| Queens (South)    |   -0.706 | 0.493 | **51% lower** |
+| Staten Island     |   -0.474 | 0.623 | **38% lower** |
+
+Plus, each coefficient has significantly lower conditional odds of arrest than the borough reference category (`Bronx`). These effects are **some of the strongest parametric associations** in the model.
+
+For what regards `sex`'s coefficients
+
+- We have a great association for `sexF`, $e^{-1.174}=0.309$. This means, the related observations have approximately **69% lower odds of arrest** than the reference sex category (`sexM`), fixing the remaining predictors;
+- However, the coefficient for `sexU` is small and non-significant ($p=0.816$). In other words, we see no evidence of a difference from the reference category.
+
+`ethnicity` also shows substantial conditional differences:
+
+| Ethnicity                | Estimate |    OR |  Relative odds |
+|--------------------------|---------:|------:|---------------:|
+| Asian / Pacific Islander |   -0.675 | 0.509 |  **49% lower** |
+| Black                    |    0.447 | 1.563 | **56% higher** |
+| Hispanic                 |    0.642 | 1.900 | **90% higher** |
+| Other                    |   -2.569 | 0.077 |  **92% lower** |
+| Unknown                  |   -1.055 | 0.348 |  **65% lower** |
+
+These comparisons are all relative to `White`.
+
+For example (holding the other variables constant) the estimated odds of arrest for observations categorized as `Hispanic` are around **1.90 times** those of `White`. Instead, `Asian / Pacific Islander` have approximately half the odds.
+
+*We move the discussion of smooth effects to the next section*.
+
+### 6.3.2) Smooth Term and Plots
 
 ```{r gam-smooth-plots, fig.width=10, fig.height=4}
 par(mfrow = c(1, 2), mar = c(4, 4, 2.5, 1))
@@ -843,7 +919,66 @@ plot(mod_gam, shade = TRUE, shade.col = "lightblue", seWithMean = TRUE,
 par(mfrow = c(1, 1))
 ```
 
-TODO: Comment
+These plots now allow a much more specific interpretation of the two smooth terms than the GAM summary alone.
+
+#### 6.3.2.1) General Interpretation
+
+First of all we focus on **EDF** or Estimated Degrees of Freedom. They tell us **how complex the fitted smooth actually is after penalization and gives us indication about the linearity**.
+
+- $EDF \approx 1$ would indicate an approximately linear effect or relationship.
+- $EDF >> 1$ instead indicates evidence of a **non-linear relationship**.
+
+Then, we have a value for $\chi^{2}$. This tests **whether the smooth term** **contributes to explaining the variance in the response after fixing the other terms in the model**.
+
+- The null hypothesis is $H_{0} : f_{j}(x) = 0$ meaning that the predictor has no meaningful contribution to the linear predictor once the other variables are accounted for.
+
+Finally, the **p-value** indicates how strong is the evidence that the smooth terms **are associated with the conditional probability of arrest (or whether the smooth contributes to the model)**, after fixing the other predictors.
+
+For what concerns the plot, the **vertical axis** is the estimated **partial effect on the log-odds of arrest** (after fixing the remaining predictors and smooth terms). Instead, the horizontal axis follows the numerical range of values for the term.
+
+The smooths are centered around zero, so:
+
+- Regions where $f(x)>0$ indicates higher conditional log-odds of arrest relative to the model's average smooth effect (baseline), while
+- $f(x)<0$ indicates lower conditional log-odds.
+
+The magnitude can also be converted into a multiplicative odds effect using $e^{f(x)}$. The **dashed curves** represent uncertainty around the estimated smooth.
+
+#### 6.3.2.2) Focus: Smooth effect of hour
+
+The smooth term for `hour` is statistically significant:
+
+$$\text{edf}=7.52,\qquad \chi^2=1164,\qquad p<2\times10^{-16}.$$
+
+This provides very strong evidence that **time of day is associated with arrest probability after controlling for the other predictors**. In other words, the hourly pattern matters.
+
+Furthermore, its **effect is strongly non-linear** ($\text{edf}=7.52 >> 1,\ p<2\times10^{-16}$).
+
+Since the significance test is not enough to indicate which particular hours have the highest or lowest arrest probabilities, we look again at the picture.
+
+The estimated arrest propensity (or "conditional log-odds of arrest relative to the model's average smooth effect")
+
+1.  Is **relatively high** during the **late-night/very early morning**. In fact, we can see that from around 8 PM to 3 AM we have $> 0.5$, with a peak at **1-2 AM**;
+2.  Then, it decreases during the early morning from approximately **4 AM onward** and finds its minimum around **7–8 AM**;
+3.  After approximately 8 AM, the smooth rises rapidly and after around 12 PM it gradually increases through the afternoon and evening;
+4.  By the **late evening (approximately 8 PM - 11 PM)**, it is clearly elevated.
+
+Thus, the model provides further evidence towards the hypothesis we made during the EDA.
+
+The fitted smooth $f_{\text{hour}}$ covers around $2.3$ log-odds units between its minimum and maximum. This corresponds to $\approx 10 \times$ difference/change in estimated arrest odds between the corresponding hours, conditional on the other variables in the model.
+
+#### 6.3.2.3) Focus: Smooth effect of age
+
+Age also has a highly significant smooth effect:
+
+$$\text{edf}=4.66,\qquad
+\chi^2=108,\qquad
+p<2\times10^{-16}.$$
+
+Thus, there is **strong evidence that arrest probability varies with age** after fixing the remaining predictors.
+
+Again, $\text{edf}=4.66,\ p<2\times10^{-16}$ indicates that the relationship is meaningfully **non-linear** and statistically significant (although its variation is smaller than `hour`).
+
+The curve indicates **relatively elevated conditional arrest propensity** among the **youngest drivers**. Then, we observe a local minimum at approximately **28–30 years**. From roughly **30-50 years** the age effect is close to zero. Finally, the curve rises to a local maximum at **60–62 years**, before a big decline for **65–70 years** (which have wider confidence intervals indicating uncertainty, consistent with the number of observations).
 
 ## 6.4) Evaluation on Test Set
 
@@ -861,28 +996,33 @@ cat(sprintf(
 ))
 ```
 
+The Youden threshold is **0.0554**, way below the 0.5 cutoff.
+
+Moreover, the **AUC of 0.6897** indicates **moderate discriminatory ability**: the GAM separates arrest from non-arrest cases a bit better than chance.
+
 ### 6.4.1) Confusion Matrix
 
 ```{r gam-cm-plot, fig.width=4, fig.height=3.5}
 plot_cm(test$arrested, class_gam, title = "GAM — Confusion Matrix (Youden threshold)")
 ```
 
-Let us start from the derived metrics:
+The confusion matrix shows
 
-| Metric               	| Value 	| Interpretation 	|
-|----------------------	|-------	|----------------	|
-| Accuracy             	|       	|                	|
-| Sensitivity / Recall 	|       	|                	|
-| Specificity          	|       	|                	|
-| Precision            	|       	|                	|
-| F1                   	|       	|                	|
-| Balanced Accuracy    	|       	|                	|
+- **1,496 true positives**;
+- **816 false negatives**;
+- **22,008 true negatives**;
+- And **12,729 false positives**.
 
-TODO: Create as many "####" subsections for the interpretation as we need, for the derived metrics like LASSO
+Now for the derived metrics:
 
-Conclusion: TODO
-
-Questions we can answer: TODO
+| Metric | Value | Interpretation |
+|-------------------------------|-----------------:|-----------------------|
+| Accuracy | 0.634 | About 63.4% of all observations are classified correctly |
+| Sensitivity / Recall | 0.647 | The model correctly identifies about 64.7% of actual arrests |
+| Specificity | 0.634 | About 63.4% of actual non-arrests are correctly classified |
+| Precision | 0.105 | Only about 10.5% of predicted arrests are actual arrests |
+| F1 | 0.181 | The low value reflects the difficult trade-off between recall and precision for the minority class |
+| Balanced Accuracy | 0.640 | Averaging sensitivity and specificity gives a more appropriate summary than ordinary accuracy in this imbalanced setting |
 
 ### 6.4.2) Performance Analysis
 
@@ -904,23 +1044,25 @@ eval_quad_plot(test$arrested, prob_gam, "GAM")
 
 #### 6.4.2.1) Overall performance
 
-| Metric            	| Value 	| Interpretation 	|
-|-------------------	|-------	|----------------	|
-| **AUC**           	|       	|                	|
-| **PR-AUC**        	|       	|                	|
-| **Log-Loss**      	|       	|                	|
-| **Brier**         	|       	|                	|
-| Threshold         	|       	|                	|
-| **MCC**           	|       	|                	|
-| Balanced Accuracy 	|       	|                	|
+| Metric | Value | Interpretation |
+|----------------|---------------:|----------------------------------------|
+| **AUC** | 0.6897 | Moderate discrimination between arrests and non-arrests |
+| **PR-AUC** | 0.1247 | Above the no-skill baseline of $\approx 0.062$, but still low in absolute terms |
+| **Log-Loss** | 0.2235 | Predicted probabilities contain useful information, though improvement over a prevalence-only model is modest |
+| **Brier** | 0.0570 | Reasonably accurate probability estimates and slightly better than the prevalence-only baseline |
+| Threshold | 0.0554 | Low cutoff selected by Youden's criterion, appropriate for the rare positive class |
+| **MCC** | 0.140 | Weak positive association between predicted and observed classes |
+| Balanced Accuracy | 0.640 | Moderate performance when both classes are weighted equally |
 
-The main conclusion is TODO
+The main conclusion is that the GAM captures **meaningful but limited predictive signal**. It manages to discriminate arrests from non-arrests better than chance and produces reasonably calibrated probabilities, but its **ability to make precise positive classifications is still weak**.
 
 #### 6.4.2.2) AUC
 
-The test-set AUC is $\approx x$. 
+The test-set AUC is $\approx 0.690$.
 
-TODO
+This means that if we randomly select (i) one observation where an arrest occurred, and (ii) one observation where an arrest did not occur, the model assigns a higher predicted probability to the arrest observation about 69% of the time.
+
+The ROC curve **remains consistently above the main diagonal**, indicating that the model contains useful ranking information. However, an AUC below $0.70$ also shows that there is still a great deal of overlap between the predicted probabilities of the two classes.
 
 #### 6.4.2.3) PR-AUC
 
@@ -930,19 +1072,27 @@ Our positive class is rare, so ROC-AUC can sometimes give an overly optimistic i
 
 Here, we obtain:
 
-TODO
+$$\text{PR-AUC}=0.1247$$
 
-*But how good is x?* TODO
+The baseline PR-AUC is approximately equal to the positive-class prevalence:
+
+$$\text{PR-AUC}_{\text{baseline}}\approx0.062$$
+
+*But how good is* $0.1247$? It is roughly **twice the baseline**, indicating that the **GAM does provide useful information for ranking observations according to arrest risk**. However, the precision is still very low.
 
 #### 6.4.2.4) Log-Loss
 
 > Log-loss evaluates the **quality of the predicted probabilities**, rather than simply stating whether the final classification is correct.
 
-This measure cares about **how confident the model is**. For example, predicting $p=0.51$ for an actual arrest is not treated the same as predicting $p=0.99$. In fact, a highly confident incorrect prediction receives a strong penalty.
+This measure cares about **how confident the model is**. In our case:
 
-In our case:
+$$\text{Log-Loss}=0.2235.$$
 
-TODO
+TODO: Rephrase the following.
+
+In order to give some more context, a simple model assigning to every observation the test-set arrest prevalence of approximately $6.2\%$ would obtain a log-loss of about $0.234$.
+
+The GAM **improves on this simple baseline, although very little**. Its probability estimates contain useful information, but a considerable amount of uncertainty in the outcome remains unexplained.
 
 #### 6.4.2.5) Brier Score
 
@@ -950,64 +1100,64 @@ The Brier score is useful here because it evaluates whether the predicted probab
 
 > Formally, the Brier score measures the squared error of the predicted probabilities (the lower, the better).
 
-TODO
+For the GAM,
+
+$$\text{Brier}=0.0570.$$
+
+A baseline model would obtain approximately
+
+$$0.0585,$$
+
+so the GAM performs just slightly better.
+
+Together with the calibration plot, this suggests that the predicted probabilities are **reasonably calibrated overall**: **groups assigned higher arrest probabilities tend to show correspondingly higher observed arrest rates**.
 
 #### 6.4.2.6) MCC
 
 The **Matthews Correlation Coefficient (MCC)** is particularly useful for imbalanced classification because it incorporates all four components of the confusion matrix:
 
-$$MCC = \frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}} \in [-1, 1]$$
-Where, 
+$$MCC =
+\frac{TP\cdot TN-FP\cdot FN}
+{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}}
+\in [-1,1]$$
+
+where:
 
 - $1$ = perfect prediction
-- $0$ = no better than random association
+- $0$ = no association between predictions and outcomes
 - $-1$ = completely incorrect prediction
 
-Our results are:
+Our result is:
 
-TODO
+$$MCC=0.140.$$
+
+Thus, there is a **positive but weak association between predictions and actual outcomes** (consistent with CM). Simply put:
+
+- The model is doing meaningfully better than random classification;
+- But that its classification performance is very limited.
 
 #### 6.4.2.7) Thresholds
 
-TODO
+The classification threshold selected using **Youden's index** is
+
+$$t^*=0.0554.$$
+
+The threshold analysis also shows the expected trade-off: lowering the threshold increases sensitivity but reduces specificity, while increasing it improves specificity at the cost of missing more arrests.
 
 #### 6.4.2.8) Final Remarks
 
-Let us up the metrics together:
+Let us put the metrics together:
 
-- **Discrimination**, $\text{AUC} \approx x$: COMMENT.
-- **Rare-class performance**, $\text{PR} \text{-} \text{AUC} \approx x$: COMMENT.
-- **Probability predictions**, $\text{Brier} \approx x, \,\, \text{LogLoss} \approx x$: COMMENT.
-- **Classification**, $\text{MCC} \approx x$: COMMENT.
-- **Class balance** $\text{ACC}_{\text{Balanced}} \approx x$: COMMENT.
-
+- **Discrimination**, $\text{AUC} \approx 0.690$: the GAM has moderate ability to rank arrests above non-arrests;
+- **Rare-class performance**, $\text{PR-AUC} \approx 0.125$: clearly better than the $\approx0.062$ no-skill baseline, but positive-class identification remains difficult;
+- **Probability predictions**, $\text{Brier} \approx 0.057,\; \text{LogLoss} \approx 0.224$: probabilities are reasonably calibrated and improve modestly over a prevalence-only model;
+- **Classification**, $\text{MCC} \approx 0.140$: binary predictions show only a weak association with the true outcomes;
+- **Class balance**, $\text{ACC}_{\text{Balanced}} \approx 0.640$: sensitivity and specificity are reasonably balanced, but overall classification performance remains moderate.
 
 Now for the final conclusions:
 
-- TODO
-
-## 6.5) Diagnostics — Smoothness Diagnostics (`gam.check`)
-
-`mgcv::gam.check()` produces four residual plots (Q-Q, residuals vs fitted, histogram of residuals, response vs fitted values) and tests whether the basis dimension $k$ is sufficient for each smooth term. A significant $p$-value in the $k$-index test indicates the smooth may be under-smoothed — the effective degrees of freedom are hitting the basis limit and a higher $k$ should be tried.
-
-```{r gam-check, fig.width=10, fig.height=8, message=FALSE, warning=FALSE}
-par(mfrow = c(2, 2))
-mgcv::gam.check(mod_gam, pch = 19, cex = 0.3)
-par(mfrow = c(1, 1))
-```
-
-```{r gam-smooth-plots2, fig.width=10, fig.height=4, message=FALSE, warning=FALSE}
-par(mfrow = c(1, 2))
-plot(
-  mod_gam,
-  shade     = TRUE,
-  shade.col = "lightblue",
-  seWithMean = TRUE,
-  scale     = 0,
-  pages     = 1,
-  main      = "GAM — Estimated smooth terms with 95% CI"
-)
-par(mfrow = c(1, 1))
-```
-
-The Q-Q plot assesses normality of deviance residuals — for logistic GAMs, heavy tails or systematic curvature indicate model misspecification. The residuals vs fitted plot should show no trend; a funnel or arch suggests an omitted non-linear term or interaction. The smooth-term plots (second figure) show the estimated partial effect of `hour_num` and `age` on the log-odds of arrest: a flat line within the confidence band would indicate the smooth contributes no signal, while a pronounced curve validates the non-linear specification over a simpler linear term.
+- The GAM captures a **real but limited predictive signal** in the available demographic, temporal, and geographical variables.
+- Its strongest result is its ability to **rank observations by relative arrest risk**, rather than to produce highly accurate binary classifications.
+- The low positive-class prevalence strongly affects precision: obtaining a sensitivity of $0.647$ requires accepting a substantial number of false positives.
+- The probability estimates appear more useful than the thresholded classifications, particularly given the reasonably good calibration.
+- Consequently, the GAM is best interpreted as a model of **relative arrest propensity and estimated probability**, rather than as a highly accurate classifier of individual arrests.
