@@ -1086,7 +1086,7 @@ $$\text{PR-AUC}_{\text{baseline}}\approx0.062$$
 
 This measure cares about **how confident the model is**. In our case:
 
-$$\text{Log-Loss}=0.2235.$$
+$$\text{Log-Loss}=0.2235$$
 
 TODO: Rephrase the following.
 
@@ -1102,11 +1102,11 @@ The Brier score is useful here because it evaluates whether the predicted probab
 
 For the GAM,
 
-$$\text{Brier}=0.0570.$$
+$$\text{Brier}=0.0570$$
 
 A baseline model would obtain approximately
 
-$$0.0585,$$
+$$0.0585$$
 
 so the GAM performs just slightly better.
 
@@ -1129,7 +1129,7 @@ where:
 
 Our result is:
 
-$$MCC=0.140.$$
+$$MCC=0.140$$
 
 Thus, there is a **positive but weak association between predictions and actual outcomes** (consistent with CM). Simply put:
 
@@ -1140,7 +1140,7 @@ Thus, there is a **positive but weak association between predictions and actual 
 
 The classification threshold selected using **Youden's index** is
 
-$$t^*=0.0554.$$
+$$t^*=0.0554$$
 
 The threshold analysis also shows the expected trade-off: lowering the threshold increases sensitivity but reduces specificity, while increasing it improves specificity at the cost of missing more arrests.
 
