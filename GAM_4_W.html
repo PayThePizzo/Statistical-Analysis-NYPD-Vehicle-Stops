@@ -2987,39 +2987,44 @@ optimally represents.</p>
 ## 
 ## R-sq.(adj) =  0.0268   Deviance explained = 9.31%
 ## -REML = 2.1492e+05  Scale est. = 1         n = 1619828</code></pre>
-<p>The model summary indicates that there are nonlinear effects for
-<code>hour_num</code> and <code>age_num</code> (we will see later).</p>
-<p>The model explains approximately <span class="math inline">\(9.61\%\)</span> (<span class="math inline">\(R^{2}
-= 0.0391\)</span>) of the variation of the post-stop arrests in NY
-during the period 2023-2025. These values indicate that the
-<strong>included variables explain only a limited proportion of the
-overall variation in arrest outcomes</strong>. This is not unexpected
-for a rare binary outcome such as <code>arrested</code>, where many
-determinants of an arrest may not be represented by these predictor</p>
+<p>The model explains approximately <strong>9.31% of the null
+deviance</strong> (<span class="math inline">\(R^{2}_{adj} =
+0.0268\)</span>) in post-stop arrests in New York during the period
+2023–2025. These values indicate that the <strong>included variables
+explain only a limited proportion of the overall arrest
+outcome</strong>. This is not unexpected for a rare binary outcome such
+as <code>arrested</code>, where many determinants of an arrest may not
+be represented by the available predictors.</p>
 <div id="coefficients" class="section level3">
 <h3>6.3.1) Coefficients</h3>
 <div id="general-interpretation" class="section level4">
 <h4>6.3.1.1) General Interpretation</h4>
 <p>The fitted GAM models the conditional probability of arrest using a
 binomial distribution with a logit link:</p>
-<p><span class="math display">\[\log\left(\frac{P(\text{arrested}=1)}{1-P(\text{arrested}=1)}\right)
+<p><span class="math display">\[
+\log\left(\frac{P(\text{arrested}=1)}
+{1-P(\text{arrested}=1)}\right)
 =
 \beta_0 + \mathbf{X}\boldsymbol{\beta}
 + f_1(\text{hour})
-+ f_2(\text{age}),\]</span></p>
++ f_2(\text{age})
+\]</span></p>
 <p>All parametric coefficients are expressed on the <strong>log-odds
 scale</strong>.</p>
 <p>Exponentiating a coefficient gives the corresponding <strong>odds
-ratio (OR)</strong> <span class="math inline">\(OR=e^\beta\)</span>. An
-<span class="math inline">\(OR&gt;1\)</span> indicates higher odds of
-arrest relative to the reference category, while <span class="math inline">\(OR&lt;1\)</span> indicates lower odds, holding all
+ratio (OR)</strong>,</p>
+<p><span class="math display">\[
+OR=e^\beta
+\]</span></p>
+<p>An <span class="math inline">\(OR&gt;1\)</span> indicates higher odds
+of arrest relative to the reference category, while <span class="math inline">\(OR&lt;1\)</span> indicates lower odds, holding all
 other variables constant.</p>
 </div>
 <div id="specific-interpretation-coefficients" class="section level4">
 <h4>6.3.1.2) Specific Interpretation — Coefficients</h4>
-<p>The <strong>intercept</strong> is <span class="math inline">\(-2.962\)</span>, corresponding to baseline odds of
-<span class="math inline">\(e^{-2.962}\approx0.052\)</span>, or a
-probability of approximately <span class="math inline">\(4.9\%\)</span>.</p>
+<p>The <strong>intercept</strong> is <span class="math inline">\(-4.177\)</span>, corresponding to baseline odds of
+<span class="math inline">\(e^{-4.177} \approx 0.0153\)</span> or a
+probability of approximately <strong>1.51%</strong>.</p>
 <ul>
 <li>However, the intercept should not be interpreted as the
 unconditional arrest rate. It refers to an <strong>observation belonging
@@ -3028,14 +3033,14 @@ are equal to zero</strong>.</li>
 </ul>
 <p>For the remaining coefficients, interpretations are conditional on
 all other predictors in the model.</p>
-<p>Let us see the significant (at <span class="math inline">\(5\%\)</span>) <em>time-related</em> coefficients
-first.</p>
+<p>Let us first consider the significant (at <span class="math inline">\(5%\)</span>) <em>time-related</em>
+coefficients</p>
 <table>
 <colgroup>
-<col width="24%" />
-<col width="24%" />
-<col width="24%" />
-<col width="26%" />
+<col width="20%" />
+<col width="8%" />
+<col width="5%" />
+<col width="65%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -3048,91 +3053,136 @@ first.</p>
 <tbody>
 <tr class="odd">
 <td><code>year2024</code></td>
-<td align="right">0.135</td>
-<td align="right">1.144</td>
-<td>Approximately <strong>14% higher odds</strong> of arrest than
+<td align="right">0.176</td>
+<td align="right">1.193</td>
+<td>Approximately <strong>19% higher odds</strong> of arrest than
 2023</td>
 </tr>
 <tr class="even">
 <td><code>year2025</code></td>
-<td align="right">0.209</td>
-<td align="right">1.232</td>
-<td>Approximately <strong>23% higher odds</strong> than 2023</td>
+<td align="right">0.162</td>
+<td align="right">1.176</td>
+<td>Approximately <strong>18% higher odds</strong> than 2023</td>
+</tr>
+<tr class="odd">
+<td><code>month2</code></td>
+<td align="right">-0.108</td>
+<td align="right">0.898</td>
+<td>February has approximately <strong>10% lower odds</strong> than
+January</td>
+</tr>
+<tr class="even">
+<td><code>month3</code></td>
+<td align="right">-0.079</td>
+<td align="right">0.924</td>
+<td>March has approximately <strong>8% lower odds</strong> than
+January</td>
 </tr>
 <tr class="odd">
 <td><code>month4</code></td>
-<td align="right">0.146</td>
-<td align="right">1.157</td>
-<td>April has approximately <strong>16% higher odds</strong> than
+<td align="right">-0.131</td>
+<td align="right">0.878</td>
+<td>April has approximately <strong>12% lower odds</strong> than
 January</td>
 </tr>
 <tr class="even">
 <td><code>month5</code></td>
-<td align="right">0.143</td>
-<td align="right">1.153</td>
-<td>May has approximately <strong>15% higher odds</strong> than
+<td align="right">-0.192</td>
+<td align="right">0.825</td>
+<td>May has approximately <strong>18% lower odds</strong> than
 January</td>
 </tr>
 <tr class="odd">
 <td><code>month6</code></td>
-<td align="right">0.137</td>
-<td align="right">1.147</td>
-<td>June has approximately <strong>15% higher odds</strong> than
+<td align="right">-0.168</td>
+<td align="right">0.845</td>
+<td>June has approximately <strong>16% lower odds</strong> than
 January</td>
 </tr>
 <tr class="even">
 <td><code>month7</code></td>
-<td align="right">0.210</td>
-<td align="right">1.234</td>
-<td>July has approximately <strong>23% higher odds</strong> than
+<td align="right">-0.220</td>
+<td align="right">0.803</td>
+<td>July has approximately <strong>20% lower odds</strong> than
 January</td>
 </tr>
 <tr class="odd">
-<td><code>month9</code></td>
-<td align="right">0.231</td>
-<td align="right">1.260</td>
-<td>September has approximately <strong>26% higher odds</strong> than
+<td><code>month8</code></td>
+<td align="right">-0.212</td>
+<td align="right">0.809</td>
+<td>August has approximately <strong>19% lower odds</strong> than
 January</td>
 </tr>
 <tr class="even">
+<td><code>month9</code></td>
+<td align="right">-0.168</td>
+<td align="right">0.845</td>
+<td>September has approximately <strong>16% lower odds</strong> than
+January</td>
+</tr>
+<tr class="odd">
 <td><code>month10</code></td>
-<td align="right">0.146</td>
-<td align="right">1.157</td>
-<td>October has approximately <strong>16% higher odds</strong> than
+<td align="right">-0.135</td>
+<td align="right">0.874</td>
+<td>October has approximately <strong>13% lower odds</strong> than
+January</td>
+</tr>
+<tr class="even">
+<td><code>month11</code></td>
+<td align="right">-0.133</td>
+<td align="right">0.875</td>
+<td>November has approximately <strong>13% lower odds</strong> than
 January</td>
 </tr>
 <tr class="odd">
 <td><code>weekdayTuesday</code></td>
-<td align="right">0.123</td>
-<td align="right">1.131</td>
-<td>Tuesday has approximately <strong>13% higher odds</strong> than
+<td align="right">0.079</td>
+<td align="right">1.082</td>
+<td>Tuesday has approximately <strong>8% higher odds</strong> than
+Monday</td>
+</tr>
+<tr class="even">
+<td><code>weekdayWednesday</code></td>
+<td align="right">0.092</td>
+<td align="right">1.097</td>
+<td>Wednesday has approximately <strong>10% higher odds</strong> than
+Monday</td>
+</tr>
+<tr class="odd">
+<td><code>weekdayThursday</code></td>
+<td align="right">0.055</td>
+<td align="right">1.057</td>
+<td>Thursday has approximately <strong>6% higher odds</strong> than
 Monday</td>
 </tr>
 <tr class="even">
 <td><code>weekdayFriday</code></td>
-<td align="right">-0.129</td>
-<td align="right">0.879</td>
-<td>Friday has approximately <strong>12% lower odds</strong> than
+<td align="right">0.054</td>
+<td align="right">1.056</td>
+<td>Friday has approximately <strong>6% higher odds</strong> than
 Monday</td>
 </tr>
 <tr class="odd">
-<td><code>weekdaySunday</code></td>
-<td align="right">-0.132</td>
-<td align="right">0.876</td>
-<td>Sunday has approximately <strong>12% lower odds</strong> than
+<td><code>weekdaySaturday</code></td>
+<td align="right">0.056</td>
+<td align="right">1.058</td>
+<td>Saturday has approximately <strong>6% higher odds</strong> than
 Monday</td>
 </tr>
 </tbody>
 </table>
-<p>As it is easy to see, there are other month and weekday coefficients
-but they are not “statistically different from their corresponding
-reference categories at the conventional <span class="math inline">\(5\%\)</span> level”.</p>
+<p>Most time-related coefficients are statistically significant in this
+larger sample.</p>
 <p>In particular,</p>
 <ul>
-<li><p>February, March, August, November and December do not differ
-significantly from January;</p></li>
-<li><p>Wednesday and Thursday similarly do not differ significantly from
-Monday, while Saturday shows weak evidence (<span class="math inline">\(p=0.082\)</span>).</p></li>
+<li>both 2024 and 2025 have significantly higher conditional odds of
+arrest than 2023;</li>
+<li>all months from February to November have significantly
+<strong>lower</strong> conditional odds than January;</li>
+<li>December does not differ significantly from January (<span class="math inline">\(p=0.621\)</span>);</li>
+<li>Tuesday through Saturday have significantly higher odds than
+Monday;</li>
+<li>Sunday does not differ significantly from Monday (<span class="math inline">\(p=0.368\)</span>).</li>
 </ul>
 <p>The coefficients from <code>boro</code> are all statistically
 significant at the same level:</p>
@@ -3148,62 +3198,64 @@ significant at the same level:</p>
 <tbody>
 <tr class="odd">
 <td>Brooklyn (North)</td>
-<td align="right">-0.878</td>
-<td align="right">0.416</td>
-<td align="right"><strong>58% lower</strong></td>
+<td align="right">-0.246</td>
+<td align="right">0.782</td>
+<td align="right"><strong>22% lower</strong></td>
 </tr>
 <tr class="even">
 <td>Brooklyn (South)</td>
-<td align="right">-0.539</td>
-<td align="right">0.583</td>
-<td align="right"><strong>42% lower</strong></td>
+<td align="right">-0.077</td>
+<td align="right">0.926</td>
+<td align="right"><strong>7% lower</strong></td>
 </tr>
 <tr class="odd">
 <td>Manhattan (North)</td>
-<td align="right">-1.120</td>
-<td align="right">0.326</td>
-<td align="right"><strong>67% lower</strong></td>
+<td align="right">-0.126</td>
+<td align="right">0.881</td>
+<td align="right"><strong>12% lower</strong></td>
 </tr>
 <tr class="even">
 <td>Manhattan (South)</td>
-<td align="right">-1.073</td>
-<td align="right">0.342</td>
-<td align="right"><strong>66% lower</strong></td>
+<td align="right">-0.630</td>
+<td align="right">0.532</td>
+<td align="right"><strong>47% lower</strong></td>
 </tr>
 <tr class="odd">
 <td>Queens (North)</td>
-<td align="right">-0.980</td>
-<td align="right">0.375</td>
-<td align="right"><strong>63% lower</strong></td>
+<td align="right">-0.586</td>
+<td align="right">0.556</td>
+<td align="right"><strong>44% lower</strong></td>
 </tr>
 <tr class="even">
 <td>Queens (South)</td>
-<td align="right">-0.706</td>
-<td align="right">0.493</td>
-<td align="right"><strong>51% lower</strong></td>
+<td align="right">-0.376</td>
+<td align="right">0.687</td>
+<td align="right"><strong>31% lower</strong></td>
 </tr>
 <tr class="odd">
 <td>Staten Island</td>
-<td align="right">-0.474</td>
-<td align="right">0.623</td>
-<td align="right"><strong>38% lower</strong></td>
+<td align="right">-0.113</td>
+<td align="right">0.893</td>
+<td align="right"><strong>11% lower</strong></td>
 </tr>
 </tbody>
 </table>
-<p>Plus, each coefficient has significantly lower conditional odds of
-arrest than the borough reference category (<code>Bronx</code>). These
-effects are <strong>some of the strongest parametric
-associations</strong> in the model.</p>
-<p>For what regards <code>sex</code>’s coefficients</p>
+<p>Each borough category therefore has significantly lower conditional
+odds of arrest than the reference category, <strong>Bronx</strong>,
+after fixing the remaining predictors.</p>
+<p>The largest geographical differences are observed for
+<code>Manhattan (South)</code> and <code>Queens (North)</code>, whose
+estimated odds are approximately <strong>47% and 44% lower</strong>,
+respectively, than those in the Bronx.</p>
+<p>For what regards <code>sex</code>:</p>
 <ul>
-<li>We have a great association for <code>sexF</code>, <span class="math inline">\(e^{-1.174}=0.309\)</span>. This means, the related
-observations have approximately <strong>69% lower odds of
-arrest</strong> than the reference sex category (<code>sexM</code>),
-fixing the remaining predictors;</li>
-<li>However, the coefficient for <code>sexU</code> is small and
-non-significant (<span class="math inline">\(p=0.816\)</span>). In other
-words, we see no evidence of a difference from the reference
-category.</li>
+<li><code>sexF</code> has a coefficient of <span class="math inline">\(-0.908\)</span>, giving <span class="math inline">\(e^{-0.908} \approx 0.403\)</span>. Thus,
+observations labeled as <code>sexF</code> have approximately <strong>60%
+lower odds of arrest</strong> than the reference category
+(<code>sexM</code>), fixing the remaining predictors.</li>
+<li>The coefficient for <code>sexU</code> is small and non-significant
+(<span class="math inline">\(p=0.373\)</span>), so there is no
+statistical evidence of a difference from <code>sexM</code>.</li>
 </ul>
 <p><code>ethnicity</code> also shows substantial conditional
 differences:</p>
@@ -3219,44 +3271,51 @@ differences:</p>
 <tbody>
 <tr class="odd">
 <td>Asian / Pacific Islander</td>
-<td align="right">-0.675</td>
-<td align="right">0.509</td>
-<td align="right"><strong>49% lower</strong></td>
+<td align="right">0.138</td>
+<td align="right">1.148</td>
+<td align="right"><strong>15% higher</strong></td>
 </tr>
 <tr class="even">
 <td>Black</td>
-<td align="right">0.447</td>
-<td align="right">1.563</td>
-<td align="right"><strong>56% higher</strong></td>
+<td align="right">1.209</td>
+<td align="right">3.349</td>
+<td align="right"><strong>235% higher</strong></td>
 </tr>
 <tr class="odd">
 <td>Hispanic</td>
-<td align="right">0.642</td>
-<td align="right">1.900</td>
-<td align="right"><strong>90% higher</strong></td>
+<td align="right">1.159</td>
+<td align="right">3.185</td>
+<td align="right"><strong>219% higher</strong></td>
 </tr>
 <tr class="even">
 <td>Other</td>
-<td align="right">-2.569</td>
-<td align="right">0.077</td>
-<td align="right"><strong>92% lower</strong></td>
+<td align="right">-0.453</td>
+<td align="right">0.636</td>
+<td align="right"><strong>36% lower</strong></td>
 </tr>
 <tr class="odd">
 <td>Unknown</td>
-<td align="right">-1.055</td>
-<td align="right">0.348</td>
-<td align="right"><strong>65% lower</strong></td>
+<td align="right">-0.466</td>
+<td align="right">0.628</td>
+<td align="right"><strong>37% lower</strong></td>
 </tr>
 </tbody>
 </table>
 <p>These comparisons are all relative to <code>White</code>.</p>
-<p>For example (holding the other variables constant) the estimated odds
-of arrest for observations categorized as <code>Hispanic</code> are
-around <strong>1.90 times</strong> those of <code>White</code>. Instead,
-<code>Asian / Pacific Islander</code> have approximately half the
-odds.</p>
-<p><em>We move the discussion of smooth effects to the next
-section</em>.</p>
+<p>For example, holding all other predictors constant, the estimated
+odds of arrest for observations categorized as <code>Black</code> are
+approximately <strong>3.35 times</strong> those for <code>White</code>,
+while the odds for <code>Hispanic</code> observations are approximately
+<strong>3.19 times</strong> those for <code>White</code>.</p>
+<p><code>Asian / Pacific Islander</code> also shows statistically
+significant higher odds, at approximately <strong>15% higher
+odds</strong> than <code>White</code>.</p>
+<p>On the other hand, observations categorized as <code>Other</code> and
+<code>Unknown</code> have approximately <strong>36–37% lower conditional
+odds</strong> than the reference category.</p>
+<p><em>We move the discussion of the smooth effects for
+<code>hour_num</code> and <code>age_num</code> to the next
+section.</em></p>
 </div>
 </div>
 <div id="smooth-term-and-plots" class="section level3">
@@ -3310,62 +3369,66 @@ curves</strong> represent uncertainty around the estimated smooth.</p>
 </div>
 <div id="focus-smooth-effect-of-hour" class="section level4">
 <h4>6.3.2.2) Focus: Smooth effect of hour</h4>
-<p>The smooth term for <code>hour</code> is statistically
+<p>The smooth term for <code>hour</code> is highly statistically
 significant:</p>
-<p><span class="math display">\[\text{edf}=7.52,\qquad
-\chi^2=1164,\qquad p&lt;2\times10^{-16}.\]</span></p>
+<p><span class="math display">\[
+\text{edf}=7.925,\qquad
+\chi^2=6499,\qquad
+p&lt;2\times10^{-16}
+\]</span></p>
 <p>This provides very strong evidence that <strong>time of day is
-associated with arrest probability after controlling for the other
-predictors</strong>. In other words, the hourly pattern matters.</p>
-<p>Furthermore, its <strong>effect is strongly non-linear</strong>
-(<span class="math inline">\(\text{edf}=7.52 &gt;&gt; 1,\
-p&lt;2\times10^{-16}\)</span>).</p>
-<p>Since the significance test is not enough to indicate which
-particular hours have the highest or lowest arrest probabilities, we
-look again at the picture.</p>
-<p>The estimated arrest propensity (or “conditional log-odds of arrest
-relative to the model’s average smooth effect”)</p>
-<ol style="list-style-type: decimal">
-<li>Is <strong>relatively high</strong> during the
-<strong>late-night/very early morning</strong>. In fact, we can see that
-from around 8 PM to 3 AM we have <span class="math inline">\(&gt;
-0.5\)</span>, with a peak at <strong>1-2 AM</strong>;</li>
-<li>Then, it decreases during the early morning from approximately
-<strong>4 AM onward</strong> and finds its minimum around <strong>7–8
-AM</strong>;</li>
-<li>After approximately 8 AM, the smooth rises rapidly and after around
-12 PM it gradually increases through the afternoon and evening;</li>
-<li>By the <strong>late evening (approximately 8 PM - 11 PM)</strong>,
-it is clearly elevated.</li>
-</ol>
-<p>Thus, the model provides further evidence towards the hypothesis we
-made during the EDA.</p>
-<p>The fitted smooth <span class="math inline">\(f_{\text{hour}}\)</span> covers around <span class="math inline">\(2.3\)</span> log-odds units between its minimum
-and maximum. This corresponds to <span class="math inline">\(\approx 10
-\times\)</span> difference/change in estimated arrest odds between the
-corresponding hours, conditional on the other variables in the
-model.</p>
+associated with the conditional probability of arrest after controlling
+for the other predictors</strong>.</p>
+<p>Furthermore, the relationship is clearly <strong>non-linear</strong>,
+since <span class="math inline">\(\text{edf}=7.925 &gt;&gt;
+1\)</span>.</p>
+<p>The estimated arrest propensity follows exactly the same pattern of
+the 2-wheels analysis. This provides further evidence for the temporal
+pattern already observed during the EDA.</p>
+<p>The fitted smooth ranges approximately from <span class="math inline">\(-1.3\)</span> at its minimum to around <span class="math inline">\(+0.6\)</span> at its maximum, corresponding to a
+difference of about <strong>1.9 log-odds units</strong>. This means that
+the estimated odds of arrest can differ by roughly <span class="math inline">\(e^{1.9} \approx 6.7 \times\)</span> between the
+highest and lowest portions of the daily curve**, fixing the remaining
+variables in the model.</p>
 </div>
 <div id="focus-smooth-effect-of-age" class="section level4">
 <h4>6.3.2.3) Focus: Smooth effect of age</h4>
 <p>Age also has a highly significant smooth effect:</p>
-<p><span class="math display">\[\text{edf}=4.66,\qquad
-\chi^2=108,\qquad
-p&lt;2\times10^{-16}.\]</span></p>
-<p>Thus, there is <strong>strong evidence that arrest probability varies
-with age</strong> after fixing the remaining predictors.</p>
-<p>Again, <span class="math inline">\(\text{edf}=4.66,\
-p&lt;2\times10^{-16}\)</span> indicates that the relationship is
-meaningfully <strong>non-linear</strong> and statistically significant
-(although its variation is smaller than <code>hour</code>).</p>
-<p>The curve indicates <strong>relatively elevated conditional arrest
-propensity</strong> among the <strong>youngest drivers</strong>. Then,
-we observe a local minimum at approximately <strong>28–30
-years</strong>. From roughly <strong>30-50 years</strong> the age effect
-is close to zero. Finally, the curve rises to a local maximum at
-<strong>60–62 years</strong>, before a big decline for <strong>65–70
-years</strong> (which have wider confidence intervals indicating
-uncertainty, consistent with the number of observations).</p>
+<p><span class="math display">\[
+\text{edf}=4.878,\qquad
+\chi^2=4057,\qquad
+p&lt;2\times10^{-16}
+\]</span></p>
+<p>Thus, there is very strong evidence that <strong>the conditional
+probability of arrest varies with age</strong>, after fixing the
+remaining predictors.</p>
+<p>Again, <span class="math inline">\(\text{edf}=4.878 &gt;&gt;
+1\)</span> indicates that this relationship is
+<strong>non-linear</strong>.</p>
+<p>The shape of the smooth differs substantially from the one observed
+in the previous, smaller dataset. The estimated age effect:</p>
+<ol style="list-style-type: decimal">
+<li>Is slightly negative for the <strong>youngest drivers</strong>,
+below age 20;</li>
+<li>Then increases rapidly, and (becoming positive) it reaches its
+maximum at <strong>27–30 years</strong>;</li>
+<li>After approximately age 30, there is a gradual decline and it
+crosses the zero line at <strong>38–40 years</strong>;</li>
+<li>From approximately <strong>40 years</strong>, the conditional effect
+becomes increasingly negative;</li>
+<li>The decline becomes particularly pronounced after <strong>50–55
+years</strong>, with the lowest estimated values observed among the
+oldest drivers.</li>
+</ol>
+<p>Therefore, the model suggests that the <strong>highest conditional
+arrest propensity occurs around the late twenties</strong>, after which
+the estimated effect decreases progressively with age.</p>
+<p>The fitted smooth moves from approximately <span class="math inline">\(+0.35\)</span> (max) to around <span class="math inline">\(-1.8\)</span>. This represents a difference of
+approximately <strong>2 log-odds units</strong>, which corresponds to an
+odds ratio of roughly <span class="math inline">\(e^{2} \approx
+7.4\)</span>. Thus, the model suggests a big change in conditional
+arrest odds between the age range with the highest estimated effect and
+the oldest observations.</p>
 </div>
 </div>
 </div>
@@ -3384,28 +3447,33 @@ uncertainty, consistent with the number of observations).</p>
 <span id="cb29-11"><a href="#cb29-11" tabindex="-1"></a>))</span></code></pre></div>
 <pre><code>## AUC: 0.7347  |  Threshold (Youden): 0.0300
 ## Sensitivity: 0.754  |  Specificity: 0.613  |  Balanced accuracy: 0.683</code></pre>
-<p>The Youden threshold is <strong>0.0554</strong>, way below the 0.5
-cutoff.</p>
-<p>Moreover, the <strong>AUC of 0.6897</strong> indicates
-<strong>moderate discriminatory ability</strong>: the GAM separates
-arrest from non-arrest cases a bit better than chance.</p>
+<p>The Youden threshold is 0.0300, which is again far below the
+conventional 0.5 cutoff. This is consistent with the strong class
+imbalance in the test set, where only approximately 3.51% of
+observations correspond to arrests.</p>
+<p>Moreover, the AUC of 0.7347 indicates moderate discriminatory
+ability: the GAM separates arrest from non-arrest cases a bit better
+than chance.</p>
 <div id="confusion-matrix" class="section level3">
 <h3>6.4.1) Confusion Matrix</h3>
 <div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a><span class="fu">plot_cm</span>(test<span class="sc">$</span>arrested, class_gam, <span class="at">title =</span> <span class="st">&quot;GAM — Confusion Matrix (Youden threshold)&quot;</span>)</span></code></pre></div>
 <p><img role="img" aria-label src="data:image/png;base64,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AACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACa45jbFQBeQk+eJGzftOnAvj2Rt2/fuX3ryZMnnp6eJUqVqt+wcafuPRo0apzbFVS7+PeFrRsDgg7/FX0nMj4+3tfPr3iJkq3atuvzxps+vr65XTtoyD+hf2/fFHD0yF/RUXcexsf7+PoVL1GyRZu2vV8fUMyHQxG2ZKfT6XK7DngJxT5NScvQ4qGVlpY2bdKE5YsXJSY+MVamTv36P85fUOWVatbsaOZ3U2d+N9X88j/Mnf+/t9/RX/4gJubLMaN3bt1scC0HB4e3R7z/zZRvnZydVS+1b970fMgZ8yugciv2kbOLi8Wrv3CKubs8SExJTkvP7YrkkJvXr/268GfpcSn/MsPeH5XpKg9iYr757ONd27YYfNXBweGtd9/7atJU/UPRHJ1bvnrhbIgFK0qu3YtXHq6zvv929vffmr/6tNnzBr71tmqhTTbyQvMp4Opob5eLFaAFCLCZuNjYYYMGHD1y2HSxkODg9s2b/rp6XduOnSzeV/jVqxavKwu7crlnh7YPYmKMFUhPT1/887zjR4M2bN9VuEgR6/cIjZj344yANSulx/UbNck0AIVfudy3S3vTh+LSBfNP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cwFI4ujo2KlTpxzeKQAAgFJOByAAAIBcRwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACaQwACAACa45jbFQDylozU5Ef/1959xzV1Lv4Df5KQAIEQkI0sERCVoYh7i71qXWhdvVorbX91tXapbW3ttdrvta4urXW0trau63XVaxUVByguUMEFMmRF9gozJCTn98exMZwMEkAQz+f9R1/hOc85eQ49hk/Oecb9mOrMRFlBekOtVCWX8YQiMys7oXsPa59QkV8/DqftvjbICh9J78dUZycpKkuUdVV8kT1f7GTdtY9d4CgzkX2bNcMYVINcmhJXlR4vK0hvqCmnVCq+2Elg52rbY5hNwBAOz9iPmg50ytD2FPV1966efnT3WkFWSk1luVxWKxSJrcUO7v4hXYMH+vcexuG22j/PwuzUe1eiMh/cqCwtrKuptLFzEju4dA0ZFDxkgsjOsbXeBdoRh6Ko9m4DvICm/xiXkl/Z3q0wWVnCicJLe5S1elsusHN1GRlp032ISYdVyevk5fmMQq6FlUDsrG+XhpqK/NM/SZMv6dzK4XA79Z3kMuoN44OF8ZrR2op75wsv/KaoLNG51Uwodhu7uMlfWjuechu4+9W4Py5mpOdXtXdDWkFZYe71U/vo13ZOnQe8PMdw/ZjD22IObzf++OPf/KxP+DTt8vgz/4k5vK22qkLfjnbO7uGz3uvRf7Tx76VTTWXZqV+/fnD9rM6tHC6335hXR7/6Hs+Mb9Jhjfy9/fz57LxHD0w6sqbPdl/n8QXN3r0tfTCph61Veza1Q36UADwD1OP/fVd+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rIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsgwAEAAAArIMABAAAAKyDAAQAAACsY9beDYAXk6WAZ22OqwvgKT6Pa87ntXcrAOAJDkVR7d0GAAAAgDaFR2AAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADAOghAAAAAwDoIQAAAAMA6CEAAAADA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" alt width="384" /></p>
-<p>The confusion matrix shows</p>
+<p>The confusion matrix shows:</p>
 <ul>
-<li><strong>1,496 true positives</strong>;</li>
-<li><strong>816 false negatives</strong>;</li>
-<li><strong>22,008 true negatives</strong>;</li>
-<li>And <strong>12,729 false positives</strong>.</li>
+<li>10,755 true positives;</li>
+<li>3,507 false negatives;</li>
+<li>240,490 true negatives;</li>
+<li>And 152,017 false positives.</li>
 </ul>
+<p>The model therefore identifies a relatively large proportion of the
+actual arrests, but this comes at the cost of a very large number of
+false-positive arrest predictions.</p>
 <p>Now for the derived metrics:</p>
 <table>
 <colgroup>
-<col width="43%" />
-<col width="25%" />
-<col width="31%" />
+<col width="13%" />
+<col width="3%" />
+<col width="83%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -3417,35 +3485,35 @@ arrest from non-arrest cases a bit better than chance.</p>
 <tbody>
 <tr class="odd">
 <td>Accuracy</td>
-<td align="right">0.634</td>
-<td>About 63.4% of all observations are classified correctly</td>
+<td align="right">0.618</td>
+<td>About 61.8% of all observations are classified correctly</td>
 </tr>
 <tr class="even">
 <td>Sensitivity / Recall</td>
-<td align="right">0.647</td>
-<td>The model correctly identifies about 64.7% of actual arrests</td>
+<td align="right">0.754</td>
+<td>The model correctly identifies about 75.4% of actual arrests</td>
 </tr>
 <tr class="odd">
 <td>Specificity</td>
-<td align="right">0.634</td>
-<td>About 63.4% of actual non-arrests are correctly classified</td>
+<td align="right">0.613</td>
+<td>About 61.3% of actual non-arrests are correctly classified</td>
 </tr>
 <tr class="even">
 <td>Precision</td>
-<td align="right">0.105</td>
-<td>Only about 10.5% of predicted arrests are actual arrests</td>
+<td align="right">0.066</td>
+<td>Only about 6.6% of predicted arrests are actual arrests</td>
 </tr>
 <tr class="odd">
 <td>F1</td>
-<td align="right">0.181</td>
-<td>The low value reflects the difficult trade-off between recall and
-precision for the minority class</td>
+<td align="right">0.122</td>
+<td>The low value reflects the strong imbalance and the trade-off
+between relatively high recall and very low precision</td>
 </tr>
 <tr class="even">
 <td>Balanced Accuracy</td>
-<td align="right">0.640</td>
+<td align="right">0.683</td>
 <td>Averaging sensitivity and specificity gives a more appropriate
-summary than ordinary accuracy in this imbalanced setting</td>
+overall measure than ordinary accuracy in this imbalanced setting</td>
 </tr>
 </tbody>
 </table>
@@ -3566,65 +3634,72 @@ NA
 <tbody>
 <tr class="odd">
 <td><strong>AUC</strong></td>
-<td align="right">0.6897</td>
+<td align="right">0.7347</td>
 <td>Moderate discrimination between arrests and non-arrests</td>
 </tr>
 <tr class="even">
 <td><strong>PR-AUC</strong></td>
-<td align="right">0.1247</td>
-<td>Above the no-skill baseline of <span class="math inline">\(\approx
-0.062\)</span>, but still low in absolute terms</td>
+<td align="right">0.0790</td>
+<td>More than twice the no-skill baseline of <span class="math inline">\(\approx 0.035\)</span>, although still low in
+absolute terms</td>
 </tr>
 <tr class="odd">
 <td><strong>Log-Loss</strong></td>
-<td align="right">0.2235</td>
-<td>Predicted probabilities contain useful information, though
-improvement over a prevalence-only model is modest</td>
+<td align="right">0.1400</td>
+<td>Probability predictions improve on a prevalence-only model, although
+substantial uncertainty remains</td>
 </tr>
 <tr class="even">
 <td><strong>Brier</strong></td>
-<td align="right">0.0570</td>
-<td>Reasonably accurate probability estimates and slightly better than
-the prevalence-only baseline</td>
+<td align="right">0.0330</td>
+<td>Slightly better than the prevalence-only baseline and consistent
+with generally good calibration</td>
 </tr>
 <tr class="odd">
 <td>Threshold</td>
-<td align="right">0.0554</td>
-<td>Low cutoff selected by Youden’s criterion, appropriate for the rare
+<td align="right">0.0300</td>
+<td>Low cutoff selected by Youden’s criterion, reflecting the rare
 positive class</td>
 </tr>
 <tr class="even">
 <td><strong>MCC</strong></td>
-<td align="right">0.140</td>
+<td align="right"><span class="math inline">\(\approx
+0.138\)</span></td>
 <td>Weak positive association between predicted and observed
 classes</td>
 </tr>
 <tr class="odd">
 <td>Balanced Accuracy</td>
-<td align="right">0.640</td>
-<td>Moderate performance when both classes are weighted equally</td>
+<td align="right">0.683</td>
+<td>Moderate performance when sensitivity and specificity are weighted
+equally</td>
 </tr>
 </tbody>
 </table>
-<p>The main conclusion is that the GAM captures <strong>meaningful but
-limited predictive signal</strong>. It manages to discriminate arrests
-from non-arrests better than chance and produces reasonably calibrated
-probabilities, but its <strong>ability to make precise positive
-classifications is still weak</strong>.</p>
+<p>The main conclusion is that the GAM captures a <strong>meaningful but
+still limited predictive signal</strong>. Compared with the previous
+analysis, discrimination is stronger, with an AUC above <span class="math inline">\(0.73\)</span>, and the model detects a substantial
+proportion of arrests. However, the severe class imbalance continues to
+produce <strong>very low precision</strong> when probabilities are
+converted into binary classifications.</p>
+<p>Note: <code>MCC</code> is reported as <code>NA</code> in the metrics
+table, but it can be computed directly from the confusion matrix and is
+approximately <span class="math inline">\(0.138\)</span>.</p>
 </div>
 <div id="auc" class="section level4">
 <h4>6.4.2.2) AUC</h4>
-<p>The test-set AUC is <span class="math inline">\(\approx
-0.690\)</span>.</p>
+<p>The test-set AUC is <span class="math inline">\(\text{AUC} =
+0.7347\)</span></p>
 <p>This means that if we randomly select (i) one observation where an
-arrest occurred, and (ii) one observation where an arrest did not occur,
+arrest occurred and (ii) one observation where an arrest did not occur,
 the model assigns a higher predicted probability to the arrest
-observation about 69% of the time.</p>
-<p>The ROC curve <strong>remains consistently above the main
-diagonal</strong>, indicating that the model contains useful ranking
-information. However, an AUC below <span class="math inline">\(0.70\)</span> also shows that there is still a
-great deal of overlap between the predicted probabilities of the two
-classes.</p>
+observation approximately <strong>73.5% of the time</strong>.</p>
+<p>The ROC curve remains clearly above the main diagonal across the
+range of thresholds. Thus, the model contains useful ranking information
+and shows <strong>moderate discriminatory ability</strong>.</p>
+<p>Unfortunately, an AUC of approximately <span class="math inline">\(0.735\)</span> is still far from perfect
+discrimination, meaning that considerable overlap remains between the
+predicted probabilities of arrests and non-arrests.</p>
 </div>
 <div id="pr-auc" class="section level4">
 <h4>6.4.2.3) PR-AUC</h4>
@@ -3633,16 +3708,20 @@ classes.</p>
 optimistic impression of performance. <strong>Precision-Recall AUC
 focuses directly on the positive class</strong>, considering the
 trade-off between precision and recall.</p>
+<p>The test-set prevalence of <code>arrested == 1</code> is
+approximately <span class="math inline">\(3.51\%\)</span> so the
+no-skill PR-AUC is approximately <span class="math inline">\(\text{PR-AUC}_{\text{baseline}}\approx0.035\)</span></p>
 <p>Here, we obtain:</p>
-<p><span class="math display">\[\text{PR-AUC}=0.1247\]</span></p>
-<p>The baseline PR-AUC is approximately equal to the positive-class
-prevalence:</p>
-<p><span class="math display">\[\text{PR-AUC}_{\text{baseline}}\approx0.062\]</span></p>
-<p><em>But how good is</em> <span class="math inline">\(0.1247\)</span>?
-It is roughly <strong>twice the baseline</strong>, indicating that the
-<strong>GAM does provide useful information for ranking observations
-according to arrest risk</strong>. However, the precision is still very
-low.</p>
+<p><span class="math display">\[
+\text{PR-AUC}=0.079
+\]</span></p>
+<p><em>But how good is it?</em> It is more than <strong>twice the
+no-skill baseline</strong>, indicating that the model provides useful
+information for ranking observations according to arrest propensity.
+However, the absolute value remains low (precision of <span class="math inline">\(0.066\)</span>).</p>
+<p>Thus, the PR curve shows us that <strong>ranking performance is
+meaningful, but precise identification of the rare positive class
+remains difficult</strong>.</p>
 </div>
 <div id="log-loss" class="section level4">
 <h4>6.4.2.4) Log-Loss</h4>
@@ -3653,15 +3732,17 @@ classification is correct.</p>
 </blockquote>
 <p>This measure cares about <strong>how confident the model is</strong>.
 In our case:</p>
-<p><span class="math display">\[\text{Log-Loss}=0.2235.\]</span></p>
+<p><span class="math display">\[
+\text{Log-Loss}=0.140
+\]</span></p>
 <p>TODO: Rephrase the following.</p>
-<p>In order to give some more context, a simple model assigning to every
-observation the test-set arrest prevalence of approximately <span class="math inline">\(6.2\%\)</span> would obtain a log-loss of about
-<span class="math inline">\(0.234\)</span>.</p>
-<p>The GAM <strong>improves on this simple baseline, although very
-little</strong>. Its probability estimates contain useful information,
-but a considerable amount of uncertainty in the outcome remains
-unexplained.</p>
+<p>To provide a baseline comparison, a model assigning the test-set
+arrest prevalence of approximately <span class="math inline">\(3.51\%\)</span> to every observation would obtain
+a log-loss of approximately <span class="math inline">\(0.152\)</span>.</p>
+<p>The GAM therefore improves on this simple prevalence-only model. The
+improvement is important but not large: the predictor information
+improves the estimated probabilities, while a great amount of
+uncertainty about individual arrest outcomes remains unexplained.</p>
 </div>
 <div id="brier-score" class="section level4">
 <h4>6.4.2.5) Brier Score</h4>
@@ -3673,10 +3754,14 @@ merely whether the model ranks observations correctly.</p>
 probabilities (the lower, the better).</p>
 </blockquote>
 <p>For the GAM,</p>
-<p><span class="math display">\[\text{Brier}=0.0570.\]</span></p>
-<p>A baseline model would obtain approximately</p>
-<p><span class="math display">\[0.0585,\]</span></p>
-<p>so the GAM performs just slightly better.</p>
+<p><span class="math display">\[
+\text{Brier}=0.033
+\]</span></p>
+<p>A prevalence-only model would obtain approximately</p>
+<p><span class="math display">\[
+0.0338
+\]</span></p>
+<p>so, the GAM performs only slightly better than the baseline.</p>
 <p>Together with the calibration plot, this suggests that the predicted
 probabilities are <strong>reasonably calibrated overall</strong>:
 <strong>groups assigned higher arrest probabilities tend to show
@@ -3700,10 +3785,13 @@ predictions and outcomes</li>
 prediction</li>
 </ul>
 <p>Our result is:</p>
-<p><span class="math display">\[MCC=0.140.\]</span></p>
-<p>Thus, there is a <strong>positive but weak association between
-predictions and actual outcomes</strong> (consistent with CM). Simply
-put:</p>
+<p><span class="math display">\[
+MCC\approx0.138.
+\]</span></p>
+<p>Thus, there is a <strong>positive but weak association between the
+predicted classes and the actual outcomes</strong> (consistent with CM).
+Simply put:</p>
+<p>This is consistent with the other classification metrics:</p>
 <ul>
 <li>The model is doing meaningfully better than random
 classification;</li>
@@ -3714,7 +3802,9 @@ classification;</li>
 <h4>6.4.2.7) Thresholds</h4>
 <p>The classification threshold selected using <strong>Youden’s
 index</strong> is</p>
-<p><span class="math display">\[t^*=0.0554.\]</span></p>
+<p><span class="math display">\[
+t^*=0.0300.
+\]</span></p>
 <p>The threshold analysis also shows the expected trade-off: lowering
 the threshold increases sensitivity but reduces specificity, while
 increasing it improves specificity at the cost of missing more
@@ -3724,37 +3814,43 @@ arrests.</p>
 <h4>6.4.2.8) Final Remarks</h4>
 <p>Let us put the metrics together:</p>
 <ul>
-<li><strong>Discrimination</strong>, <span class="math inline">\(\text{AUC} \approx 0.690\)</span>: the GAM has
+<li><strong>Discrimination</strong>, <span class="math inline">\(\text{AUC}\approx0.735\)</span>: the GAM has
 moderate ability to rank arrests above non-arrests;</li>
-<li><strong>Rare-class performance</strong>, <span class="math inline">\(\text{PR-AUC} \approx 0.125\)</span>: clearly
-better than the <span class="math inline">\(\approx0.062\)</span>
-no-skill baseline, but positive-class identification remains
-difficult;</li>
-<li><strong>Probability predictions</strong>, <span class="math inline">\(\text{Brier} \approx 0.057,\; \text{LogLoss}
-\approx 0.224\)</span>: probabilities are reasonably calibrated and
-improve modestly over a prevalence-only model;</li>
-<li><strong>Classification</strong>, <span class="math inline">\(\text{MCC} \approx 0.140\)</span>: binary
-predictions show only a weak association with the true outcomes;</li>
-<li><strong>Class balance</strong>, <span class="math inline">\(\text{ACC}_{\text{Balanced}} \approx
-0.640\)</span>: sensitivity and specificity are reasonably balanced, but
-overall classification performance remains moderate.</li>
+<li><strong>Rare-class performance</strong>, <span class="math inline">\(\text{PR-AUC}\approx0.079\)</span>: more than
+twice the <span class="math inline">\(\approx0.035\)</span> no-skill
+baseline, although positive-class identification remains difficult;</li>
+<li><strong>Probability predictions</strong>, <span class="math inline">\(\text{Brier}\approx0.033,\;
+\text{LogLoss}\approx0.140\)</span>: probabilities are generally well
+calibrated and improve modestly over a prevalence-only model;</li>
+<li><strong>Classification</strong>, <span class="math inline">\(\text{MCC}\approx0.138\)</span>: binary
+predictions show only a weak positive association with the true
+outcomes;</li>
+<li><strong>Class balance</strong>, <span class="math inline">\(\text{ACC}_{\text{Balanced}}\approx0.683\)</span>:
+the model obtains a reasonably balanced sensitivity-specificity
+trade-off;</li>
+<li><strong>Sensitivity</strong>, <span class="math inline">\(0.754\)</span>: approximately three quarters of
+actual arrests are detected, although this comes at the cost of very low
+precision (<span class="math inline">\(0.066\)</span>).</li>
 </ul>
 <p>Now for the final conclusions:</p>
 <ul>
-<li>The GAM captures a <strong>real but limited predictive
-signal</strong> in the available demographic, temporal, and geographical
-variables.</li>
-<li>Its strongest result is its ability to <strong>rank observations by
-relative arrest risk</strong>, rather than to produce highly accurate
-binary classifications.</li>
-<li>The low positive-class prevalence strongly affects precision:
-obtaining a sensitivity of <span class="math inline">\(0.647\)</span>
-requires accepting a substantial number of false positives.</li>
-<li>The probability estimates appear more useful than the thresholded
-classifications, particularly given the reasonably good
-calibration.</li>
-<li>Consequently, the GAM is best interpreted as a model of
-<strong>relative arrest propensity and estimated probability</strong>,
+<li>The GAM captures a <strong>meaningful predictive signal</strong> in
+the available demographic, temporal, and geographical variables.</li>
+<li>Its strongest result is its ability to <strong>rank observations
+according to relative arrest propensity</strong>, with an AUC of
+approximately <span class="math inline">\(0.735\)</span>.</li>
+<li>The PR-AUC is substantially above the prevalence baseline,
+confirming that the model contains useful information about the rare
+positive class, even though precision remains low.</li>
+<li>The severe class imbalance strongly affects classification:
+obtaining a sensitivity of <span class="math inline">\(0.754\)</span>
+requires accepting a large number of false-positive arrest
+predictions.</li>
+<li>The predicted probabilities appear <strong>more informative than the
+final binary classifications</strong>, particularly given the relatively
+good calibration.</li>
+<li>Consequently, the GAM is best interpreted as a model for
+<strong>estimating and ranking conditional arrest propensity</strong>,
 rather than as a highly accurate classifier of individual arrests.</li>
 </ul>
 </div>
