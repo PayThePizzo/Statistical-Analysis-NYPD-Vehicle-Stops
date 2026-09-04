@@ -1440,7 +1440,7 @@ Therefore, the difference between the two LASSO models is not being driven by ra
 
 Let us up the metrics together:
 
-- **Discrimination**, $\text{AUC} \approx 0.687$: The model has **some useful ability to distinguish arrests from non-arrests**, but discrimination is moderate rather than strong.
+- **Discrimination**, $\text{AUC} \approx 0.687$: The model has **some useful ability to distinguish arrests from non-arrests**, but discrimination is moderate.
 - **Rare-class performance**, $\text{PR} \text{-} \text{AUC} \approx 0.121$: The model performs better than the prevalence baseline, but precision remains low.
 - **Probability predictions**, $\text{Brier} \approx 0.058, \,\, \text{LogLoss} \approx 0.224$: The models produce probabilities with **limited but non-negligible predictive information**. The 1-SE model has a marginally lower log-loss, while Brier score is identical.
 - **Classification**, $\text{MCC} \approx 0.14$: The thresholded predictions have only a **weak overall association** with the actual outcome.
