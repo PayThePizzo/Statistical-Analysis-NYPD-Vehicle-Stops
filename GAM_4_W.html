@@ -3001,21 +3001,17 @@ be represented by the available predictors.</p>
 <h4>6.3.1.1) General Interpretation</h4>
 <p>The fitted GAM models the conditional probability of arrest using a
 binomial distribution with a logit link:</p>
-<p><span class="math display">\[
-\log\left(\frac{P(\text{arrested}=1)}
+<p><span class="math display">\[\log\left(\frac{P(\text{arrested}=1)}
 {1-P(\text{arrested}=1)}\right)
 =
 \beta_0 + \mathbf{X}\boldsymbol{\beta}
 + f_1(\text{hour})
-+ f_2(\text{age})
-\]</span></p>
++ f_2(\text{age})\]</span></p>
 <p>All parametric coefficients are expressed on the <strong>log-odds
 scale</strong>.</p>
 <p>Exponentiating a coefficient gives the corresponding <strong>odds
 ratio (OR)</strong>,</p>
-<p><span class="math display">\[
-OR=e^\beta
-\]</span></p>
+<p><span class="math display">\[OR=e^\beta\]</span></p>
 <p>An <span class="math inline">\(OR&gt;1\)</span> indicates higher odds
 of arrest relative to the reference category, while <span class="math inline">\(OR&lt;1\)</span> indicates lower odds, holding all
 other variables constant.</p>
@@ -3037,10 +3033,10 @@ all other predictors in the model.</p>
 coefficients</p>
 <table>
 <colgroup>
-<col width="20%" />
-<col width="8%" />
-<col width="5%" />
-<col width="65%" />
+<col width="15%" />
+<col width="15%" />
+<col width="15%" />
+<col width="54%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -3371,11 +3367,9 @@ curves</strong> represent uncertainty around the estimated smooth.</p>
 <h4>6.3.2.2) Focus: Smooth effect of hour</h4>
 <p>The smooth term for <code>hour</code> is highly statistically
 significant:</p>
-<p><span class="math display">\[
-\text{edf}=7.925,\qquad
+<p><span class="math display">\[\text{edf}=7.925,\qquad
 \chi^2=6499,\qquad
-p&lt;2\times10^{-16}
-\]</span></p>
+p&lt;2\times10^{-16}\]</span></p>
 <p>This provides very strong evidence that <strong>time of day is
 associated with the conditional probability of arrest after controlling
 for the other predictors</strong>.</p>
@@ -3394,11 +3388,9 @@ variables in the model.</p>
 <div id="focus-smooth-effect-of-age" class="section level4">
 <h4>6.3.2.3) Focus: Smooth effect of age</h4>
 <p>Age also has a highly significant smooth effect:</p>
-<p><span class="math display">\[
-\text{edf}=4.878,\qquad
+<p><span class="math display">\[\text{edf}=4.878,\qquad
 \chi^2=4057,\qquad
-p&lt;2\times10^{-16}
-\]</span></p>
+p&lt;2\times10^{-16}\]</span></p>
 <p>Thus, there is very strong evidence that <strong>the conditional
 probability of arrest varies with age</strong>, after fixing the
 remaining predictors.</p>
@@ -3471,9 +3463,9 @@ false-positive arrest predictions.</p>
 <p>Now for the derived metrics:</p>
 <table>
 <colgroup>
-<col width="13%" />
-<col width="3%" />
-<col width="83%" />
+<col width="15%" />
+<col width="15%" />
+<col width="69%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -3620,9 +3612,9 @@ NA
 <h4>6.4.2.1) Overall performance</h4>
 <table>
 <colgroup>
-<col width="22%" />
-<col width="22%" />
-<col width="55%" />
+<col width="23%" />
+<col width="23%" />
+<col width="52%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -3712,9 +3704,7 @@ trade-off between precision and recall.</p>
 approximately <span class="math inline">\(3.51\%\)</span> so the
 no-skill PR-AUC is approximately <span class="math inline">\(\text{PR-AUC}_{\text{baseline}}\approx0.035\)</span></p>
 <p>Here, we obtain:</p>
-<p><span class="math display">\[
-\text{PR-AUC}=0.079
-\]</span></p>
+<p><span class="math display">\[\text{PR-AUC}=0.079\]</span></p>
 <p><em>But how good is it?</em> It is more than <strong>twice the
 no-skill baseline</strong>, indicating that the model provides useful
 information for ranking observations according to arrest propensity.
@@ -3732,9 +3722,7 @@ classification is correct.</p>
 </blockquote>
 <p>This measure cares about <strong>how confident the model is</strong>.
 In our case:</p>
-<p><span class="math display">\[
-\text{Log-Loss}=0.140
-\]</span></p>
+<p><span class="math display">\[\text{Log-Loss}=0.140\]</span></p>
 <p>TODO: Rephrase the following.</p>
 <p>To provide a baseline comparison, a model assigning the test-set
 arrest prevalence of approximately <span class="math inline">\(3.51\%\)</span> to every observation would obtain
@@ -3754,13 +3742,9 @@ merely whether the model ranks observations correctly.</p>
 probabilities (the lower, the better).</p>
 </blockquote>
 <p>For the GAM,</p>
-<p><span class="math display">\[
-\text{Brier}=0.033
-\]</span></p>
+<p><span class="math display">\[\text{Brier}=0.033\]</span></p>
 <p>A prevalence-only model would obtain approximately</p>
-<p><span class="math display">\[
-0.0338
-\]</span></p>
+<p><span class="math display">\[0.0338\]</span></p>
 <p>so, the GAM performs only slightly better than the baseline.</p>
 <p>Together with the calibration plot, this suggests that the predicted
 probabilities are <strong>reasonably calibrated overall</strong>:
@@ -3785,9 +3769,7 @@ predictions and outcomes</li>
 prediction</li>
 </ul>
 <p>Our result is:</p>
-<p><span class="math display">\[
-MCC\approx0.138.
-\]</span></p>
+<p><span class="math display">\[MCC\approx0.138\]</span></p>
 <p>Thus, there is a <strong>positive but weak association between the
 predicted classes and the actual outcomes</strong> (consistent with CM).
 Simply put:</p>
@@ -3802,9 +3784,7 @@ classification;</li>
 <h4>6.4.2.7) Thresholds</h4>
 <p>The classification threshold selected using <strong>Youden’s
 index</strong> is</p>
-<p><span class="math display">\[
-t^*=0.0300.
-\]</span></p>
+<p><span class="math display">\[t^*=0.0300\]</span></p>
 <p>The threshold analysis also shows the expected trade-off: lowering
 the threshold increases sensitivity but reduces specificity, while
 increasing it improves specificity at the cost of missing more
@@ -3819,7 +3799,7 @@ moderate ability to rank arrests above non-arrests;</li>
 <li><strong>Rare-class performance</strong>, <span class="math inline">\(\text{PR-AUC}\approx0.079\)</span>: more than
 twice the <span class="math inline">\(\approx0.035\)</span> no-skill
 baseline, although positive-class identification remains difficult;</li>
-<li><strong>Probability predictions</strong>, <span class="math inline">\(\text{Brier}\approx0.033,\;
+<li><strong>Probability predictions</strong>, <span class="math inline">\(\text{Brier}\approx0.033,\,
 \text{LogLoss}\approx0.140\)</span>: probabilities are generally well
 calibrated and improve modestly over a prevalence-only model;</li>
 <li><strong>Classification</strong>, <span class="math inline">\(\text{MCC}\approx0.138\)</span>: binary

@@ -831,22 +831,18 @@ The model explains approximately **9.31% of the null deviance** ($R^{2}_{adj} = 
 
 The fitted GAM models the conditional probability of arrest using a binomial distribution with a logit link:
 
-$$
-\log\left(\frac{P(\text{arrested}=1)}
+$$\log\left(\frac{P(\text{arrested}=1)}
 {1-P(\text{arrested}=1)}\right)
 =
 \beta_0 + \mathbf{X}\boldsymbol{\beta}
 + f_1(\text{hour})
-+ f_2(\text{age})
-$$
++ f_2(\text{age})$$
 
 All parametric coefficients are expressed on the **log-odds scale**.
 
 Exponentiating a coefficient gives the corresponding **odds ratio (OR)**,
 
-$$
-OR=e^\beta
-$$
+$$OR=e^\beta$$
 
 An $OR>1$ indicates higher odds of arrest relative to the reference category, while $OR<1$ indicates lower odds, holding all other variables constant.
 
@@ -860,40 +856,40 @@ For the remaining coefficients, interpretations are conditional on all other pre
 
 Let us first consider the significant (at $5%$) *time-related* coefficients
 
-| Effect             | Estimate |    OR | Interpretation                                              |
-| ------------------ | -------: | ----: | ----------------------------------------------------------- |
-| `year2024`         |    0.176 | 1.193 | Approximately **19% higher odds** of arrest than 2023       |
-| `year2025`         |    0.162 | 1.176 | Approximately **18% higher odds** than 2023                 |
-| `month2`           |   -0.108 | 0.898 | February has approximately **10% lower odds** than January  |
-| `month3`           |   -0.079 | 0.924 | March has approximately **8% lower odds** than January      |
-| `month4`           |   -0.131 | 0.878 | April has approximately **12% lower odds** than January     |
-| `month5`           |   -0.192 | 0.825 | May has approximately **18% lower odds** than January       |
-| `month6`           |   -0.168 | 0.845 | June has approximately **16% lower odds** than January      |
-| `month7`           |   -0.220 | 0.803 | July has approximately **20% lower odds** than January      |
-| `month8`           |   -0.212 | 0.809 | August has approximately **19% lower odds** than January    |
-| `month9`           |   -0.168 | 0.845 | September has approximately **16% lower odds** than January |
-| `month10`          |   -0.135 | 0.874 | October has approximately **13% lower odds** than January   |
-| `month11`          |   -0.133 | 0.875 | November has approximately **13% lower odds** than January  |
-| `weekdayTuesday`   |    0.079 | 1.082 | Tuesday has approximately **8% higher odds** than Monday    |
-| `weekdayWednesday` |    0.092 | 1.097 | Wednesday has approximately **10% higher odds** than Monday |
-| `weekdayThursday`  |    0.055 | 1.057 | Thursday has approximately **6% higher odds** than Monday   |
-| `weekdayFriday`    |    0.054 | 1.056 | Friday has approximately **6% higher odds** than Monday     |
-| `weekdaySaturday`  |    0.056 | 1.058 | Saturday has approximately **6% higher odds** than Monday   |
+| Effect | Estimate | OR | Interpretation |
+|-----------|----------:|----------:|---------------------------------------|
+| `year2024` | 0.176 | 1.193 | Approximately **19% higher odds** of arrest than 2023 |
+| `year2025` | 0.162 | 1.176 | Approximately **18% higher odds** than 2023 |
+| `month2` | -0.108 | 0.898 | February has approximately **10% lower odds** than January |
+| `month3` | -0.079 | 0.924 | March has approximately **8% lower odds** than January |
+| `month4` | -0.131 | 0.878 | April has approximately **12% lower odds** than January |
+| `month5` | -0.192 | 0.825 | May has approximately **18% lower odds** than January |
+| `month6` | -0.168 | 0.845 | June has approximately **16% lower odds** than January |
+| `month7` | -0.220 | 0.803 | July has approximately **20% lower odds** than January |
+| `month8` | -0.212 | 0.809 | August has approximately **19% lower odds** than January |
+| `month9` | -0.168 | 0.845 | September has approximately **16% lower odds** than January |
+| `month10` | -0.135 | 0.874 | October has approximately **13% lower odds** than January |
+| `month11` | -0.133 | 0.875 | November has approximately **13% lower odds** than January |
+| `weekdayTuesday` | 0.079 | 1.082 | Tuesday has approximately **8% higher odds** than Monday |
+| `weekdayWednesday` | 0.092 | 1.097 | Wednesday has approximately **10% higher odds** than Monday |
+| `weekdayThursday` | 0.055 | 1.057 | Thursday has approximately **6% higher odds** than Monday |
+| `weekdayFriday` | 0.054 | 1.056 | Friday has approximately **6% higher odds** than Monday |
+| `weekdaySaturday` | 0.056 | 1.058 | Saturday has approximately **6% higher odds** than Monday |
 
 Most time-related coefficients are statistically significant in this larger sample.
 
 In particular,
 
-* both 2024 and 2025 have significantly higher conditional odds of arrest than 2023;
-* all months from February to November have significantly **lower** conditional odds than January;
-* December does not differ significantly from January ($p=0.621$);
-* Tuesday through Saturday have significantly higher odds than Monday;
-* Sunday does not differ significantly from Monday ($p=0.368$).
+- both 2024 and 2025 have significantly higher conditional odds of arrest than 2023;
+- all months from February to November have significantly **lower** conditional odds than January;
+- December does not differ significantly from January ($p=0.621$);
+- Tuesday through Saturday have significantly higher odds than Monday;
+- Sunday does not differ significantly from Monday ($p=0.368$).
 
 The coefficients from `boro` are all statistically significant at the same level:
 
 | Borough category  | Estimate |    OR | Relative odds |
-| ----------------- | -------: | ----: | ------------: |
+|-------------------|---------:|------:|--------------:|
 | Brooklyn (North)  |   -0.246 | 0.782 | **22% lower** |
 | Brooklyn (South)  |   -0.077 | 0.926 |  **7% lower** |
 | Manhattan (North) |   -0.126 | 0.881 | **12% lower** |
@@ -914,7 +910,7 @@ For what regards `sex`:
 `ethnicity` also shows substantial conditional differences:
 
 | Ethnicity                | Estimate |    OR |   Relative odds |
-| ------------------------ | -------: | ----: | --------------: |
+|--------------------------|---------:|------:|----------------:|
 | Asian / Pacific Islander |    0.138 | 1.148 |  **15% higher** |
 | Black                    |    1.209 | 3.349 | **235% higher** |
 | Hispanic                 |    1.159 | 3.185 | **219% higher** |
@@ -968,11 +964,9 @@ The magnitude can also be converted into a multiplicative odds effect using $e^{
 
 The smooth term for `hour` is highly statistically significant:
 
-$$
-\text{edf}=7.925,\qquad
+$$\text{edf}=7.925,\qquad
 \chi^2=6499,\qquad
-p<2\times10^{-16}
-$$
+p<2\times10^{-16}$$
 
 This provides very strong evidence that **time of day is associated with the conditional probability of arrest after controlling for the other predictors**.
 
@@ -980,17 +974,15 @@ Furthermore, the relationship is clearly **non-linear**, since $\text{edf}=7.925
 
 The estimated arrest propensity follows exactly the same pattern of the 2-wheels analysis. This provides further evidence for the temporal pattern already observed during the EDA.
 
-The fitted smooth ranges approximately from $-1.3$ at its minimum to around $+0.6$ at its maximum, corresponding to a difference of about **1.9 log-odds units**. This means that the estimated odds of arrest can differ by roughly $e^{1.9} \approx 6.7 \times$ between the highest and lowest portions of the daily curve**, fixing the remaining variables in the model.
+The fitted smooth ranges approximately from $-1.3$ at its minimum to around $+0.6$ at its maximum, corresponding to a difference of about **1.9 log-odds units**. This means that the estimated odds of arrest can differ by roughly $e^{1.9} \approx 6.7 \times$ between the highest and lowest portions of the daily curve\*\*, fixing the remaining variables in the model.
 
 #### 6.3.2.3) Focus: Smooth effect of age
 
 Age also has a highly significant smooth effect:
 
-$$
-\text{edf}=4.878,\qquad
+$$\text{edf}=4.878,\qquad
 \chi^2=4057,\qquad
-p<2\times10^{-16}
-$$
+p<2\times10^{-16}$$
 
 Thus, there is very strong evidence that **the conditional probability of arrest varies with age**, after fixing the remaining predictors.
 
@@ -998,11 +990,11 @@ Again, $\text{edf}=4.878 >> 1$ indicates that this relationship is **non-linear*
 
 The shape of the smooth differs substantially from the one observed in the previous, smaller dataset. The estimated age effect:
 
-1. Is slightly negative for the **youngest drivers**, below age 20;
-2. Then increases rapidly, and (becoming positive) it reaches its maximum at **27–30 years**;
-3. After approximately age 30, there is a gradual decline and it crosses the zero line at **38–40 years**;
-4. From approximately **40 years**, the conditional effect becomes increasingly negative;
-5. The decline becomes particularly pronounced after **50–55 years**, with the lowest estimated values observed among the oldest drivers.
+1.  Is slightly negative for the **youngest drivers**, below age 20;
+2.  Then increases rapidly, and (becoming positive) it reaches its maximum at **27–30 years**;
+3.  After approximately age 30, there is a gradual decline and it crosses the zero line at **38–40 years**;
+4.  From approximately **40 years**, the conditional effect becomes increasingly negative;
+5.  The decline becomes particularly pronounced after **50–55 years**, with the lowest estimated values observed among the oldest drivers.
 
 Therefore, the model suggests that the **highest conditional arrest propensity occurs around the late twenties**, after which the estimated effect decreases progressively with age.
 
@@ -1045,15 +1037,14 @@ The model therefore identifies a relatively large proportion of the actual arres
 
 Now for the derived metrics:
 
-| Metric               | Value | Interpretation                                                                                                                   |
-| -------------------- | ----: | -------------------------------------------------------------------------------------------------------------------------------- |
-| Accuracy             | 0.618 | About 61.8% of all observations are classified correctly                                                                         |
-| Sensitivity / Recall | 0.754 | The model correctly identifies about 75.4% of actual arrests                                                                     |
-| Specificity          | 0.613 | About 61.3% of actual non-arrests are correctly classified                                                                       |
-| Precision            | 0.066 | Only about 6.6% of predicted arrests are actual arrests                                                                          |
-| F1                   | 0.122 | The low value reflects the strong imbalance and the trade-off between relatively high recall and very low precision              |
-| Balanced Accuracy    | 0.683 | Averaging sensitivity and specificity gives a more appropriate overall measure than ordinary accuracy in this imbalanced setting |
-
+| Metric | Value | Interpretation |
+|-----------|----------:|---------------------------------------------------|
+| Accuracy | 0.618 | About 61.8% of all observations are classified correctly |
+| Sensitivity / Recall | 0.754 | The model correctly identifies about 75.4% of actual arrests |
+| Specificity | 0.613 | About 61.3% of actual non-arrests are correctly classified |
+| Precision | 0.066 | Only about 6.6% of predicted arrests are actual arrests |
+| F1 | 0.122 | The low value reflects the strong imbalance and the trade-off between relatively high recall and very low precision |
+| Balanced Accuracy | 0.683 | Averaging sensitivity and specificity gives a more appropriate overall measure than ordinary accuracy in this imbalanced setting |
 
 ### 6.4.2) Performance Analysis
 
@@ -1076,7 +1067,7 @@ eval_quad_plot(test$arrested, prob_gam, "GAM")
 #### 6.4.2.1) Overall performance
 
 | Metric | Value | Interpretation |
-|----------------|---------------:|----------------------------------------|
+|-----------------|----------------:|--------------------------------------|
 | **AUC** | 0.7347 | Moderate discrimination between arrests and non-arrests |
 | **PR-AUC** | 0.0790 | More than twice the no-skill baseline of $\approx 0.035$, although still low in absolute terms |
 | **Log-Loss** | 0.1400 | Probability predictions improve on a prevalence-only model, although substantial uncertainty remains |
@@ -1109,9 +1100,7 @@ The test-set prevalence of `arrested == 1` is approximately $3.51\%$ so the no-s
 
 Here, we obtain:
 
-$$
-\text{PR-AUC}=0.079
-$$
+$$\text{PR-AUC}=0.079$$
 
 *But how good is it?* It is more than **twice the no-skill baseline**, indicating that the model provides useful information for ranking observations according to arrest propensity. However, the absolute value remains low (precision of $0.066$).
 
@@ -1123,9 +1112,7 @@ Thus, the PR curve shows us that **ranking performance is meaningful, but precis
 
 This measure cares about **how confident the model is**. In our case:
 
-$$
-\text{Log-Loss}=0.140
-$$
+$$\text{Log-Loss}=0.140$$
 
 TODO: Rephrase the following.
 
@@ -1141,15 +1128,11 @@ The Brier score is useful here because it evaluates whether the predicted probab
 
 For the GAM,
 
-$$
-\text{Brier}=0.033
-$$
+$$\text{Brier}=0.033$$
 
 A prevalence-only model would obtain approximately
 
-$$
-0.0338
-$$
+$$0.0338$$
 
 so, the GAM performs only slightly better than the baseline.
 
@@ -1172,9 +1155,7 @@ where:
 
 Our result is:
 
-$$
-MCC\approx0.138.
-$$
+$$MCC\approx0.138$$
 
 Thus, there is a **positive but weak association between the predicted classes and the actual outcomes** (consistent with CM). Simply put:
 
@@ -1187,9 +1168,7 @@ This is consistent with the other classification metrics:
 
 The classification threshold selected using **Youden's index** is
 
-$$
-t^*=0.0300.
-$$
+$$t^*=0.0300$$
 
 The threshold analysis also shows the expected trade-off: lowering the threshold increases sensitivity but reduces specificity, while increasing it improves specificity at the cost of missing more arrests.
 
@@ -1199,7 +1178,7 @@ Let us put the metrics together:
 
 - **Discrimination**, $\text{AUC}\approx0.735$: the GAM has moderate ability to rank arrests above non-arrests;
 - **Rare-class performance**, $\text{PR-AUC}\approx0.079$: more than twice the $\approx0.035$ no-skill baseline, although positive-class identification remains difficult;
-- **Probability predictions**, $\text{Brier}\approx0.033,\; \text{LogLoss}\approx0.140$: probabilities are generally well calibrated and improve modestly over a prevalence-only model;
+- **Probability predictions**, $\text{Brier}\approx0.033,\, \text{LogLoss}\approx0.140$: probabilities are generally well calibrated and improve modestly over a prevalence-only model;
 - **Classification**, $\text{MCC}\approx0.138$: binary predictions show only a weak positive association with the true outcomes;
 - **Class balance**, $\text{ACC}_{\text{Balanced}}\approx0.683$: the model obtains a reasonably balanced sensitivity-specificity trade-off;
 - **Sensitivity**, $0.754$: approximately three quarters of actual arrests are detected, although this comes at the cost of very low precision ($0.066$).
