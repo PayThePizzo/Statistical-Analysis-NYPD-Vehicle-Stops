@@ -1,0 +1,1120 @@
+---
+title: "Predicting Excessive Enforcement Patterns in Police Behavior After Vehicles Stops in New York"
+subtitle: "Model Selection and Evaluation - Naive Bayes 2-Wheels"
+author: "Gianmaria Pizzo"
+output:
+  html_document:
+    fig_caption: yes
+    theme: flatly
+    highlight: pygments
+    code_folding: show
+    toc: yes
+    toc_depth: 4
+    number_sections: no
+    toc_float:
+      smooth_scroll: no
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+These `.Rmd` files represent the project submission for the course [Statistical Inference and Learning](https://www.unive.it/data/course/521944) by Professor [Cristiano Varin](https://www.unive.it/data/people/5592728) at [Ca' Foscari University of Venice](https://www.unive.it/) for the year 2025/2026.
+
+------------------------------------------------------------------------
+
+# 0) Environment
+
+## 0.1) Packages
+
+```{r requirements}
+requirements <- c(
+  "remotes", "summarytools", "forcats", "scales", "purrr", "broom",
+  "stringr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
+  "timeDate", "timechange", "tzdb", "hms", "readr", "ggcorrplot",
+  "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor",
+  "sf", "ggplot2", "patchwork", "pROC", "kableExtra", "mgcv", "glmnet"
+)
+```
+
+```{r install-requirements, include=FALSE}
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      install.packages(req)
+  }
+}
+```
+
+Note that some of the packages may not be used, but to avoid any error related to dependencies, we are going to keep all of these libraries. Now, the loading of all packages should be immediate.
+
+```{r load-requirements, include=FALSE}
+for (req in requirements){
+  if (!require(req, character.only = TRUE)){
+      library(req, character.only = TRUE)
+  }
+}
+```
+
+```{r remove-vars, include=FALSE}
+rm(requirements, req)
+```
+
+## 0.2) Functions
+
+Here we define the helper functions used throughout model selection and evaluation, kept in one place for reuse across every model fitted below.
+
+### 0.2.1) Data-Split and Cross-Validation Helpers
+
+```{r fn-check-prop}
+# ==============================================================================
+# 1. Train / Test Split Diagnostics
+# ==============================================================================
+
+#' @title Check Train/Test Level Proportions
+#'
+#' @description Tabulates one variable's level proportions separately in
+#' `train` and `test` and reports the discrepancy in percentage points. Used
+#' to verify that the stratified split preserved the marginal distribution of
+#' key covariates.
+#'
+#' @param var The column name (present in both `train` and `test`) to tabulate.
+#' @param label Human-readable label for the variable, stored in the output.
+#'
+#' @return A tibble with columns variable, level, train, test, diff_ppt.
+check_prop <- function(var, label) {
+  tr <- prop.table(table(train[[var]]))
+  te <- prop.table(table(test[[var]]))
+  tibble(
+    level = names(tr),
+    train = as.numeric(tr),
+    test = as.numeric(te),
+    diff_ppt = round((as.numeric(te) - as.numeric(tr)) * 100, 2)
+  ) %>%
+    mutate(variable = label) %>%
+    relocate(variable)
+}
+```
+
+```{r fn-cv-auc}
+# ==============================================================================
+# 2. Cross-Validated AUC
+# ==============================================================================
+
+#' @title Cross-Validated AUC for a Logistic Regression Formula
+#'
+#' @description Refits a binomial GLM on each of the k training folds and
+#' scores it on the held-out fold, returning the mean AUC across folds. Folds
+#' are processed in parallel since refitting a GLM on ~1.7M rows ten times is
+#' the dominant cost of the model-comparison sections below.
+#'
+#' @param formula Model formula passed to glm(family = binomial).
+#' @param data Training data.frame; must contain the response `arrested`.
+#' @param folds_vec Integer vector, same length as nrow(data), with values
+#' 1..k giving each row's fold assignment.
+#'
+#' @return A numeric scalar, the mean out-of-fold AUC (NA folds are dropped).
+cv_auc <- function(formula, data, folds_vec) {
+  k <- max(folds_vec)
+
+  auc_vals <- parallel::mclapply(seq_len(k), function(i) {
+    tr <- data[folds_vec != i, ]
+    te <- data[folds_vec == i, ]
+
+    # A fold can fail to fit (e.g. rank deficiency in a rare stratum) — treat
+    # as a missing fold rather than aborting the whole CV run
+    fit <- tryCatch(
+      glm(formula, family = binomial, data = tr),
+      error = function(e) NULL
+    )
+    if (is.null(fit)) return(NA_real_)
+
+    prob <- tryCatch(
+      predict(fit, newdata = te, type = "response"),
+      error = function(e) rep(NA_real_, nrow(te))
+    )
+
+    tryCatch(
+      as.numeric(pROC::auc(te$arrested, prob, quiet = TRUE)),
+      error = function(e) NA_real_
+    )
+  }, mc.cores = parallel::detectCores() - 1)
+
+  mean(unlist(auc_vals), na.rm = TRUE)
+}
+```
+
+```{r fn-nb-cv-auc}
+#' @title Cross-Validated AUC for Naive Bayes at a Given Laplace Constant
+#'
+#' @description Refits e1071::naiveBayes on each training fold with smoothing
+#' constant `k` and scores it on the held-out fold, returning the mean AUC.
+#' Mirrors cv_auc() but calls naiveBayes() instead of glm() and reads the
+#' positive-class probability from the second column of the raw posterior.
+#'
+#' @param k Numeric Laplace smoothing constant passed to naiveBayes(laplace = k).
+#' @param data Training data.frame; must contain the response `arrested`.
+#' @param folds_vec Integer vector, same length as nrow(data), with values
+#' 1..k giving each row's fold assignment.
+#' @param formula Model formula passed to naiveBayes().
+#'
+#' @return A numeric scalar, the mean out-of-fold AUC (NA folds are dropped).
+nb_cv_auc <- function(k, data, folds_vec, formula) {
+  n_folds  <- max(folds_vec)
+  auc_vals <- numeric(n_folds)
+  for (i in seq_len(n_folds)) {
+    tr  <- data[folds_vec != i, ]
+    te  <- data[folds_vec == i, ]
+    fit <- e1071::naiveBayes(formula, data = tr, laplace = k)
+
+    # Posterior: columns named after class levels; column 2 = P(arrested=1)
+    prob <- predict(fit, newdata = te, type = "raw")[, 2]
+    auc_vals[i] <- tryCatch(
+      as.numeric(pROC::auc(te$arrested, prob, quiet = TRUE)),
+      error = function(e) NA_real_
+    )
+  }
+  mean(auc_vals, na.rm = TRUE)
+}
+```
+
+### 0.2.2) Threshold and Confusion-Matrix Helpers
+
+```{r fn-eval-helpers}
+# ==============================================================================
+# 3. Threshold Selection and Confusion-Matrix Helpers
+# ==============================================================================
+
+#' @title Find the Youden-Optimal Classification Threshold
+#'
+#' @description Finds the probability threshold on an ROC curve that
+#' maximises Youden's J statistic (sensitivity + specificity − 1), used
+#' throughout as the single decision threshold for turning predicted
+#' probabilities into classes.
+#'
+#' @param roc_obj A pROC "roc" object, as returned by pROC::roc().
+#'
+#' @return A numeric scalar, the optimal threshold on the probability scale.
+best_thresh <- function(roc_obj) {
+  pROC::coords(roc_obj, "best", ret = "threshold", best.method = "youden",
+               quiet = TRUE)$threshold
+}
+
+
+#' @title Tally a Confusion Matrix
+#'
+#' @description Cross-tabulates actual vs predicted binary class labels.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param predicted Integer/numeric vector of 0/1 predicted labels.
+#'
+#' @return A tibble with columns Actual, Predicted, n (one row per non-empty cell).
+conf_tib <- function(actual, predicted) {
+  tibble(
+    Actual    = factor(actual,    levels = c(0, 1)),
+    Predicted = factor(predicted, levels = c(0, 1))
+  ) %>% count(Actual, Predicted)
+}
+
+
+#' @title Plot a Confusion-Matrix Heatmap
+#'
+#' @description Renders conf_tib() output as a 2x2 tile plot with cell counts.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param predicted Integer/numeric vector of 0/1 predicted labels.
+#' @param title Main title of the plot.
+#'
+#' @return A ggplot2 object.
+plot_cm <- function(actual, predicted, title = "Confusion Matrix") {
+  conf_tib(actual, predicted) %>%
+    ggplot(aes(Predicted, Actual, fill = n)) +
+    geom_tile(colour = "white") +
+    geom_text(aes(label = scales::comma(n)), size = 5.5, fontface = "bold") +
+    scale_fill_gradient(low = "#e8f4f8", high = "#2c7bb6", guide = "none") +
+    scale_x_discrete(labels = c("0" = "No arrest", "1" = "Arrest")) +
+    scale_y_discrete(labels = c("0" = "No arrest", "1" = "Arrest")) +
+    labs(title = title, x = "Predicted", y = "Actual") +
+    theme_minimal(base_size = 12) +
+    theme(panel.grid = element_blank())
+}
+
+
+#' @title Compute Threshold-Dependent Classification Metrics
+#'
+#' @description Computes sensitivity, specificity, balanced accuracy, PPV,
+#' and NPV for a fixed set of hard class predictions against the true labels.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param predicted Integer/numeric vector of 0/1 predicted labels.
+#' @param pos Value in `actual`/`predicted` denoting the positive class.
+#'
+#' @return A named list with sensitivity, specificity, balanced_acc, ppv, npv.
+class_metrics <- function(actual, predicted, pos = 1) {
+  tp <- sum(actual == pos & predicted == pos)
+  tn <- sum(actual != pos & predicted != pos)
+  fp <- sum(actual != pos & predicted == pos)
+  fn <- sum(actual == pos & predicted != pos)
+  sens <- tp / (tp + fn)
+  spec <- tn / (tn + fp)
+  list(
+    sensitivity  = sens,
+    specificity  = spec,
+    balanced_acc = (sens + spec) / 2,
+    ppv          = tp / (tp + fp),
+    npv          = tn / (tn + fn)
+  )
+}
+
+
+# ==============================================================================
+# 4. Probability-Based Evaluation Metrics
+# ==============================================================================
+
+#' @title Compute the Full Evaluation-Metrics Tibble for One Model
+#'
+#' @description Given predicted probabilities and true labels, computes
+#' threshold-free metrics (AUC, PR-AUC, log-loss, Brier score) plus
+#' threshold-dependent metrics at the Youden-optimal cut-off (sensitivity,
+#' specificity, precision, F1, MCC, balanced accuracy). Returns one row per
+#' call, so results from multiple models can be row-bound into a comparison
+#' table.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param model_name Label stored in the Model column.
+#'
+#' @return A one-row tibble of rounded metrics (see column names in the body).
+compute_metrics <- function(actual, prob, model_name = "Model") {
+  valid  <- !is.na(actual) & !is.na(prob)
+  actual <- actual[valid]; prob <- prob[valid]
+  roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
+  auc_val <- as.numeric(pROC::auc(roc_obj))
+  thr     <- best_thresh(roc_obj)
+  pred_cl <- as.integer(prob >= thr)
+
+  tp <- sum(actual == 1 & pred_cl == 1); tn <- sum(actual == 0 & pred_cl == 0)
+  fp <- sum(actual == 0 & pred_cl == 1); fn <- sum(actual == 1 & pred_cl == 0)
+  sens <- if ((tp+fn) == 0) NA_real_ else tp / (tp+fn)
+  spec <- if ((tn+fp) == 0) NA_real_ else tn / (tn+fp)
+  prec <- if ((tp+fp) == 0) NA_real_ else tp / (tp+fp)
+  f1   <- if (is.na(prec) || is.na(sens) || (prec+sens) == 0) NA_real_ else
+            2 * prec * sens / (prec + sens)
+
+  # Matthews correlation coefficient — guard the denominator against any
+  # degenerate (all-one-class) confusion matrix, which would divide by zero
+  mcc_den <- sqrt(as.numeric(tp+fp) * as.numeric(tp+fn) *
+                  as.numeric(tn+fp) * as.numeric(tn+fn))
+  mcc_val <- if (mcc_den == 0) NA_real_ else (tp*tn - fp*fn) / mcc_den
+
+  # eps floors probabilities away from 0/1 so log() never evaluates to -Inf
+  eps     <- 1e-15
+  logloss <- -mean(actual * log(pmax(prob, eps)) + (1-actual) * log(pmax(1-prob, eps)))
+  brier   <- mean((prob - actual)^2)
+
+  # PR-AUC via trapezoid rule over pROC coords (pROC has no built-in PR-AUC)
+  pr_raw <- pROC::coords(roc_obj, "all",
+                          ret = c("sensitivity", "precision"),
+                          transpose = FALSE, drop = FALSE)
+  names(pr_raw)[names(pr_raw) == "sensitivity"] <- "recall"
+  pr_raw <- pr_raw %>%
+    filter(!is.nan(precision), !is.na(precision), !is.nan(recall)) %>%
+    arrange(recall)
+  pr_auc_val <- if (nrow(pr_raw) >= 2)
+    sum(diff(pr_raw$recall) *
+          (head(pr_raw$precision, -1) + tail(pr_raw$precision, -1)) / 2)
+  else NA_real_
+
+  tibble(
+    Model       = model_name,
+    AUC         = round(auc_val, 4),
+    PR_AUC      = round(pr_auc_val, 4),
+    Log_Loss    = round(logloss, 4),
+    Brier       = round(brier, 4),
+    Threshold   = round(thr, 4),
+    Sensitivity = round(sens, 3),
+    Specificity = round(spec, 3),
+    Precision   = round(prec, 3),
+    F1          = round(f1, 3),
+    MCC         = round(mcc_val, 3),
+    Bal_Acc     = round(if (!is.na(sens) && !is.na(spec)) (sens+spec)/2
+                        else NA_real_, 3)
+  )
+}
+```
+
+### 0.2.3) Model Evaluation Plot Functions
+
+```{r fn-plot-roc-single}
+# ==============================================================================
+# 5. Plots for Single-Model Evaluation
+# ==============================================================================
+
+#' @title Plot the ROC Curve for a Single Model
+#'
+#' @description Plots sensitivity vs specificity across all thresholds, with
+#' the AUC annotated on the panel.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param title Main title of the plot.
+#'
+#' @return A ggplot2 object.
+plot_roc_single <- function(actual, prob, title = "ROC Curve") {
+  roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
+  auc_lbl <- paste0("AUC = ", round(as.numeric(pROC::auc(roc_obj)), 4))
+  pROC::ggroc(roc_obj, colour = "#2c7bb6", linewidth = 0.9) +
+    geom_abline(slope = 1, intercept = 1, linetype = "dashed", colour = "grey60") +
+    annotate("text", x = 0.25, y = 0.06, label = auc_lbl,
+             colour = "#2c7bb6", size = 4) +
+    labs(x = "Specificity", y = "Sensitivity", title = title) +
+    theme_minimal(base_size = 11) + theme(panel.grid.minor = element_blank())
+}
+```
+
+```{r fn-plot-pr-single}
+#' @title Plot the Precision-Recall Curve for a Single Model
+#'
+#' @description Plots precision vs recall across all thresholds against the
+#' no-skill baseline (the class prevalence), with PR-AUC annotated. More
+#' informative than the ROC curve under the severe class imbalance here.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param title Main title of the plot.
+#'
+#' @return A ggplot2 object.
+plot_pr_single <- function(actual, prob, title = "Precision-Recall Curve") {
+  roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
+  pr_raw  <- pROC::coords(roc_obj, "all",
+                           ret = c("sensitivity", "precision"),
+                           transpose = FALSE, drop = FALSE)
+  names(pr_raw)[names(pr_raw) == "sensitivity"] <- "recall"
+  pr_df <- pr_raw %>%
+    filter(!is.nan(precision), !is.na(precision)) %>% arrange(recall)
+
+  # PR-AUC via trapezoid rule, same approach as in compute_metrics()
+  pr_auc_lbl <- if (nrow(pr_df) >= 2) {
+    v <- sum(diff(pr_df$recall) *
+               (head(pr_df$precision,-1) + tail(pr_df$precision,-1)) / 2)
+    paste0("PR-AUC = ", round(v, 4))
+  } else "PR-AUC = NA"
+  baseline <- mean(actual)
+  ggplot(pr_df, aes(x = recall, y = precision)) +
+    geom_line(colour = "#d73027", linewidth = 0.9) +
+    geom_hline(yintercept = baseline, linetype = "dashed", colour = "grey55") +
+    annotate("text", x = 0.02, y = baseline + 0.015,
+             label = paste0("No-skill = ", round(baseline, 3)),
+             colour = "grey40", size = 3.2, hjust = 0) +
+    annotate("text", x = 0.55, y = 0.90, label = pr_auc_lbl,
+             colour = "#d73027", size = 4) +
+    scale_x_continuous(limits = c(0, 1)) + scale_y_continuous(limits = c(0, 1)) +
+    labs(x = "Recall", y = "Precision", title = title) +
+    theme_minimal(base_size = 11) + theme(panel.grid.minor = element_blank())
+}
+```
+
+```{r fn-plot-calibration-single}
+#' @title Plot the Calibration (Reliability) Curve for a Single Model
+#'
+#' @description Bins predictions into `n_bins` equal-frequency groups and
+#' plots mean predicted probability against observed positive rate per bin,
+#' against the perfect-calibration diagonal.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param title Main title of the plot.
+#' @param n_bins Number of quantile bins of `prob`.
+#'
+#' @return A ggplot2 object.
+plot_calibration_single <- function(actual, prob, title = "Calibration Plot",
+                                    n_bins = 10) {
+  # Quantile breaks (not equal-width) so each bin has a comparable sample size
+  # despite the predicted probabilities being heavily right-skewed
+  brks  <- unique(quantile(prob, seq(0, 1, length.out = n_bins + 1), na.rm = TRUE))
+  cal_df <- tibble(actual = actual, prob = prob) %>%
+    mutate(bin = cut(prob, breaks = brks, include.lowest = TRUE)) %>%
+    filter(!is.na(bin)) %>%
+    group_by(bin) %>%
+    summarise(mean_pred = mean(prob), mean_obs = mean(actual),
+              n = n(), .groups = "drop")
+  ggplot(cal_df, aes(x = mean_pred, y = mean_obs)) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "grey55") +
+    geom_line(colour = "#2c7bb6", linewidth = 0.8) +
+    geom_point(aes(size = n), colour = "#2c7bb6", alpha = 0.85) +
+    scale_size_continuous(name = "Count", range = c(2, 9)) +
+    scale_x_continuous(labels = scales::percent_format(accuracy = 0.1)) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 0.1)) +
+    labs(x = "Mean predicted probability", y = "Observed positive rate",
+         title = title,
+         caption = "Size ∝ bin count.  Dashed = perfect calibration.") +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "bottom", panel.grid.minor = element_blank())
+}
+```
+
+```{r fn-plot-threshold-single}
+#' @title Plot the Threshold-Sweep Metrics for a Single Model
+#'
+#' @description Plots sensitivity, specificity, precision, and F1 as
+#' functions of the classification threshold, with the Youden-optimal
+#' threshold marked.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param title Main title of the plot.
+#'
+#' @return A ggplot2 object.
+plot_threshold_single <- function(actual, prob, title = "Threshold Analysis") {
+  roc_obj  <- pROC::roc(actual, prob, quiet = TRUE)
+  thr_data <- pROC::coords(roc_obj, "all",
+                            ret = c("threshold","sensitivity","specificity","precision"),
+                            transpose = FALSE, drop = FALSE) %>%
+    filter(is.finite(threshold), threshold >= 0, threshold <= 1) %>%
+    mutate(f1 = ifelse(!is.nan(precision) & (precision + sensitivity) > 0,
+                       2 * precision * sensitivity / (precision + sensitivity), 0)) %>%
+    pivot_longer(c(sensitivity, specificity, precision, f1),
+                 names_to = "Metric", values_to = "Value") %>%
+    mutate(Metric = recode(Metric,
+      sensitivity = "Sensitivity", specificity = "Specificity",
+      precision   = "Precision",   f1          = "F1 Score"))
+  thr_opt <- best_thresh(roc_obj)
+  ggplot(thr_data, aes(x = threshold, y = Value, colour = Metric)) +
+    geom_line(linewidth = 0.75, na.rm = TRUE) +
+    geom_vline(xintercept = thr_opt, linetype = "dashed",
+               colour = "grey35", linewidth = 0.55) +
+    annotate("text", x = thr_opt, y = 0.04,
+             label = paste0("Youden\n", round(thr_opt, 3)),
+             hjust = -0.08, size = 3, colour = "grey30") +
+    scale_colour_viridis_d(option = "turbo", begin = 0.05, end = 0.92) +
+    scale_y_continuous(limits = c(0, 1)) +
+    labs(x = "Threshold", y = "Metric value", colour = NULL, title = title,
+         caption = "Dashed: Youden's J optimal threshold") +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "bottom", panel.grid.minor = element_blank())
+}
+```
+
+```{r fn-plot-eval-quad}
+#' @title Plot the 2x2 Evaluation Panel for a Single Model
+#'
+#' @description Composes plot_roc_single(), plot_pr_single(),
+#' plot_calibration_single(), and plot_threshold_single() into one
+#' (ROC | PR) / (Calibration | Threshold) patchwork layout.
+#'
+#' @param actual Integer/numeric vector of 0/1 true labels.
+#' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param model_name Prefixed to each sub-plot's title.
+#'
+#' @return A patchwork object (composed ggplot2 object).
+eval_quad_plot <- function(actual, prob, model_name) {
+  p1 <- plot_roc_single(actual, prob,   paste(model_name, "— ROC"))
+  p2 <- plot_pr_single(actual, prob,    paste(model_name, "— Precision-Recall"))
+  p3 <- plot_calibration_single(actual, prob, paste(model_name, "— Calibration"))
+  p4 <- plot_threshold_single(actual, prob, paste(model_name, "— Threshold Analysis"))
+  (p1 | p2) / (p3 | p4)
+}
+```
+
+```{r fn-plot-nb-feature}
+#' @title Plot a Naive Bayes Conditional-Probability Bar Chart
+#'
+#' @description Plots P(feature level | class) from one entry of a fitted
+#' naiveBayes model's frequency tables, grouped by class, so the strongest
+#' discriminators under the conditional-independence assumption are visible.
+#'
+#' @param feature_name Name of a predictor in `mod$tables`.
+#' @param mod A fitted e1071::naiveBayes model object.
+#'
+#' @return A ggplot2 object.
+plot_nb_feature <- function(feature_name, mod) {
+  tbl <- mod$tables[[feature_name]]
+  as.data.frame(tbl) %>%
+    rename(level = 2, class = 1, prob = Freq) %>%
+    mutate(class = factor(class, labels = c("Not arrested", "Arrested"))) %>%
+    ggplot(aes(x = level, y = prob, fill = class)) +
+    geom_col(position = position_dodge(width = 0.75), width = 0.65) +
+    scale_fill_viridis_d(option = "mako", begin = 0.3, end = 0.8) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    labs(x = NULL, y = "P(level | class)", title = feature_name, fill = NULL) +
+    theme_minimal(base_size = 9) +
+    theme(
+      axis.text.x    = element_text(angle = 30, hjust = 1),
+      legend.position = "bottom",
+      panel.grid.minor = element_blank()
+    )
+}
+```
+
+### 0.2.4) Model-Summary Helpers
+
+```{r fn-build-modal-row}
+# ==============================================================================
+# 6. Marginal-Effect and Coefficient Helpers
+# ==============================================================================
+
+#' @title Build a One-Row Data Frame of Modal/Median Covariate Values
+#'
+#' @description For each variable in `vars`, takes the most frequent level
+#' (factor/character) or the median (numeric) from `data`. Used to hold
+#' non-focal predictors fixed at a representative value when computing
+#' marginal-effect predictions for an interaction term.
+#'
+#' @param data Data.frame to summarise (typically `train`).
+#' @param vars Character vector of column names in `data`.
+#'
+#' @return A one-row data.frame with one column per entry in `vars`.
+build_modal_row <- function(data, vars) {
+  row_list <- lapply(vars, function(v) {
+    x <- data[[v]]
+    if (is.factor(x)) {
+      factor(names(sort(table(x), decreasing = TRUE))[1], levels = levels(x))
+    } else if (is.numeric(x)) {
+      median(x, na.rm = TRUE)
+    } else {
+      names(sort(table(x), decreasing = TRUE))[1]
+    }
+  })
+  as.data.frame(setNames(row_list, vars))
+}
+```
+
+```{r fn-extract-coefs}
+#' @title Extract Non-Zero LASSO Coefficients at a Given Lambda
+#'
+#' @description Extracts the coefficients selected by a cv.glmnet fit at a
+#' named lambda (e.g. "lambda.min" or "lambda.1se"), drops the zeroed-out
+#' coefficients, and adds the exponentiated odds ratio.
+#'
+#' @param cv_fit A fitted glmnet::cv.glmnet object.
+#' @param s_name Lambda selector passed to coef(cv_fit, s = s_name), typically
+#' "lambda.min" or "lambda.1se".
+#'
+#' @return A tibble with columns feature, estimate (log-odds), OR (odds ratio),
+#' sorted by descending |estimate|.
+extract_coefs <- function(cv_fit, s_name) {
+  cf <- coef(cv_fit, s = s_name)
+  tibble(
+    feature  = rownames(cf)[-1],
+    estimate = as.numeric(cf[-1])
+  ) %>%
+    filter(estimate != 0) %>%
+    arrange(desc(abs(estimate))) %>%
+    mutate(OR = round(exp(estimate), 3), estimate = round(estimate, 4))
+}
+```
+
+------------------------------------------------------------------------
+
+# 1) Data Loading and Preparation
+
+```{r load-data}
+vehstop <- read.csv("data/vehiclestops_2_wheels_final.csv")
+```
+
+## 1.1) Factor conversion and Reference Levels
+
+We convert all categorical predictors to factors and set interpretable reference levels before any modelling step, ensuring consistency between all downstream model fits and cross-validation folds.
+
+```{r factor-prep}
+# Ordered weekday levels (ISO order)
+wday_levels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+# Ordered time bracket levels
+tbkt_levels <- c(
+  "Late night (0–3)",
+  "Early morning (4–7)",
+  "Morning commute (8–11)",
+  "Midday (12–15)",
+  "Afternoon/evening (16–19)",
+  "Night (20–23)"
+)
+
+# Ordered age-bracket levels
+abkt_levels <- c("Under 18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+", "Unknown")
+
+vehstop <- vehstop %>%
+  mutate(
+    year = factor(year),
+    month = factor(month, levels = 1:12),
+    weekday = factor(weekday, levels = wday_levels),
+    hour = factor(hour, levels = 0:23),
+    time_bracket = factor(time_bracket, levels = tbkt_levels),
+    area = factor(area),
+    boro = factor(boro),
+    sex = factor(sex),
+    ethnicity = factor(ethnicity),
+    age_bracket = factor(age_bracket, levels = abkt_levels)
+  )
+
+# Reference levels chosen for interpretable contrasts
+vehstop$sex <- relevel(vehstop$sex, ref = "M")
+vehstop$ethnicity <- relevel(vehstop$ethnicity, ref = "White")
+vehstop$weekday <- relevel(vehstop$weekday, ref = "Monday")
+vehstop$time_bracket <- relevel(vehstop$time_bracket, ref = "Morning commute (8–11)")
+vehstop$age_bracket <- relevel(vehstop$age_bracket, ref = "25–34")
+
+rm(wday_levels, tbkt_levels, abkt_levels)
+```
+
+## 1.2) Stratified Train / Test Split
+
+For the train/test split, a **stratified sampling approach** is used to ensure that the training and test sets have comparable distributions of the outcome variable (`arrested`) and relevant contextual variables.
+
+This is particularly important because the target variable is imbalanced, with arrested cases representing only a small proportion of all observations. Rather than stratifying only on `arrested`, the code constructs a **joint stratification variable** from `arrested`, `area`, `sex`, `ethnicity`, and `hour` using `interaction()`. Thus, each observation is assigned to a stratum corresponding to a particular combination of these variables.
+
+Formally, the strata can be represented as
+
+$$S_i = (\text{arrested}_i,\text{area}_i,\text{sex}_i,\text{ethnicity}_i,\text{hour}_i),$$
+
+where $S_i$ denotes the stratum to which observation $i$ belongs. The objective is to sample approximately 80% of observations within each stratum for the training set and retain the remaining 20% for testing:
+
+$$P(i \in \mathcal{D}_{train} \mid S_i=s) \approx 0.8,
+\qquad
+P(i \in \mathcal{D}_{test} \mid S_i=s) \approx 0.2.$$
+
+```{r stratified-split}
+set.seed(2026)
+
+# Joint stratum key; drop = TRUE removes empty combinations
+vehstop$.strat <- interaction(
+  vehstop$arrested, vehstop$area, vehstop$sex, vehstop$ethnicity, vehstop$hour,
+  drop = TRUE
+)
+
+train_rows <- vehstop %>%
+  dplyr::mutate(.row = row_number()) %>%
+  dplyr::group_by(.strat) %>%
+  dplyr::slice_sample(prop = 0.8) %>%
+  dplyr::pull(.row)
+
+train <- vehstop[ train_rows, ] %>% dplyr::select(-.strat)
+test <- vehstop[-train_rows, ] %>% dplyr::select(-.strat)
+vehstop <- vehstop %>% dplyr::select(-.strat)
+
+cv_folds <- sample(rep(1:5, length.out = nrow(train)))
+```
+
+In the code, `group_by(.strat) %>% slice_sample(prop = 0.8)` performs this within-stratum sampling, while the observations not selected for training form the test set. This approach aims to preserve not only the overall prevalence of the outcome,
+
+$$P_{\text{train}}(\text{arrested}=1) \approx P_{\text{test}}(\text{arrested}=1),$$
+
+but also the composition of the data across geographic, demographic, and temporal characteristics. This is desirable because differences in these characteristics could otherwise introduce an unintended distributional difference between the training and test sets. The temporary `.strat` variable is removed after the split because it is used solely to define the sampling groups and is not intended to be used as a predictor in the subsequent modelling.
+
+Finally, the verification code compares the empirical marginal distributions of `arrested`, `area`, `sex`, and `ethnicity` in the two datasets. For a variable $X$ and level $k$, the proportion in each dataset is calculated as
+
+$$\hat{P}_{train}(X=k)
+=
+\frac{\sum_{i \in \mathcal{D}_{train}} \mathbb{I}(X_i=k)}
+{|\mathcal{D}_{train}|},$$
+
+and analogously for the test set. The difference is then reported in **percentage points**:
+
+$$\Delta_k =
+100\left[
+\hat{P}_{test}(X=k)
+-
+\hat{P}_{train}(X=k)
+\right].$$
+
+Small values of $\Delta_k$ indicate that the corresponding characteristic is similarly represented in the two datasets. The final summary additionally compares the number of observations and the proportion of arrested cases in the training and test sets, providing a direct check that the intended approximately 80/20 split and the class distribution have been maintained.
+
+```{r split-verification}
+bind_rows(
+  check_prop("arrested", "arrested"),
+  check_prop("area", "area"),
+  check_prop("sex", "sex"),
+  check_prop("ethnicity", "ethnicity")
+) %>%
+  kbl(
+    digits = 4,
+    caption = "Proportion of each level in train vs test (diff in percentage points)",
+    col.names = c("Variable", "Level", "Train", "Test", "Δ (ppt)")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+  collapse_rows(columns = 1, valign = "top")
+```
+
+```{r split-summary}
+cat(sprintf(
+  "Training set : %d rows  |  Arrested: %.2f%%\nTest set     : %d rows  |  Arrested: %.2f%%\n",
+  nrow(train), 100 * mean(train$arrested),
+  nrow(test),  100 * mean(test$arrested)
+))
+```
+
+The maximum absolute discrepancy between the two sets is on the order of fractions of a percentage point, confirming that the stratification preserved the joint distribution of the target and the key covariates.
+
+```{r remove-vehstop}
+# Remove vehstop for memory purposes
+rm(vehstop)
+```
+
+------------------------------------------------------------------------
+
+# 4) Naive Bayes
+
+Naive Bayes is a probabilistic classification method based on **Bayes' theorem**. For binary classification, with the response $Y \in {0,1}$, the classifier estimates the posterior probability of each class given a set of predictors $X = (X_{1}, \ldots , X_{p})$ and assigns an observation to the class with the largest posterior probability.
+
+The defining assumption of Naive Bayes is that predictors are **conditionally independent given the class**. This assumption is generally restrictive, but it simplifies estimation and can still provide effective classification even when independence is not exactly satisfied.
+
+## 4.1) Assumptions and Setup
+
+We had to exclude `age` as a predictor, since we had missing values that we labeled as `Unknown` in `age_bracket`. Therefore, this is the final formulation of the model
+
+```{r final-model-formula}
+f_final <- arrested ~ year + month + weekday + hour + boro + sex + ethnicity + age_bracket
+```
+
+## 4.2) Model Fit
+
+```{r fit-nb}
+mod_nb <- e1071::naiveBayes(f_final, data = train)
+```
+
+## 4.3) Specific Analysis and Interpretation
+
+Unlike logistic regression, the fitted parameters should not be interpreted as marginal effects or changes in the odds of arrest.
+
+Instead, they describe how the distribution of each predictor differs between arrested and non-arrested observations. Variables whose conditional distributions differ substantially between the two classes provide stronger evidence for distinguishing arrests from non-arrests.
+
+```{r summary-nb}
+mod_nb
+```
+
+### 4.3.1) A-Priori Probabilities
+
+The **a-priori probabilities** (or prior probabilities) represent the probability of belonging to each response class **before considering the information contained in the predictors**.
+
+For instance, a larger value of $P(Y=k)$ means that an observation is initially considered more likely to belong to class $k$.
+
+In other words, the prior probabilities provide the model's **starting preference** before we present evidence specific for each predictor.
+
+In our case we have:
+
+| Class | Probability | Percentage |
+|------:|------------:|-----------:|
+|     0 |      0.9462 |     94.62% |
+|     1 |      0.0538 |      5.38% |
+
+The estimated a-priori probabilities are
+
+$$P(Y=0) \approx 0.9462, \qquad P(Y=1) \approx 0.0538$$
+
+Therefore, before considering any predictor information, the model assigns an observation a **94.62% prior probability of belonging to the non-arrested class** and only a **5.38% prior probability of belonging to the arrested class**.
+
+What can we say? These values reflect the **strong class imbalance**: the model starts with a preference toward predicting class 0.
+
+### 4.3.2) Conditional Probabilities
+
+The **conditional probabilities** describe how the predictors are distributed **within each response class**.
+
+For each categorical predictor $X_j$, level $l$, and class $Y=k$, the model estimates
+
+$$P(X_j=l\mid Y=k), \qquad k\in\{0,1\}$$
+
+These quantities represent the evidence contributed by each predictor when determining whether an observation is more likely to belong to class $k=0$ (not arrested) or class $k=1$ (arrested).
+
+> Thus, for categorical predictors, the conditional probabilities describe **how frequently each category occurs within each response class**.
+
+How do we interpret them? **By comparing the probability of the same category across the two response classes**. For example:
+
+- if $P(X_j=l \mid Y=1) > P(X_j=l \mid Y=0)$, observing that category provides evidence in favor of class 1 (`arrested == 1`);
+- if $P(X_j=l \mid Y=1) < P(X_j=l \mid Y=0)$, observing that category provides evidence in favor of class 0;
+- Similar probabilities across the two classes indicate relatively little discriminatory information from that category.
+
+It is important to note that these probabilities are **not arrest probabilities**. For example, $P(\text{sex}=M \mid Y=1)$ is the proportion of arrested observations that are male, not the probability of being arrested given that an observation is male.
+
+Now let us see the tables and a plot that focuses on a subset of predictors showing some of the more relevant differences between the two response classes: `ethnicity`, `sex`, `age_bracket`, `boro`, and `hour`.
+
+```{r cond-probs}
+mod_nb$tables
+```
+
+```{r nb-tables-plot, fig.width=11, fig.height=6}
+# Extract tables for a selected set of substantively interesting predictors
+key_preds <- intersect(
+  c("ethnicity", "sex", "age_bracket", "boro", "hour"),
+  names(mod_nb$tables)
+)
+
+plots_nb <- lapply(key_preds, plot_nb_feature, mod = mod_nb)
+patchwork::wrap_plots(plots_nb, ncol = 3) +
+  patchwork::plot_annotation(
+    title   = "Naive Bayes — Conditional probability by class for key predictors",
+    caption = "P(level | class) from the training-set frequency tables"
+  ) +
+  patchwork::plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+```
+
+The conditional probabilities show that the predictors differ in how strongly they distinguish between arrested and non-arrested observations.
+
+- **Ethnicity**
+  - `Hispanic` observations are more frequent among arrests (**63.4%**) than among non-arrests (**46.9%**)
+  - `Black` observations are also present (**25.6% vs. 20.4%**).
+  - On the other hand, `White`, `Asian / Pacific Islander`, and `Unknown` observations are less represented among arrests.
+- **Sex**
+  - `sexM` represents approximately **99.0%** of arrested observations compared with **95.9%** of non-arrested observations.
+  - `sexF` shows the opposite pattern (**0.9% vs. 3.7%**).
+- **Age bracket**
+  - The `18–24` and `Under 18` groups are relatively more frequent among arrests,
+  - Whereas `25–34` and `35–44` are more frequent among non-arrests.
+- **Borough**
+  - The **Bronx** represents approximately **34.9%** of arrested observations but only **14.6%** of non-arrested observations, providing strong evidence toward the arrested class.
+  - On the other hand, `Manhattan (North)`, `Manhattan (South)`, and `Queens (North)` are relatively less represented among arrests.
+- **Hour**
+  - Arrests are more concentrated during the **late evening and nighttime**, particularly around 18:00–23:00 and shortly after midnight.
+  - Instead, the period around **06:00–13:00**, is much more strongly represented among non-arrests.
+
+Overall, the largest differences between the class-conditional distributions appear for **borough, hour, and ethnicity**, while **age bracket and sex show more limited separation**. Naive Bayes combines these individual pieces of evidence with the a-priori probabilities to obtain the posterior probability of arrest.
+
+## 4.4) Evaluation on Test Set
+
+```{r nb-eval}
+posterior_nb <- predict(mod_nb, newdata = test, type = "raw")
+prob_nb  <- predict(mod_nb, newdata = test, type = "raw")[, 2]
+roc_nb   <- pROC::roc(test$arrested, prob_nb, quiet = TRUE)
+auc_nb   <- as.numeric(pROC::auc(roc_nb))
+thr_nb   <- best_thresh(roc_nb)
+class_nb <- as.integer(prob_nb >= thr_nb)
+met_nb   <- class_metrics(test$arrested, class_nb)
+
+cat(sprintf(
+  "AUC: %.4f  |  Threshold (Youden): %.4f\nSensitivity: %.3f  |  Specificity: %.3f  |  Balanced accuracy: %.3f\n",
+  auc_nb, thr_nb, met_nb$sensitivity, met_nb$specificity, met_nb$balanced_acc
+))
+```
+
+### 4.4.1) Confusion Matrix
+
+```{r nb-cm-plot, fig.width=4, fig.height=3.5}
+plot_cm(test$arrested, class_nb, title = "Naive Bayes — Confusion Matrix (Youden threshold)")
+```
+
+Let us start from the derived metrics:
+
+| Metric | Value | Interpretation |
+|-------------------------------|-----------------:|-----------------------|
+| Accuracy | 0.595 | About $59.5\%$ of all observations are classified correctly |
+| Sensitivity / Recall | 0.676 | The model correctly identifies about $67.6\%$ of actual arrests |
+| Specificity | 0.589 | The model correctly identifies about $58.9\%$ of actual non-arrests |
+| Precision | 0.100 | Only about $10.0\%$ of observations predicted as arrests are actually arrests |
+| F1 | 0.174 | The combined precision-recall performance for the positive class is low |
+| Balanced Accuracy | 0.633 | Averaging sensitivity and specificity gives moderate classification performance across the two classes |
+
+This behavior is partly a consequence of the low classification threshold selected for the rare positive class. The model is willing to classify observations as arrests in order to increase sensitivity, but doing this reduces precision and specificity.
+
+### 4.4.2) Posterior Probabilities
+
+The **posterior probabilities** represent the estimated probability that an observation belongs to each response class **after combining the a-priori class probabilities with the evidence provided by all predictors**.
+
+Here, each observation receives two posterior probabilities
+
+- $P(Y=0\mid\mathbf{x})$ is the estimated probability that the observation belongs to the **not-arrested** class;
+- $P(Y=1\mid\mathbf{x})$ is the estimated probability that the observation belongs to the **arrested** class.
+
+For example, suppose an observation receives $P(Y=0\mid\mathbf{x})=0.82, \, P(Y=1\mid\mathbf{x})=0.18$. This means that the model assigns more probability to the non-arrested class.
+
+The posterior probabilities for the test observations can be obtained as follows:
+
+```{r posterior-probs}
+post_nb <- predict(
+  mod_nb,
+  newdata = test,
+  type = "raw"
+)
+
+posterior_df <- data.frame(
+  Observed = test$arrested,
+  `P(Y = 0)` = post_nb[, "0"],
+  `P(Y = 1)` = post_nb[, "1"],
+  check.names = FALSE
+)
+
+knitr::kable(
+  head(posterior_df, 10),
+  digits = 4,
+  caption = "Posterior probabilities for the first 10 test observations"
+)
+```
+
+Since the test set contains a very large number of observations, displaying all posterior probabilities is not useful. Therefore, we provide the plot related to the **distribution of** $P(Y=1\mid\mathbf{x})$ separately for the two observed classes.
+
+```{r posterior-probs-plot, fig.width=9, fig.height=5}
+posterior_plot_df <- data.frame(
+  observed = factor(
+    test$arrested,
+    levels = c(0, 1),
+    labels = c("Not arrested", "Arrested")
+  ),
+  prob_arrest = post_nb[, "1"]
+)
+
+ggplot(
+  posterior_plot_df,
+  aes(x = prob_arrest, fill = observed)
+) +
+  geom_density(alpha = 0.4) +
+  labs(
+    title = "Naive Bayes — Distribution of Posterior Probabilities",
+    subtitle = "Posterior probability of arrest by observed class",
+    x = expression(P(Y == 1 ~ "|" ~ X)),
+    y = "Density",
+    fill = "Observed class"
+  ) +
+  theme_minimal()
+```
+
+The plot shows that observations belonging to the arrested class tend to receive **higher predicted probabilities of arrest** than non-arrested observations. In fact, the distribution for `arrested = 1` is shifted to the right and has more probability mass at moderately high posterior probabilities. This indicates that the **model captures meaningful predictive signal**.
+
+However, the two distributions **overlap considerably**. Many arrested observations receive probabilities similar to those assigned to non-arrested observations, **indicating limited separation between the classes and suggesting that classification remains difficult**.
+
+In other words, the model tends to rank arrested observations as more likely to be arrested, but it does not produce a clear separation between the two classes.
+
+### 4.4.3) Performance Analysis
+
+This was partly covered in the previous section, so here we will be focusing on the metrics that we have yet to mention.
+
+```{r nb-metrics-table}
+compute_metrics(test$arrested, prob_nb, "Naive Bayes") %>%
+  kbl(
+    caption   = "Naive Bayes — full evaluation metrics (test set, Youden threshold)",
+    col.names = c("Model","AUC","PR-AUC","Log-Loss","Brier",
+                  "Threshold","Sensitivity","Specificity","Precision","F1","MCC","Bal. Acc.")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped","condensed"), full_width = TRUE)
+```
+
+```{r nb-eval-plots, fig.width=10, fig.height=8}
+eval_quad_plot(test$arrested, prob_nb, "Naive Bayes")
+```
+
+#### 4.4.3.1) Overall performance
+
+| Metric | Value | Interpretation |
+|-----------------------------|-----------------:|-------------------------|
+| **AUC** | 0.6818 | Modest discrimination between arrests and non-arrests |
+| **PR-AUC** | 0.1169 | Clearly above the no-skill baseline of $\approx 0.063$, but still low in absolute terms |
+| **Log-Loss** | 0.2306 | Predicted probabilities contain some information, with only a modest improvement over a prevalence-only model |
+| **Brier** | 0.0584 | Reasonably calibrated probabilities overall, but only slightly better than the prevalence baseline |
+| Threshold | 0.0489 | Low cutoff selected by Youden's criterion to increase detection of the rare positive class |
+| **MCC** | 0.131 | Weak positive association between predicted and observed classes |
+| Balanced Accuracy | 0.633 | Moderate ability to classify both classes when they are weighted equally |
+
+The main conclusion is that Naive Bayes captures **meaningful but limited predictive signal**.
+
+It performs clearly better than random classification, particularly in identifying a subset of arrests, but its discrimination and classification performance remain moderate. The strong class imbalance also leads to relatively low precision despite reasonable sensitivity.
+
+#### 4.4.3.2) AUC
+
+The test-set AUC is $\approx 0.682$.
+
+This means that, when randomly selecting one arrested and one non-arrested observation, the model assigns a higher predicted probability to the arrested case approximately $68.2\%$ of the time.
+
+This represents **modest discrimination**: the model performs clearly better than random guessing, for which $\text{AUC}=0.5$, but it does not provide strong separation between the two classes. This is also visible in the ROC curve, which lies above the diagonal but relatively far from the upper-left corner.
+
+#### 4.4.3.3) PR-AUC
+
+This is particularly important given our imbalanced outcome.
+
+Our positive class is rare, so ROC-AUC can sometimes give an overly optimistic impression of performance. **Precision-Recall AUC focuses directly on the positive class**, considering the trade-off between precision and recall.
+
+Here, we obtain:
+
+$$\text{PR-AUC}=0.1169$$
+
+The corresponding no-skill baseline is approximately the prevalence of the positive class,
+
+$$\text{PR-AUC}_{\text{baseline}} \approx 0.063$$
+
+Therefore, the model achieves a PR-AUC roughly $1.86$ times the no-skill baseline.
+
+*But how good is* $0.1169$? It indicates that the model contains meaningful information for detecting arrests, since it clearly exceeds the prevalence baseline. However, its absolute value remains low, reflecting the difficulty of obtaining high precision when arrests are rare. The Precision-Recall curve confirms that precision decreases as recall increases.
+
+#### 4.4.3.4) Log-Loss
+
+> Log-loss evaluates the **quality of the predicted probabilities**, rather than simply stating whether the final classification is correct.
+
+This measure cares about **how confident the model is**. For example, predicting $p=0.51$ for an actual arrest is not treated the same as predicting $p=0.99$. In fact, a highly confident incorrect prediction receives a strong penalty.
+
+In our case:
+
+$$\text{Log-Loss}=0.2306$$
+
+For comparison, using only the positive-class prevalence of approximately $0.063$ for every observation would produce a log-loss of approximately
+
+$$0.235$$
+
+Thus, Naive Bayes improves on a prevalence-only prediction, but only **slightly**. The probability estimates therefore contain useful information, although the improvement in probabilistic prediction is limited.
+
+#### 4.4.3.5) Brier Score
+
+The Brier score is useful here because it evaluates whether the predicted probabilities are close to the observed outcomes, rather than merely whether the model ranks observations correctly.
+
+> Formally, the Brier score measures the squared error of the predicted probabilities (the lower, the better).
+
+For Naive Bayes,
+
+$$\text{Brier}=0.0584$$
+
+A prevalence-only model with a positive-class probability of approximately $0.063$ would have a Brier score of about
+
+$$0.0590$$
+
+Therefore, the model again performs **slightly better than the prevalence baseline**, although the improvement is modest.
+
+The calibration plot is broadly close to the perfect-calibration line, suggesting that the predicted probabilities are reasonably aligned with observed arrest rates. Some deviations are nevertheless present, particularly in the higher-probability regions where fewer observations are available.
+
+#### 4.4.3.6) MCC
+
+The **Matthews Correlation Coefficient (MCC)** is particularly useful for imbalanced classification because it incorporates all four components of the confusion matrix:
+
+$$MCC = \frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}} \in [-1, 1]$$ Where,
+
+- $1$ = perfect prediction
+- $0$ = no better than random association
+- $-1$ = completely incorrect prediction
+
+Our result is:
+
+$$MCC=0.131$$
+
+This represents a **weak but positive association** between predicted and observed classes. Therefore, the classification contains genuine predictive information, but the separation between arrests and non-arrests remains limited.
+
+This is consistent with the relatively low precision and F1 score produced by the model.
+
+#### 4.4.3.7) Thresholds
+
+Using Youden's criterion, the selected classification threshold is
+
+$$t^*=0.0489$$
+
+This is considerably below the conventional threshold of $0.5$, which would be inappropriate for such an imbalanced outcome because predicted probabilities of arrest are generally low.
+
+At this threshold, the model obtains:
+
+$$\text{Sensitivity}=0.676, \, \text{Specificity}=0.589, \, \text{Precision}=0.100, \, F1=0.174$$
+
+The model therefore identifies approximately $67.6\%$ of actual arrests, at the cost of a relatively large number of false positives. Specificity remains moderate at $58.9\%$, while precision of $10.0\%$ means that only about one in ten observations classified as arrests is actually an arrest.
+
+This trade-off is expected in a strongly imbalanced problem. The threshold analysis shows that increasing the threshold improves specificity and precision but rapidly reduces sensitivity. The Youden threshold therefore represents a compromise that gives comparable importance to sensitivity and specificity rather than maximizing overall accuracy.
+
+#### 4.4.3.8) Final Remarks
+
+Let us put the metrics together:
+
+- **Discrimination**, $\text{AUC} \approx 0.682$: the model has modest ability to rank arrested observations above non-arrested ones.
+- **Rare-class performance**, $\text{PR-AUC} \approx 0.117$: performance is clearly above the no-skill baseline of $\approx 0.063$, although precision remains limited in absolute terms.
+- **Probability predictions**, $\text{Brier} \approx 0.0584, \,\, \text{LogLoss} \approx 0.2306$: predicted probabilities improve slightly over a prevalence-only model and appear reasonably calibrated overall.
+- **Classification**, $\text{MCC} \approx 0.131$: there is a weak but meaningful association between predictions and the true classes.
+- **Class balance**, $\text{ACC}_{\text{Balanced}} \approx 0.633$: the model achieves moderate performance when sensitivity and specificity are given equal importance.
+
+Now for the final conclusions:
+
+- Naive Bayes captures **real but relatively weak predictive structure** in the data.
+- Its performance is substantially better than random or prevalence-only prediction, but the improvement is moderate rather than strong.
+- The model prioritizes detection of the minority class at the selected threshold, achieving a sensitivity of $67.6\%$, but this comes at the cost of lower specificity and particularly low precision.
+- The PR-AUC and precision results show that the **class imbalance remains a major limitation**: even when the model successfully identifies many arrests, false positives remain frequent.
+- Overall, Naive Bayes provides a useful probabilistic benchmark, but its predictive performance suggests that the conditional-independence assumption and the available predictors limit how well it can separate arrests from non-arrests.
