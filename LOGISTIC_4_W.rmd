@@ -35,7 +35,7 @@ requirements <- c(
   "stringr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
   "timeDate", "timechange", "tzdb", "hms", "readr", "ggcorrplot",
   "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor",
-  "sf", "ggplot2", "patchwork", "pROC", "kableExtra", "mgcv", "glmnet"
+  "sf", "ggplot2", "patchwork", "pROC", "kableExtra", "mgcv", "glmnet", "effects"
 )
 ```
 
@@ -755,6 +755,18 @@ rm(vehstop)
 
 # 3) Full Logistic Regression
 
+Here, logistic regression models the conditional probability of belonging to the positive class through the logit transformation,
+
+$$\log\left( \frac{p(X)}{1-p(X)} \right) = \beta_0 + \beta_1 X_1 + \cdots + \beta_p X_{p}$$
+
+where $p(X)=P(Y=1\mid X)$.
+
+We considered this model for the following reasons
+
+1.  First of all, our response `arrested` is **binary** and this makes the binomial logistic model a natural choice for estimating the probability of an arrest.
+2.  Then we want to exploit its **interpretability**: each coefficient describes the association between a predictor and the log-odds of arrest while holding the other variables fixed. This allows the model to be used not only as a classifier, but also to **investigate** how demographic, time-related and geographic features **are associated with the probability of arrest**.
+3.  Finally, logistic regression provides a useful **baseline model**. This makes it possible to assess if other models (LASSO, GAM, or Naive Bayes) can be better with respect to predictive power and to analyze the differences in additional complexity.
+
 ## 3.1) Assumptions and Setup
 
 We had to exclude `age` as a predictor, since we had missing values that we labeled as `Unknown` in `age_bracket`. Therefore, this is the final formulation of the model
@@ -775,17 +787,76 @@ mod_logit_best <- glm(f_final, family = binomial, data = train)
 summary(mod_logit_best)
 ```
 
-TODO: Analyze the final metrics not the coefficients and OR
+The model improves the fit compared with the intercept-only model. The **null deviance** decreases from $63,178$ to a **residual deviance** of $57,191$, corresponding to a reduction of $5,987$ deviance units with $63$ additional parameters.
+
+Even though this suggests that our predictors contribute to explaining the probability of arrest, the residual deviance remains relatively large. Unfortunately, this means that a considerable amount of variation is still not captured by the model.
+
+This is what we expected given that the model is simple and has an additive form (we do not consider interactions or non-linear effects here for interpretability).
 
 ### 3.3.1) Coefficients analysis
 
-TODO: Introduce how to read them
+The coefficients are estimated by maximum likelihood and describe changes in the log-odds of the positive outcome/arrests (`arrested = 1`) while holding the remaining predictors fixed.
 
-TODO: Provide analysis and interpretation concerning estimate, SE, z value etc..
+When several predictors are **categorical**, each factor with $K$ levels is represented through $K-1$ indicator variables relative to a chosen reference category. In this case, the estimated coefficients represent changes in the **log-odds of arrest**, relative to the corresponding reference category and conditional on all other predictors being held fixed.
 
-### 3.3.2) Odd Ratios and Significance
+The intercept ($-2.330$) represents the estimated **log-odds of arrest for the reference level**. In other words, an observation belonging to all reference categories of the categorical predictors (see section 1.1). Its negative value suggests that we have a relatively low baseline probability of arrest (approximately $8.9\%$), which is also significant ($p<2 \times 10^{-16}$).
 
-TODO: Introduce OR and what they represent/ how they are interpreted
+Overall, the coefficient estimates suggest that `hour`, `boro`, `sex`, `ethnicity`, and `age_bracket` **contain the strongest conditional signals in the fitted model**, while `month` and `weekday` show smaller contributions.
+
+Let us see the predictors now.
+
+#### 3.3.1.1) Time-related
+
+First of all, we consider the time-related predictors:
+
+- `year`: The coefficients for **2024** ($0.151$) and **2025** ($0.191$) are both positive and statistically significant, indicating **higher conditional log-odds of arrest than in 2023** (reference year);
+- `month`: In general, monthly effects are comparatively modest. Relative to January, April through July generally show positive coefficients, with the largest occurring in **July** ($0.223$). September ($0.211$) and October ($0.166$) also show significant positive differences. In contrast, several months, including February, March, August and December, do not differ significantly from January.
+- `weekday` differences are also relatively small. **Tuesday** has a positive coefficient ($0.142$), while **Friday** ($-0.136$) and **Sunday** ($-0.127$) are significantly lower than Monday.
+- `hour`: The strongest temporal pattern is associated with **hour of the day**. Relative to midnight, coefficients become strongly negative during the morning, reaching their minimum at **07:00** ($-3.355$). Large negative coefficients are also observed between approximately 06:00 and 12:00. The magnitude then progressively decreases during the afternoon and evening, with coefficients approaching zero again by 23:00. This indicates a pronounced time-of-day structure that cannot be summarized as a simple linear trend.
+
+#### 3.3.1.2) Borough
+
+Then we look at `boro` for the geographic coefficients.
+
+- **All its coefficients are significant and negative relative to the reference borough (Bronx)**.
+- The largest differences are observed for **Manhattan North** ($-1.103$), **Manhattan South** ($-1.067$), and **Queens North** ($-0.939$). Brooklyn North also shows a substantial negative coefficient ($-0.878$).
+- This heterogeneity in arrest patterns suggests that our decision to use `boro` instead of `area` was somewhat worth it.
+
+#### 3.3.1.3) Sex
+
+For what concerns `sex`
+
+- The coefficient for **Female** is strongly negative ($-1.204$) and highly significant relative to `sexM`.
+- In contrast, the coefficient for **Unknown sex** ($-0.053$) is close to zero and not statistically significant, providing little evidence of a difference from the reference category after adjustment for the other predictors.
+
+#### 3.3.1.4) Ethnicity
+
+The `ethnicity` coefficients show marked differences relative to the reference category.
+
+- **Black** ($0.372$) and **Hispanic** ($0.575$) have positive and statistically significant coefficients, while **Asian / Pacific Islander** ($-0.711$), **Other** ($-2.288$), and **Unknown** ($-1.109$) have negative coefficients.
+
+- Among these, `ethnicityOther` has the largest absolute coefficient. However, its relatively large standard error ($0.338$) suggests greater uncertainty than for the more frequent categories.
+
+#### 3.3.1.5) Age Bracket
+
+Finally for `age_bracket`, using age 25–34 as the reference category,
+
+- The strongest positive coefficient is observed for individuals **under 18** ($0.545$).
+- Positive coefficients are also found for ages 35–44 ($0.096$), 45–54 ($0.191$), and 55–64 ($0.327$).
+- The coefficient for age 18–24 is small ($0.072$), although statistically significant $p = 0.021894$, while the coefficient for **65+** ($-0.104$) is not significant $p = 0.550084$.
+- The `Unknown` age category has a positive coefficient of $0.219$.
+
+### 3.3.2) Odd Ratios, Significance and Effects
+
+In logistic regression, coefficients are estimated on the **log-odds scale**, which can be difficult to interpret directly. Thus, they are often transformed into **odds ratios**
+
+$$OR=e^{\beta}$$
+
+For a categorical predictor, the odds ratio **compares the odds of arrest for a given category with those of its reference category, while holding all other predictors fixed**. We say that
+
+- $OR>1$ indicates higher odds of arrest, relative to the reference group (while holding all other predictors fixed);
+- $OR<1$ indicates lower odds, relative to the reference group (while holding all other predictors fixed);
+- $OR=1$ indicates no difference, relative to the reference group (while holding all other predictors fixed).
 
 ```{r odds-ratios-table}
 predictors <- c("year", "month", "weekday", "hour", "boro", "sex", "ethnicity", "age_bracket")
@@ -821,11 +892,7 @@ or_tbl %>%
   collapse_rows(columns = 1, valign = "top")
 ```
 
-TODO: Comment
-
-### 3.3.3) Odd Ratios Plots
-
-The forest plot below displays estimated odds ratios with 95% confidence intervals, faceted by predictor. Points are coloured by significance at the 5% level. The vertical dashed line marks OR = 1 (no effect). Note the logarithmic x-axis.
+Since this is not easy to visualize, we use the below to display estimated odds ratios with 95% confidence intervals, faceted by predictor
 
 ```{r or-plot, fig.width=11, fig.height=10}
 or_plot_data <- or_tbl %>%
@@ -867,11 +934,145 @@ ggplot(or_plot_data, aes(x = estimate, y = reorder(level, estimate), colour = is
   )
 ```
 
-TODO: Comment
+#### 3.3.2.1) Year
 
-### 3.3.4) Key Findings
+```{r effect-year}
+plot(effect("year", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest")
+```
 
-TODO: Connect the whole discussion first in general, then for the specific value.
+Using **2023 as the reference year**, both 2024 and 2025 show statistically significant and higher odds of arrest.
+
+- In 2024, the odds are estimated to be about **16% higher** than in 2023 (OR = 1.163);
+
+- In 2025 they are about **21% higher** (OR = 1.210).
+
+This pattern suggests a **gradual increase in the conditional odds of arrest across the three years**, after accounting for the remaining predictors.
+
+#### 3.3.2.2) Month
+
+```{r effect-month}
+plot(effect("month", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest")
+```
+
+The reference category for month is **January**. The OR are smaller than those for `hour` or `boro`.
+
+The following months show **higher odds of arrest than January**:
+
+- April (OR = 1.139),
+
+- May (OR = 1.165),
+
+- June (OR = 1.197),
+
+- July (OR = 1.250),
+
+- September (OR = 1.235),
+
+- and October (OR = 1.181).
+
+As expected from the EDA, **July has the largest estimated difference**, with approximately **25% higher odds**, followed closely by September.
+
+On the other hand,
+
+- February, March and August have odds ratios close to 1 and confidence intervals that clearly include 1, suggesting **little evidence of a difference from January**;
+
+- November has an OR of 1.119 but does not reach conventional statistical significance ($p=0.082$);
+
+- December has an OR below 1 (0.901), but its confidence interval also includes 1;
+
+#### 3.3.2.3) Weekday
+
+```{r effect-weekday}
+plot(effect("weekday", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest")
+```
+
+Using **Monday as the reference**, most OR differences in weekday are small.
+
+- Tuesday is surprisingly associated with significantly higher odds of arrest (OR = 1.153), corresponding to approximately **15% higher odds** than Monday, holding the remaining predictors fixed.
+
+- Friday (OR = 0.873) and Sunday (OR = 0.881) are instead **associated with significantly lower odds, approximately 13% and 12% lower** than Monday, respectively.
+
+- Wednesday and Thursday are very close to the reference value and **neither is statistically significant**. Saturday also shows lower odds, but the confidence interval includes 1.
+
+#### 3.3.2.4) Hour
+
+```{r effect-hour}
+plot(effect("hour", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest")
+```
+
+The reference hour is **00:00**, and this predictor shows one of the clearest patterns in the model.
+
+- Hours **1, 2 and 3 do not differ significantly from midnight.**
+
+- From approximately 04:00, the odds decrease sharply. At 04:00 the estimated OR is 0.610, already **indicating lower odds than at midnight**.
+
+- There is another **great reduction between 05:00 and 12:00**.
+
+  - At 05:00 OR = 0.288, and at 06:00 it decreases to 0.083.
+
+  - The lowest value is observed at **07:00**, with OR = 0.035. In other words, conditional on all other included variables, the **odds of arrest at 07:00 are only about 3.5% of the corresponding odds at midnight**.
+
+- The odds remain **very low during the rest of the morning**.
+
+- From midday, the odds gradually increase again.
+
+- By 21:00, the OR is 0.844. Then, at 22:00 (OR = 0.880, $p=0.053$) and 23:00 (OR = 0.972, $p=0.683$), the difference from midnight is no longer statistically significant.
+
+This produces a **non-linear pattern coherent with EDA**: the conditional odds are highest around the reference hour, then they fall during the morning, and gradually build up towards midnight.
+
+#### 3.3.2.5) Borough
+
+```{r effect-boro}
+plot(effect("boro", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest", rotx = 45)
+```
+
+The **Bronx is the reference category**, and every other borough has an odds ratio significantly below 1.
+
+- The strongest differences are observed for Manhattan North (OR = 0.332) and Manhattan South (OR = 0.344). This means that (after fixing the other variables) the **estimated odds of arrest in these areas are roughly one third of those in the Bronx**.
+
+- Queens North also has lower odds (OR = 0.391), followed by Brooklyn North (OR = 0.416), Queens South (OR = 0.502), Brooklyn South (OR = 0.614), and Staten Island (OR = 0.631).
+
+#### 3.3.2.6) Sex
+
+```{r effect-sex}
+plot(effect("sex", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest")
+```
+
+With **Male as the reference category**, `sexF` has an OR of 0.300 and the estimate is statistically significant. This indicates **substantially lower conditional odds** of arrest for female motorists (with respect to male drivers), after fixing the remaining predictors.
+
+On the other hand, the `Unknown` category has an OR of 0.948 and a very wide confidence interval which includes 1, and a non-significant $p$-value. Thus, there is no evidence of a difference between the Unknown and Male categories in this model.
+
+#### 3.3.2.7) Ethnicity
+
+```{r effect-ethnicity}
+plot(effect("ethnicity", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest", rotx = 45)
+```
+
+Using **White as the reference category**, the ethnicity coefficients show some of the largest differences in the model and are all statistically significant.
+
+- The estimated odds for **Black observations are higher** than for the White reference group (OR = 1.451).
+
+- **Hispanic** observations have an **even larger estimated OR** of 1.778, corresponding to approximately **78% higher conditional odds** relative to the White reference category.
+
+- On the other hand, Asian / Pacific Islander has an OR of 0.491, indicating lower estimated odds. The `Other` category has a particularly small OR of 0.102 and `Unknown` has an OR of 0.330.
+
+#### 3.3.2.8) Age bracket
+
+```{r effect-age}
+plot(effect("age_bracket", mod_logit_best), rescale.axis=FALSE, ylab="Probability of Arrest", rotx = 45)
+```
+
+The reference age category is **25–34 years**.
+
+- The strongest positive difference comes from the **Under 18** group, with an OR of 1.725. This corresponds to **higher conditional odds than the 25–34** reference group.
+
+- The 18–24 category has an OR of 1.075. Although the **estimate is statistically significant**, the estimation is small and does not represent a huge difference from the reference category.
+
+- For **older age groups, the estimated odds increase progressively** from 35–44 (OR = 1.101) to 45–54 (OR = 1.210) and 55–64 (OR = 1.387), and they are all statistically significant.
+
+- The 65+ group is different: its OR is 0.901, but the confidence interval is wide and contains 1. Therefore, there is **no evidence of a significant difference between the 65+ and 25–34 groups**.
+
+- The `Unknown` age category has an OR of 1.245 and is **statistically significant, indicating higher conditional odds relative to the reference group**.
 
 ## 3.4) Evaluation on Test Set
 
@@ -893,14 +1094,14 @@ plot_cm(test$arrested, class_logit,
 
 Let us start from the derived metrics:
 
-| Metric               | Value | Interpretation |
-|----------------------|------:|----------------|
-| Accuracy             | 0.665 | About 66.5% of all observations are classified correctly, although this metric is strongly influenced by the dominant non-arrest class |
+| Metric | Value | Interpretation |
+|-------------------------------|-----------------:|-----------------------|
+| Accuracy | 0.665 | About 66.5% of all observations are classified correctly, although this metric is strongly influenced by the dominant non-arrest class |
 | Sensitivity / Recall | 0.607 | The model correctly identifies about 60.7% of actual arrests |
-| Specificity          | 0.668 | The model correctly identifies about 66.8% of actual non-arrests |
-| Precision            | 0.110 | Only about 11.0% of observations predicted as arrests are actually arrests |
-| F1                   | 0.186 | Low overall balance between precision and recall for the arrest class |
-| Balanced Accuracy    | 0.638 | Moderate classification performance when arrests and non-arrests are weighted equally |
+| Specificity | 0.668 | The model correctly identifies about 66.8% of actual non-arrests |
+| Precision | 0.110 | Only about 11.0% of observations predicted as arrests are actually arrests |
+| F1 | 0.186 | Low overall balance between precision and recall for the arrest class |
+| Balanced Accuracy | 0.638 | Moderate classification performance when arrests and non-arrests are weighted equally |
 
 Overall, the confusion matrix confirms that the model provides **meaningful but limited classification performance**: it captures a majority of arrests, but it accepts a greater false-positive rate.
 
@@ -954,15 +1155,11 @@ Our positive class is rare, so ROC-AUC can sometimes give an overly optimistic i
 
 Here, we obtain:
 
-$$
-\text{PR-AUC} = 0.1207
-$$
+$$\text{PR-AUC} = 0.1207$$
 
 The no-skill baseline corresponds approximately to the positive-class prevalence,
 
-$$
-\text{PR-AUC}_{\text{baseline}} \approx 0.063
-$$
+$$\text{PR-AUC}_{\text{baseline}} \approx 0.063$$
 
 Thus, the model achieves a PR-AUC almost **1.9 times the prevalence baseline**.
 
@@ -976,9 +1173,7 @@ This measure cares about **how confident the model is**. For example, predicting
 
 In our case:
 
-$$
-\text{Log-Loss} = 0.2257
-$$
+$$\text{Log-Loss} = 0.2257$$
 
 For comparison, a prevalence-only model predicting approximately $p=0.063$ for every observation would have a log-loss of roughly $0.235$. The fitted logistic regression therefore improves on this baseline, although the reduction is relatively modest.
 
@@ -992,9 +1187,7 @@ The Brier score is useful here because it evaluates whether the predicted probab
 
 The model obtains
 
-$$
-\text{Brier} = 0.0576
-$$
+$$\text{Brier} = 0.0576$$
 
 A prevalence-only prediction of approximately $0.063$ would produce a Brier score of about $0.0590$. The logistic regression therefore provides a **small improvement in probability accuracy** over the baseline.
 
@@ -1012,9 +1205,7 @@ $$MCC = \frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}} \in [-
 
 Our result is:
 
-$$
-MCC = 0.141
-$$
+$$MCC = 0.141$$
 
 This represents a **weak but positive association** between the predicted and observed classes. The classifier therefore performs better than random classification, but the relatively low MCC confirms that its threshold-based predictions remain limited.
 
@@ -1024,25 +1215,19 @@ This is consistent with the low precision of $0.110$: although the model identif
 
 Using Youden's criterion, the selected classification threshold is
 
-$$
-t^* = 0.0605
-$$
+$$t^* = 0.0605$$
 
 This value is much lower than the conventional $0.5$ cutoff because the positive class is rare. A threshold of $0.5$ would classify very few observations as arrests and would therefore produce very poor sensitivity.
 
 At the selected threshold, the model achieves:
 
-$$
-\text{Sensitivity}=0.607,
+$$\text{Sensitivity}=0.607,
 \qquad
-\text{Specificity}=0.668
-$$
+\text{Specificity}=0.668$$
 
 resulting in
 
-$$
-\text{Balanced Accuracy}=0.638
-$$
+$$\text{Balanced Accuracy}=0.638$$
 
 Thus, approximately **60.7% of actual arrests are detected**, while approximately **66.8% of non-arrests are correctly excluded**.
 
@@ -1050,9 +1235,7 @@ The threshold analysis shows the expected trade-off: lowering the threshold incr
 
 Precision at this threshold remains low,
 
-$$
-\text{Precision}=0.110
-$$
+$$\text{Precision}=0.110$$
 
 meaning that only about 11% of observations classified as arrests are actually arrests. This is an important consequence of the low prevalence of the positive class.
 
@@ -1136,9 +1319,9 @@ In this model, all adjusted GVIF values are extremely close to 1, ranging from *
 
 Therefore, there is **no evidence of problematic multicollinearity among the predictors**. This is particularly relevant for predictors such as `hour`, `month`, and `boro`, which contain many factor levels but still show adjusted GVIF values essentially equal to 1.
 
-### 3.5.2) Influential Observations 
+### 3.5.2) Influential Observations
 
-Influence diagnostics assess whether individual observations have an unusually large effect on the fitted logistic regression model. 
+Influence diagnostics assess whether individual observations have an unusually large effect on the fitted logistic regression model.
 
 Here we consider **Cook's distance** which measures how much the fitted model would change if a given observation were removed.
 
