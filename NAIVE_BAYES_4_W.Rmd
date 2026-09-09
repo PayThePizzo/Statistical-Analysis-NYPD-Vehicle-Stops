@@ -31,11 +31,8 @@ These `.Rmd` files represent the project submission for the course [Statistical 
 
 ```{r requirements}
 requirements <- c(
-  "remotes", "summarytools", "forcats", "scales", "purrr", "broom",
-  "stringr", "dbplyr", "dplyr", "dtplyr", "tidyr", "tidyselect",
-  "timeDate", "timechange", "tzdb", "hms", "readr", "ggcorrplot",
-  "lubridate", "prettyunits", "RColorBrewer", "viridis", "rcartocolor",
-  "sf", "ggplot2", "patchwork", "pROC", "kableExtra", "mgcv", "glmnet"
+  "scales", "dplyr", "tidyr", "viridis",
+  "ggplot2", "patchwork", "pROC", "kableExtra", "e1071"
 )
 ```
 
@@ -47,7 +44,7 @@ for (req in requirements){
 }
 ```
 
-Note that some of the packages may not be used, but to avoid any error related to dependencies, we are going to keep all of these libraries. Now, the loading of all packages should be immediate.
+The list only contains packages actually used in this notebook. Now, the loading of all packages should be immediate.
 
 ```{r load-requirements, include=FALSE}
 for (req in requirements){
@@ -65,7 +62,7 @@ rm(requirements, req)
 
 Here we define the helper functions used throughout model selection and evaluation, kept in one place for reuse across every model fitted below.
 
-### 0.2.1) Data-Split and Cross-Validation Helpers
+### 0.2.1) Data-Split Diagnostics
 
 ```{r fn-check-prop}
 # ==============================================================================
@@ -97,93 +94,11 @@ check_prop <- function(var, label) {
 }
 ```
 
-```{r fn-cv-auc}
-# ==============================================================================
-# 2. Cross-Validated AUC
-# ==============================================================================
-
-#' @title Cross-Validated AUC for a Logistic Regression Formula
-#'
-#' @description Refits a binomial GLM on each of the k training folds and
-#' scores it on the held-out fold, returning the mean AUC across folds. Folds
-#' are processed in parallel since refitting a GLM on ~1.7M rows ten times is
-#' the dominant cost of the model-comparison sections below.
-#'
-#' @param formula Model formula passed to glm(family = binomial).
-#' @param data Training data.frame; must contain the response `arrested`.
-#' @param folds_vec Integer vector, same length as nrow(data), with values
-#' 1..k giving each row's fold assignment.
-#'
-#' @return A numeric scalar, the mean out-of-fold AUC (NA folds are dropped).
-cv_auc <- function(formula, data, folds_vec) {
-  k <- max(folds_vec)
-
-  auc_vals <- parallel::mclapply(seq_len(k), function(i) {
-    tr <- data[folds_vec != i, ]
-    te <- data[folds_vec == i, ]
-
-    # A fold can fail to fit (e.g. rank deficiency in a rare stratum) — treat
-    # as a missing fold rather than aborting the whole CV run
-    fit <- tryCatch(
-      glm(formula, family = binomial, data = tr),
-      error = function(e) NULL
-    )
-    if (is.null(fit)) return(NA_real_)
-
-    prob <- tryCatch(
-      predict(fit, newdata = te, type = "response"),
-      error = function(e) rep(NA_real_, nrow(te))
-    )
-
-    tryCatch(
-      as.numeric(pROC::auc(te$arrested, prob, quiet = TRUE)),
-      error = function(e) NA_real_
-    )
-  }, mc.cores = parallel::detectCores() - 1)
-
-  mean(unlist(auc_vals), na.rm = TRUE)
-}
-```
-
-```{r fn-nb-cv-auc}
-#' @title Cross-Validated AUC for Naive Bayes at a Given Laplace Constant
-#'
-#' @description Refits e1071::naiveBayes on each training fold with smoothing
-#' constant `k` and scores it on the held-out fold, returning the mean AUC.
-#' Mirrors cv_auc() but calls naiveBayes() instead of glm() and reads the
-#' positive-class probability from the second column of the raw posterior.
-#'
-#' @param k Numeric Laplace smoothing constant passed to naiveBayes(laplace = k).
-#' @param data Training data.frame; must contain the response `arrested`.
-#' @param folds_vec Integer vector, same length as nrow(data), with values
-#' 1..k giving each row's fold assignment.
-#' @param formula Model formula passed to naiveBayes().
-#'
-#' @return A numeric scalar, the mean out-of-fold AUC (NA folds are dropped).
-nb_cv_auc <- function(k, data, folds_vec, formula) {
-  n_folds  <- max(folds_vec)
-  auc_vals <- numeric(n_folds)
-  for (i in seq_len(n_folds)) {
-    tr  <- data[folds_vec != i, ]
-    te  <- data[folds_vec == i, ]
-    fit <- e1071::naiveBayes(formula, data = tr, laplace = k)
-
-    # Posterior: columns named after class levels; column 2 = P(arrested=1)
-    prob <- predict(fit, newdata = te, type = "raw")[, 2]
-    auc_vals[i] <- tryCatch(
-      as.numeric(pROC::auc(te$arrested, prob, quiet = TRUE)),
-      error = function(e) NA_real_
-    )
-  }
-  mean(auc_vals, na.rm = TRUE)
-}
-```
-
 ### 0.2.2) Threshold and Confusion-Matrix Helpers
 
 ```{r fn-eval-helpers}
 # ==============================================================================
-# 3. Threshold Selection and Confusion-Matrix Helpers
+# 2. Threshold Selection and Confusion-Matrix Helpers
 # ==============================================================================
 
 #' @title Find the Youden-Optimal Classification Threshold
@@ -269,7 +184,7 @@ class_metrics <- function(actual, predicted, pos = 1) {
 
 
 # ==============================================================================
-# 4. Probability-Based Evaluation Metrics
+# 3. Probability-Based Evaluation Metrics
 # ==============================================================================
 
 #' @title Compute the Full Evaluation-Metrics Tibble for One Model
@@ -348,7 +263,7 @@ compute_metrics <- function(actual, prob, model_name = "Model") {
 
 ```{r fn-plot-roc-single}
 # ==============================================================================
-# 5. Plots for Single-Model Evaluation
+# 4. Plots for Single-Model Evaluation
 # ==============================================================================
 
 #' @title Plot the ROC Curve for a Single Model
@@ -544,64 +459,6 @@ plot_nb_feature <- function(feature_name, mod) {
       legend.position = "bottom",
       panel.grid.minor = element_blank()
     )
-}
-```
-
-### 0.2.4) Model-Summary Helpers
-
-```{r fn-build-modal-row}
-# ==============================================================================
-# 6. Marginal-Effect and Coefficient Helpers
-# ==============================================================================
-
-#' @title Build a One-Row Data Frame of Modal/Median Covariate Values
-#'
-#' @description For each variable in `vars`, takes the most frequent level
-#' (factor/character) or the median (numeric) from `data`. Used to hold
-#' non-focal predictors fixed at a representative value when computing
-#' marginal-effect predictions for an interaction term.
-#'
-#' @param data Data.frame to summarise (typically `train`).
-#' @param vars Character vector of column names in `data`.
-#'
-#' @return A one-row data.frame with one column per entry in `vars`.
-build_modal_row <- function(data, vars) {
-  row_list <- lapply(vars, function(v) {
-    x <- data[[v]]
-    if (is.factor(x)) {
-      factor(names(sort(table(x), decreasing = TRUE))[1], levels = levels(x))
-    } else if (is.numeric(x)) {
-      median(x, na.rm = TRUE)
-    } else {
-      names(sort(table(x), decreasing = TRUE))[1]
-    }
-  })
-  as.data.frame(setNames(row_list, vars))
-}
-```
-
-```{r fn-extract-coefs}
-#' @title Extract Non-Zero LASSO Coefficients at a Given Lambda
-#'
-#' @description Extracts the coefficients selected by a cv.glmnet fit at a
-#' named lambda (e.g. "lambda.min" or "lambda.1se"), drops the zeroed-out
-#' coefficients, and adds the exponentiated odds ratio.
-#'
-#' @param cv_fit A fitted glmnet::cv.glmnet object.
-#' @param s_name Lambda selector passed to coef(cv_fit, s = s_name), typically
-#' "lambda.min" or "lambda.1se".
-#'
-#' @return A tibble with columns feature, estimate (log-odds), OR (odds ratio),
-#' sorted by descending |estimate|.
-extract_coefs <- function(cv_fit, s_name) {
-  cf <- coef(cv_fit, s = s_name)
-  tibble(
-    feature  = rownames(cf)[-1],
-    estimate = as.numeric(cf[-1])
-  ) %>%
-    filter(estimate != 0) %>%
-    arrange(desc(abs(estimate))) %>%
-    mutate(OR = round(exp(estimate), 3), estimate = round(estimate, 4))
 }
 ```
 
