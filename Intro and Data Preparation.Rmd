@@ -60,27 +60,6 @@ As already stated above, our analysis will provide a better insight, through pre
 
 We hope this analysis dissipates or pinpoints the police bias clearly, even with limited data, as it might lead to either confirming that some areas and ethnicities are more subject to police enforcement than others, or that this has been a product of the prominent propaganda, and the police is "just doing its job".
 
-## Questions we want to ask
-
-Obviously, we could not proceed forward if we did not have some designated questions for our data.
-
-**Is it more likely to be the subject of an arrest** ...
-
-- When stopped in a specific area (or borough)?
-- When stopped during a specific time bracket (ex: 0am-3am)?
-- When stopped during a specific day of the week or weekend (ex: Saturday/Sunday)?
-- If the driver is under 35 years old or if they belong to a specific age bracket (ex: 18-24)?
-- If the driver belongs to a specific reported ethnicity?
-- If the driver identifies with a specific reported sex?
-- If the vehicles used belongs to a specific category (ex: 2-Wheels vs 4-Wheels)?
-
-Furthermore, we may also formulate questions of the kind:
-
-- Is there a specific sub-category of drivers (grouped by reported sex and/or reported ethnicity and/or reported age) that is subject of most of these episodes?
-- Is there a specific reported ethnicity targeted by excessive enforcement behavior in a particular area/borough?
-
-Finally, these questions will be refined as we proceed with exploration and analysis.
-
 ## Goal of this rmarkdown file
 
 The ultimate goal of this file is to build a dataset ready for EDA (Exploratory Data Analysis) by showing a preview of the main issues encountered, and motivating the eventual modification of the original data.
