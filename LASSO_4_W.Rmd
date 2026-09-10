@@ -81,15 +81,24 @@ Here we define the helper functions used throughout model selection and evaluati
 #'
 #' @return A tibble with columns variable, level, train, test, diff_ppt.
 check_prop <- function(var, label) {
+  # Compute the relative frequency of each level in the training set
   tr <- prop.table(table(train[[var]]))
+  # Compute the relative frequency of each level in the test set
   te <- prop.table(table(test[[var]]))
+  # Create a summary table comparing train and test proportions
   tibble(
+    # Variable levels
     level = names(tr),
+    # Proportion in training set
     train = as.numeric(tr),
+    # Proportion in test set
     test = as.numeric(te),
+    # Difference in % between test and training proportions
     diff_ppt = round((as.numeric(te) - as.numeric(tr)) * 100, 2)
   ) %>%
-    mutate(variable = label) %>%
+    # Add descriptive variable name
+    mutate(variable = label) %>% 
+    # Move variable name to first column
     relocate(variable)
 }
 ```
@@ -112,8 +121,10 @@ check_prop <- function(var, label) {
 #'
 #' @return A numeric scalar, the optimal threshold on the probability scale.
 best_thresh <- function(roc_obj) {
-  pROC::coords(roc_obj, "best", ret = "threshold", best.method = "youden",
-               quiet = TRUE)$threshold
+  pROC::coords(
+    roc_obj, "best", ret = "threshold", 
+    best.method = "youden", quiet = TRUE
+  )$threshold
 }
 
 
@@ -127,9 +138,10 @@ best_thresh <- function(roc_obj) {
 #' @return A tibble with columns Actual, Predicted, n (one row per non-empty cell).
 conf_tib <- function(actual, predicted) {
   tibble(
-    Actual    = factor(actual,    levels = c(0, 1)),
+    Actual = factor(actual, levels = c(0, 1)),
     Predicted = factor(predicted, levels = c(0, 1))
-  ) %>% count(Actual, Predicted)
+  ) %>% 
+    count(Actual, Predicted)
 }
 
 
@@ -167,18 +179,18 @@ plot_cm <- function(actual, predicted, title = "Confusion Matrix") {
 #'
 #' @return A named list with sensitivity, specificity, balanced_acc, ppv, npv.
 class_metrics <- function(actual, predicted, pos = 1) {
-  tp <- sum(actual == pos & predicted == pos)
-  tn <- sum(actual != pos & predicted != pos)
-  fp <- sum(actual != pos & predicted == pos)
-  fn <- sum(actual == pos & predicted != pos)
+  tp <- as.numeric(sum(actual == pos & predicted == pos))
+  tn <- as.numeric(sum(actual != pos & predicted != pos))
+  fp <- as.numeric(sum(actual != pos & predicted == pos))
+  fn <- as.numeric(sum(actual == pos & predicted != pos))
   sens <- tp / (tp + fn)
   spec <- tn / (tn + fp)
   list(
-    sensitivity  = sens,
-    specificity  = spec,
+    sensitivity = sens,
+    specificity = spec,
     balanced_acc = (sens + spec) / 2,
-    ppv          = tp / (tp + fp),
-    npv          = tn / (tn + fn)
+    ppv = tp / (tp + fp),
+    npv = tn / (tn + fn)
   )
 }
 
@@ -198,63 +210,97 @@ class_metrics <- function(actual, predicted, pos = 1) {
 #'
 #' @param actual Integer/numeric vector of 0/1 true labels.
 #' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param thr Classification threshold selected externally (on the training set),
+#' applied here rather than recomputed from `actual`/`prob` to avoid leaking test labels.
 #' @param model_name Label stored in the Model column.
 #'
 #' @return A one-row tibble of rounded metrics (see column names in the body).
-compute_metrics <- function(actual, prob, model_name = "Model") {
-  valid  <- !is.na(actual) & !is.na(prob)
-  actual <- actual[valid]; prob <- prob[valid]
+compute_metrics <- function(actual, prob, thr, model_name = "Model") {
+  valid <- !is.na(actual) & !is.na(prob)
+  actual <- actual[valid]
+  prob <- prob[valid]
+
   roc_obj <- pROC::roc(actual, prob, quiet = TRUE)
   auc_val <- as.numeric(pROC::auc(roc_obj))
-  thr     <- best_thresh(roc_obj)
   pred_cl <- as.integer(prob >= thr)
+  
+  # Confusion Matrix Metrics
+  tp <- as.numeric(sum(actual == 1 & pred_cl == 1))
+  tn <- as.numeric(sum(actual == 0 & pred_cl == 0))
+  fp <- as.numeric(sum(actual == 0 & pred_cl == 1))
+  fn <- as.numeric(sum(actual == 1 & pred_cl == 0))
 
-  tp <- sum(actual == 1 & pred_cl == 1); tn <- sum(actual == 0 & pred_cl == 0)
-  fp <- sum(actual == 0 & pred_cl == 1); fn <- sum(actual == 1 & pred_cl == 0)
-  sens <- if ((tp+fn) == 0) NA_real_ else tp / (tp+fn)
-  spec <- if ((tn+fp) == 0) NA_real_ else tn / (tn+fp)
-  prec <- if ((tp+fp) == 0) NA_real_ else tp / (tp+fp)
-  f1   <- if (is.na(prec) || is.na(sens) || (prec+sens) == 0) NA_real_ else
-            2 * prec * sens / (prec + sens)
+  # Confusion Matrix Derived Metrics
+  sens <- (
+    if ((tp+fn) == 0) NA_real_ 
+    else tp / (tp+fn)
+  )
+  spec <- (
+    if ((tn+fp) == 0) NA_real_ 
+    else tn / (tn+fp)
+  )
+  prec <- (
+    if ((tp+fp) == 0) NA_real_ 
+    else tp / (tp+fp)
+  )
+  f1 <- (
+    if (is.na(prec) || is.na(sens) || (prec+sens) == 0) NA_real_ 
+    else 2 * prec * sens / (prec + sens)
+  )
 
-  # Matthews correlation coefficient — guard the denominator against any
-  # degenerate (all-one-class) confusion matrix, which would divide by zero
-  mcc_den <- sqrt(as.numeric(tp+fp) * as.numeric(tp+fn) *
-                  as.numeric(tn+fp) * as.numeric(tn+fn))
-  mcc_val <- if (mcc_den == 0) NA_real_ else (tp*tn - fp*fn) / mcc_den
+  # MCC
+  mcc_den <- sqrt(
+    as.numeric(tp+fp) * as.numeric(tp+fn) *
+    as.numeric(tn+fp) * as.numeric(tn+fn)
+  )
+  mcc_val <- (
+    if (mcc_den == 0) NA_real_ 
+    else (tp*tn - fp*fn) / mcc_den
+  )
 
-  # eps floors probabilities away from 0/1 so log() never evaluates to -Inf
-  eps     <- 1e-15
-  logloss <- -mean(actual * log(pmax(prob, eps)) + (1-actual) * log(pmax(1-prob, eps)))
-  brier   <- mean((prob - actual)^2)
+  # Logloss
+  eps <- 1e-15
+  logloss <- -mean(
+    actual * log(pmax(prob, eps)) + 
+    (1-actual) * log(pmax(1-prob, eps))
+  )
+  
+  # Brier Score
+  brier <- mean((prob - actual)^2)
 
   # PR-AUC via trapezoid rule over pROC coords (pROC has no built-in PR-AUC)
-  pr_raw <- pROC::coords(roc_obj, "all",
-                          ret = c("sensitivity", "precision"),
-                          transpose = FALSE, drop = FALSE)
+  pr_raw <- pROC::coords(
+    roc_obj, "all", ret = c("sensitivity", "precision"),
+    transpose = FALSE, drop = FALSE
+  )
+  
   names(pr_raw)[names(pr_raw) == "sensitivity"] <- "recall"
+
   pr_raw <- pr_raw %>%
     filter(!is.nan(precision), !is.na(precision), !is.nan(recall)) %>%
     arrange(recall)
+
   pr_auc_val <- if (nrow(pr_raw) >= 2)
-    sum(diff(pr_raw$recall) *
-          (head(pr_raw$precision, -1) + tail(pr_raw$precision, -1)) / 2)
+    sum(diff(pr_raw$recall) * (head(pr_raw$precision, -1) + tail(pr_raw$precision, -1)) / 2)
   else NA_real_
 
+  # Print Metrics
   tibble(
-    Model       = model_name,
-    AUC         = round(auc_val, 4),
-    PR_AUC      = round(pr_auc_val, 4),
-    Log_Loss    = round(logloss, 4),
-    Brier       = round(brier, 4),
-    Threshold   = round(thr, 4),
+    Model = model_name,
+    AUC = round(auc_val, 4),
+    PR_AUC = round(pr_auc_val, 4),
+    Log_Loss = round(logloss, 4),
+    Brier = round(brier, 4),
+    Threshold = round(thr, 4),
     Sensitivity = round(sens, 3),
     Specificity = round(spec, 3),
-    Precision   = round(prec, 3),
-    F1          = round(f1, 3),
-    MCC         = round(mcc_val, 3),
-    Bal_Acc     = round(if (!is.na(sens) && !is.na(spec)) (sens+spec)/2
-                        else NA_real_, 3)
+    Precision = round(prec, 3),
+    F1 = round(f1, 3),
+    MCC = round(mcc_val, 3),
+    Bal_Acc = round(
+      if (!is.na(sens) && !is.na(spec)) (sens+spec)/2
+      else NA_real_, 3
+    )
   )
 }
 ```
@@ -281,8 +327,7 @@ plot_roc_single <- function(actual, prob, title = "ROC Curve") {
   auc_lbl <- paste0("AUC = ", round(as.numeric(pROC::auc(roc_obj)), 4))
   pROC::ggroc(roc_obj, colour = "#2c7bb6", linewidth = 0.9) +
     geom_abline(slope = 1, intercept = 1, linetype = "dashed", colour = "grey60") +
-    annotate("text", x = 0.25, y = 0.06, label = auc_lbl,
-             colour = "#2c7bb6", size = 4) +
+    annotate("text", x = 0.25, y = 0.06, label = auc_lbl, colour = "#2c7bb6", size = 4) +
     labs(x = "Specificity", y = "Sensitivity", title = title) +
     theme_minimal(base_size = 11) + theme(panel.grid.minor = element_blank())
 }
@@ -378,10 +423,11 @@ plot_calibration_single <- function(actual, prob, title = "Calibration Plot",
 #'
 #' @param actual Integer/numeric vector of 0/1 true labels.
 #' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param thr Classification threshold selected externally (on the training set).
 #' @param title Main title of the plot.
 #'
 #' @return A ggplot2 object.
-plot_threshold_single <- function(actual, prob, title = "Threshold Analysis") {
+plot_threshold_single <- function(actual, prob, thr, title = "Threshold Analysis") {
   roc_obj  <- pROC::roc(actual, prob, quiet = TRUE)
   thr_data <- pROC::coords(roc_obj, "all",
                             ret = c("threshold","sensitivity","specificity","precision"),
@@ -394,18 +440,17 @@ plot_threshold_single <- function(actual, prob, title = "Threshold Analysis") {
     mutate(Metric = recode(Metric,
       sensitivity = "Sensitivity", specificity = "Specificity",
       precision   = "Precision",   f1          = "F1 Score"))
-  thr_opt <- best_thresh(roc_obj)
   ggplot(thr_data, aes(x = threshold, y = Value, colour = Metric)) +
     geom_line(linewidth = 0.75, na.rm = TRUE) +
-    geom_vline(xintercept = thr_opt, linetype = "dashed",
+    geom_vline(xintercept = thr, linetype = "dashed",
                colour = "grey35", linewidth = 0.55) +
-    annotate("text", x = thr_opt, y = 0.04,
-             label = paste0("Youden\n", round(thr_opt, 3)),
+    annotate("text", x = thr, y = 0.04,
+             label = paste0("Train-selected\n", round(thr, 3)),
              hjust = -0.08, size = 3, colour = "grey30") +
     scale_colour_viridis_d(option = "turbo", begin = 0.05, end = 0.92) +
     scale_y_continuous(limits = c(0, 1)) +
     labs(x = "Threshold", y = "Metric value", colour = NULL, title = title,
-         caption = "Dashed: Youden's J optimal threshold") +
+         caption = "Dashed: threshold selected on the training set") +
     theme_minimal(base_size = 11) +
     theme(legend.position = "bottom", panel.grid.minor = element_blank())
 }
@@ -420,14 +465,15 @@ plot_threshold_single <- function(actual, prob, title = "Threshold Analysis") {
 #'
 #' @param actual Integer/numeric vector of 0/1 true labels.
 #' @param prob Numeric vector of predicted P(arrested = 1), same length as `actual`.
+#' @param thr Classification threshold selected externally (on the training set).
 #' @param model_name Prefixed to each sub-plot's title.
 #'
 #' @return A patchwork object (composed ggplot2 object).
-eval_quad_plot <- function(actual, prob, model_name) {
+eval_quad_plot <- function(actual, prob, thr, model_name) {
   p1 <- plot_roc_single(actual, prob,   paste(model_name, "— ROC"))
   p2 <- plot_pr_single(actual, prob,    paste(model_name, "— Precision-Recall"))
   p3 <- plot_calibration_single(actual, prob, paste(model_name, "— Calibration"))
-  p4 <- plot_threshold_single(actual, prob, paste(model_name, "— Threshold Analysis"))
+  p4 <- plot_threshold_single(actual, prob, thr, paste(model_name, "— Threshold Analysis"))
   (p1 | p2) / (p3 | p4)
 }
 ```
@@ -636,7 +682,7 @@ rm(vehstop)
 
 In binary classification, it is particularly useful when there are many potentially relevant predictors and we want to identify a smaller set of variables associated with the probability of the positive outcome.
 
-For a binary target \(Y \in \{0,1\}\), LASSO logistic regression models
+For a binary target $Y \in \{0,1\}$, LASSO logistic regression models
 
 $$ P(Y=1\mid X)=\frac{1}{1+\exp(-\eta)}, $$
 
@@ -768,7 +814,7 @@ Meanwhile, the number of coefficients falls from 63 to 50:
 
 $$ \frac{63-50}{63} \cdot 100 \approx 20.6\%. $$
 
-So the 1-SE model removes approximately one-fifth of the non-zero coefficients while changing CV-AUC by less than one-thousandth. This is an even stronger complexity-performance trade-off than in our other dataset.
+So the 1-SE model "removes" approximately one-fifth of the non-zero coefficients while changing CV-AUC by less than one-thousandth. This is an even stronger complexity-performance trade-off than in our other dataset.
 
 The standard errors are:
 
@@ -871,6 +917,8 @@ Therefore:
 - $\beta_j \approx 0$, $OR \approx 1$: relatively little contribution after regularisation.
 
 Note that, for categorical variables, each coefficient is relative to the omitted reference category.
+
+> These odds ratios are derived from penalised coefficients and should be interpreted as predictive associations originating from the model. In fact, they do not represent unbiased inferential effect estimates.
 
 #### 5.3.2.2) Specific Interpretation
 
@@ -998,7 +1046,7 @@ This confirms the interpretation from the coefficient paths quite well. Moving f
 
 For the main predictors, the signs and approximate ranking are highly consistent:
 
-| Feature     | \(\beta_{\min}\) | \(\beta_{1se}\) | OR \(\lambda_{\min}\) | OR \(\lambda_{1se}\) |
+| Feature     | $\beta_{\min}$ | $\beta_{1se}$ | OR $\lambda_{\min}$ | OR $\lambda_{1se}$ |
 | ----------- | ---------------: | --------------: | --------------------: | -------------------: |
 | `hour7`     |           -1.752 |          -1.476 |                 0.173 |                0.228 |
 | `age 65+`   |           -1.565 |          -1.411 |                 0.209 |                0.244 |
@@ -1038,42 +1086,51 @@ One further observation worth mentioning is that **the Black and Hispanic coeffi
 ## 5.4) Evaluation on Test Set
 
 ```{r lasso-eval}
+prob_lasso_min_train <- as.numeric(predict(cv_lasso, newx = X_train, s = "lambda.min", type = "response"))
+prob_lasso_1se_train <- as.numeric(predict(cv_lasso, newx = X_train, s = "lambda.1se", type = "response"))
+
+roc_lasso_min_train <- pROC::roc(y_train, prob_lasso_min_train, quiet = TRUE)
+roc_lasso_1se_train <- pROC::roc(y_train, prob_lasso_1se_train, quiet = TRUE)
+
+thr_lasso_min <- best_thresh(roc_lasso_min_train)
+thr_lasso_1se <- best_thresh(roc_lasso_1se_train)
+
+
 prob_lasso_min <- as.numeric(predict(cv_lasso, newx = X_test, s = "lambda.min", type = "response"))
 prob_lasso_1se <- as.numeric(predict(cv_lasso, newx = X_test, s = "lambda.1se", type = "response"))
 
 roc_lasso_min <- pROC::roc(y_test, prob_lasso_min, quiet = TRUE)
 roc_lasso_1se <- pROC::roc(y_test, prob_lasso_1se, quiet = TRUE)
+
 auc_lasso_min <- as.numeric(pROC::auc(roc_lasso_min))
 auc_lasso_1se <- as.numeric(pROC::auc(roc_lasso_1se))
 
-thr_lasso_min  <- best_thresh(roc_lasso_min)
 class_lasso_min <- as.integer(prob_lasso_min >= thr_lasso_min)
 met_lasso_min   <- class_metrics(y_test, class_lasso_min)
 
-cat(sprintf(
-  "λ.min — AUC: %.4f  |  Threshold: %.4f  |  Sens: %.3f  |  Spec: %.3f  |  Bal.Acc: %.3f\n",
-  auc_lasso_min, thr_lasso_min,
-  met_lasso_min$sensitivity, met_lasso_min$specificity, met_lasso_min$balanced_acc
-))
-
-thr_lasso_1se   <- best_thresh(roc_lasso_1se)
 class_lasso_1se <- as.integer(prob_lasso_1se >= thr_lasso_1se)
 met_lasso_1se   <- class_metrics(y_test, class_lasso_1se)
-
-cat(sprintf(
-  "λ.1se — AUC: %.4f  |  Threshold: %.4f  |  Sens: %.3f  |  Spec: %.3f  |  Bal.Acc: %.3f\n",
-  auc_lasso_1se, thr_lasso_1se,
-  met_lasso_1se$sensitivity, met_lasso_1se$specificity, met_lasso_1se$balanced_acc
-))
 ```
 
 ### 5.4.1) Confusion Matrix
 
 ```{r lasso-cm-plots, fig.width=8, fig.height=3.5}
-p_cm_min <- plot_cm(y_test, class_lasso_min, "LASSO (λ.min) — Confusion Matrix")
-p_cm_1se <- plot_cm(y_test, class_lasso_1se, "LASSO (λ.1se) — Confusion Matrix")
+p_cm_min <- plot_cm(y_test, class_lasso_min, "LASSO (λ.min) — Confusion Matrix (Youden threshold, train-selected)")
+p_cm_1se <- plot_cm(y_test, class_lasso_1se, "LASSO (λ.1se) — Confusion Matrix (Youden threshold, train-selected)")
 
 p_cm_min | p_cm_1se
+
+cat(sprintf(
+  "λ.min — AUC: %.4f  |  Threshold (Youden, train-selected): %.4f  |  Sens: %.3f  |  Spec: %.3f  |  Bal.Acc: %.3f\n",
+  auc_lasso_min, thr_lasso_min,
+  met_lasso_min$sensitivity, met_lasso_min$specificity, met_lasso_min$balanced_acc
+))
+
+cat(sprintf(
+  "λ.1se — AUC: %.4f  |  Threshold (Youden, train-selected): %.4f  |  Sens: %.3f  |  Spec: %.3f  |  Bal.Acc: %.3f\n",
+  auc_lasso_1se, thr_lasso_1se,
+  met_lasso_1se$sensitivity, met_lasso_1se$specificity, met_lasso_1se$balanced_acc
+))
 ```
 
 The two LASSO specifications show almost identical discrimination on the held-out test set:
@@ -1099,11 +1156,11 @@ This was partly covered in the previous section, so here we will be focusing on 
 
 ```{r lasso-metrics-table}
 bind_rows(
-  compute_metrics(y_test, prob_lasso_min, "LASSO λ.min"),
-  compute_metrics(y_test, prob_lasso_1se, "LASSO λ.1se")
+  compute_metrics(y_test, prob_lasso_min, thr_lasso_min, "LASSO λ.min"),
+  compute_metrics(y_test, prob_lasso_1se, thr_lasso_1se, "LASSO λ.1se")
 ) %>%
   kbl(
-    caption = "LASSO — full evaluation metrics (test set, Youden threshold)",
+    caption = "LASSO — full evaluation metrics (test set; Youden threshold selected on training set)",
     col.names = c(
       "Model","AUC","PR-AUC","Log-Loss","Brier", "Threshold","Sensitivity",
       "Specificity","Precision","F1","MCC","Bal. Acc."
@@ -1116,30 +1173,30 @@ bind_rows(
 ```
 
 ```{r lasso-eval-plots-min, fig.width=10, fig.height=8}
-eval_quad_plot(y_test, prob_lasso_min, "LASSO (λ.min)")
+eval_quad_plot(y_test, prob_lasso_min, thr_lasso_min, "LASSO (λ.min)")
 ```
 
 ```{r lasso-eval-plots-1se, fig.width=10, fig.height=8}
-eval_quad_plot(y_test, prob_lasso_1se, "LASSO (λ.1se)")
+eval_quad_plot(y_test, prob_lasso_1se, thr_lasso_1se, "LASSO (λ.1se)")
 ```
 
 #### 5.4.2.1) Overall performance
 
-| Metric                | \(\lambda_{\min}\) | \(\lambda_{1se}\) | Interpretation                                        |
+| Metric                | $\lambda_{\min}$ | $\lambda_{1se}$ | Interpretation                                        |
 | --------------------- | -----------------: | ----------------: | ----------------------------------------------------- |
 | **AUC**               |         **0.7351** |            0.7340 | Virtually identical, moderate discrimination          |
 | **PR-AUC**            |         **0.0773** |            0.0763 | Similar rare-class ranking performance                |
 | **Log-Loss**          |         **0.1373** |            0.1374 | Essentially identical probability performance         |
 | **Brier**             |             0.0322 |            0.0322 | Identical probability accuracy                        |
-| **Threshold**         |             0.0313 |            0.0294 | Both require a very low decision threshold            |
+| **Threshold**         |             0.0313 |            0.0294 | Both low cutoffs, selected on the training set via Youden's criterion |
 | **Sensitivity**       |              0.736 |         **0.757** | 1-SE detects more actual arrests                      |
-| **Specificity**       |          **0.631** |             0.608 | \(\lambda_{\min}\) rejects more non-arrests correctly |
+| **Specificity**       |          **0.631** |             0.608 | $\lambda_{\min}$ rejects more non-arrests correctly |
 | **Precision**         |          **0.066** |             0.064 | Low for both models                                   |
 | **F1**                |          **0.121** |             0.118 | Similar; limited by low precision                     |
 | **MCC**               |                 NA |                NA | Should be investigated rather than interpreted        |
 | **Balanced Accuracy** |          **0.683** |             0.682 | Essentially identical                                 |
 
-The main conclusion is that **the two LASSO models have almost indistinguishable predictive performance on the held-out test set**. The principal difference is in the sensitivity-specificity trade-off: \(\lambda_{1se}\) identifies slightly more arrests, while \(\lambda_{\min}\) produces fewer false alarms.
+The main conclusion is that **the two LASSO models have almost indistinguishable predictive performance on the held-out test set**. The principal difference is in the sensitivity-specificity trade-off: $\lambda_{1se}$ identifies slightly more arrests, while $\lambda_{\min}$ produces fewer false alarms.
 
 Since the 1-SE model achieves essentially the same discrimination with **50 rather than 63 non-zero coefficients**, it remains attractive from the perspective of parsimony. However, the choice also depends on whether false positives or false negatives are considered more costly.
 
@@ -1153,7 +1210,7 @@ $$
 \text{AUC}_{1se}=0.7340.
 $$
 
-An AUC of approximately \(0.735\) means that, if we randomly select one observation where an arrest occurred and one where no arrest occurred, the model assigns a higher predicted probability to the arrest observation approximately **73.5% of the time**.
+An AUC of approximately $0.735$ means that, if we randomly select one observation where an arrest occurred and one where no arrest occurred, the model assigns a higher predicted probability to the arrest observation approximately **73.5% of the time**.
 
 > **Note:** AUC measures **discrimination/ranking ability** across all possible classification thresholds. It does not mean that 73.5% of individual predictions are correct.
 
@@ -1208,7 +1265,7 @@ $$
 \frac{0.0773}{0.034}\approx2.27.
 $$
 
-The \(\lambda_{\min}\) model achieves a PR-AUC approximately **2.3 times the no-skill baseline**; the conclusion for \(\lambda_{1se}\) is essentially the same.
+The $\lambda_{\min}$ model achieves a PR-AUC approximately **2.3 times the no-skill baseline**; the conclusion for $\lambda_{1se}$ is essentially the same.
 
 This means that the model extracts meaningful information about the rare positive class.
 
@@ -1218,7 +1275,7 @@ $$
 \boxed{\text{PR-AUC}\approx0.077}
 $$
 
-remains low in absolute terms. This is an important complement to the more favourable ROC-AUC of approximately \(0.735\): **the model ranks arrests reasonably well, but distinguishing a very rare positive class with high precision remains difficult.**
+remains low in absolute terms. This is an important complement to the more favourable ROC-AUC of approximately $0.735$: **the model ranks arrests reasonably well, but distinguishing a very rare positive class with high precision remains difficult.**
 
 #### 5.4.2.4) Log-Loss
 
@@ -1277,7 +1334,7 @@ p(1-p)
 \approx0.0330.
 $$
 
-The LASSO score of \(0.0322\) is therefore better, although the improvement is relatively modest.
+The LASSO score of $0.0322$ is therefore better, although the improvement is relatively modest.
 
 The calibration plots provide additional information. For both models, the observed positive rates lie reasonably close to the dashed perfect-calibration line over most probability bins.
 
@@ -1306,7 +1363,7 @@ Specificity_{1se}&=0.608.
 \end{aligned}
 $$
 
-Thus, \(\lambda_{1se}\) correctly detects a larger proportion of actual arrests:
+Thus, $\lambda_{1se}$ correctly detects a larger proportion of actual arrests:
 
 $$
 73.6\%\rightarrow75.7\%.
@@ -1340,7 +1397,7 @@ $$
 }
 $$
 
-whereas \(\lambda_{\min}\) is somewhat more conservative.
+whereas $\lambda_{\min}$ is somewhat more conservative.
 
 This is exactly the trade-off visible in the confusion matrices.
 
@@ -1364,7 +1421,7 @@ $$
 P(Y=1)=3.42\%.
 $$
 
-For \(\lambda_{\min}\),
+For $\lambda_{\min}$,
 
 $$
 \frac{6.6\%}{3.42\%}\approx1.93.
@@ -1396,7 +1453,7 @@ Again, the difference between the two models is negligible.
 
 #### 5.4.2.8) Thresholds
 
-The selected thresholds are:
+Using Youden's criterion, the selected thresholds are:
 
 $$
 t_{\min}=0.0313
@@ -1404,9 +1461,11 @@ t_{\min}=0.0313
 t_{1se}=0.0294.
 $$
 
-These values are much lower than the conventional threshold of \(0.5\), but this is unsurprising given that only approximately **3.4% of observations correspond to arrests**.
+Each threshold is selected once by maximising Youden's $J$ on the corresponding lambda's training-set ROC curve, then frozen and applied unchanged to the test set, so no test-set information is used in choosing the cutoff.
 
-Importantly, these are **Youden's \(J\)-selected thresholds**, where
+These values are much lower than the conventional threshold of $0.5$, but this is unsurprising given that only approximately **3.4% of observations correspond to arrests**.
+
+Importantly, these are **Youden's $J$-selected thresholds**, where
 
 $$
 J=Sensitivity+Specificity-1.
@@ -1478,7 +1537,7 @@ $$
 Sens=0.757,\quad Spec=0.608.
 $$
 
-Thus, the 1-SE solution shifts performance slightly toward detecting arrests, while \(\lambda_{\min}\) performs somewhat better at correctly identifying non-arrests.
+Thus, the 1-SE solution shifts performance slightly toward detecting arrests, while $\lambda_{\min}$ performs somewhat better at correctly identifying non-arrests.
 
 #### 5.4.2.10) MCC
 
@@ -1502,21 +1561,21 @@ I would correct the MCC computation before including this metric in the final re
 
 Putting the diagnostics together:
 
-* **Discrimination — \(AUC\approx0.735\):** The models demonstrate **moderate ability to distinguish arrests from non-arrests**. Test discrimination is somewhat below the CV estimate of approximately \(0.752\), but remains reasonably consistent out of sample.
-* **Rare-class ranking — \(PR\text{-}AUC\approx0.077\):** Performance is substantially above the no-skill baseline of approximately \(0.034\), indicating meaningful signal for the rare positive class. Nevertheless, absolute precision-recall performance remains limited.
-* **Probability prediction — \(Brier=0.0322,\ LogLoss\approx0.137\):** The two models are essentially identical. Calibration plots additionally suggest that predicted probabilities are reasonably aligned with observed arrest frequencies.
-* **Positive-class detection — \(Sensitivity\approx0.74-0.76\):** The models identify a substantial majority of actual arrests.
-* **False alarms — \(FPR\approx0.37-0.39\):** This sensitivity comes at the cost of incorrectly flagging a substantial proportion of actual non-arrests.
-* **Precision — \(\approx0.064-0.066\):** Only about 6–7% of predicted arrests correspond to actual arrests, reflecting the severe class imbalance and the sensitivity-oriented operating point.
-* **Class balance — \(BA\approx0.683\):** Both models perform meaningfully above chance when sensitivity and specificity receive equal weight, with virtually identical balanced accuracy.
+* **Discrimination — $AUC\approx0.735$:** The models demonstrate **moderate ability to distinguish arrests from non-arrests**. Test discrimination is somewhat below the CV estimate of approximately $0.752$, but remains reasonably consistent out of sample.
+* **Rare-class ranking — $PR\text{-}AUC\approx0.077$:** Performance is substantially above the no-skill baseline of approximately $0.034$, indicating meaningful signal for the rare positive class. Nevertheless, absolute precision-recall performance remains limited.
+* **Probability prediction — $Brier=0.0322,\ LogLoss\approx0.137$:** The two models are essentially identical. Calibration plots additionally suggest that predicted probabilities are reasonably aligned with observed arrest frequencies.
+* **Positive-class detection — $Sensitivity\approx0.74-0.76$:** The models identify a substantial majority of actual arrests.
+* **False alarms — $FPR\approx0.37-0.39$:** This sensitivity comes at the cost of incorrectly flagging a substantial proportion of actual non-arrests.
+* **Precision — $\approx0.064-0.066$:** Only about 6–7% of predicted arrests correspond to actual arrests, reflecting the severe class imbalance and the sensitivity-oriented operating point.
+* **Class balance — $BA\approx0.683$:** Both models perform meaningfully above chance when sensitivity and specificity receive equal weight, with virtually identical balanced accuracy.
 
 ### Final conclusions
 
-The LASSO models demonstrate **moderate out-of-sample discrimination**, with test AUC around \(0.735\), and contain meaningful predictive information about the rare arrest outcome, as demonstrated by a PR-AUC more than twice the no-skill baseline.
+The LASSO models demonstrate **moderate out-of-sample discrimination**, with test AUC around $0.735$, and contain meaningful predictive information about the rare arrest outcome, as demonstrated by a PR-AUC more than twice the no-skill baseline.
 
 However, the severe class imbalance remains a major limitation for hard classification. At the Youden-selected thresholds, the models recover approximately **74–76% of actual arrests**, but this comes at the cost of a **37–39% false-alarm rate** and precision of only approximately **6–7%**. The model therefore has substantially greater utility as a **risk-ranking/probability model than as a high-precision binary classifier** at the selected operating point.
 
-Most importantly, the two regularisation choices are almost indistinguishable across AUC, PR-AUC, log-loss, Brier score, F1 and balanced accuracy. The principal difference is that \(\lambda_{1se}\) trades slightly higher sensitivity for lower specificity.
+Most importantly, the two regularisation choices are almost indistinguishable across AUC, PR-AUC, log-loss, Brier score, F1 and balanced accuracy. The principal difference is that $\lambda_{1se}$ trades slightly higher sensitivity for lower specificity.
 
 Since
 
@@ -1526,6 +1585,6 @@ $$
 50\text{ coefficients at }\lambda_{1se}
 $$
 
-with almost no deterioration in predictive performance, the results provide strong support for the **more parsimonious \(\lambda_{1se}\) solution** when model simplicity is the primary criterion.
+with almost no deterioration in predictive performance, the results provide strong support for the **more parsimonious $\lambda_{1se}$ solution** when model simplicity is the primary criterion.
 
-However, under the project's **excessive-enforcement framing**, the choice is not purely statistical. Because \(\lambda_{\min}\) has a lower false-alarm rate, it may be preferable if false-positive classifications are considered substantively more problematic than missed arrests. This motivates the subsequent group-level FP/FN analysis: aggregate performance alone cannot determine whether these errors are distributed uniformly across demographic, geographic, and temporal groups.
+However, under the project's **excessive-enforcement framing**, the choice is not purely statistical. Because $\lambda_{\min}$ has a lower false-alarm rate, it may be preferable if false-positive classifications are considered substantively more problematic than missed arrests. This motivates the subsequent group-level FP/FN analysis: aggregate performance alone cannot determine whether these errors are distributed uniformly across demographic, geographic, and temporal groups.
