@@ -984,14 +984,16 @@ Let us start from the derived metrics:
 
 | Metric | Value | Interpretation |
 |-------------------------------|-----------------:|-----------------------|
-| Accuracy | 0.665 | About 66.5% of all observations are classified correctly, although this metric is strongly influenced by the dominant non-arrest class |
-| Sensitivity / Recall | 0.607 | The model correctly identifies about 60.7% of actual arrests |
-| Specificity | 0.668 | The model correctly identifies about 66.8% of actual non-arrests |
-| Precision | 0.110 | Only about 11.0% of observations predicted as arrests are actually arrests |
-| F1 | 0.186 | Low overall balance between precision and recall for the arrest class |
-| Balanced Accuracy | 0.638 | Moderate classification performance when arrests and non-arrests are weighted equally |
+| Accuracy | 0.581 | Overall proportion of correct classifications, of limited usefulness alone because of class imbalance |
+| Sensitivity / Recall | 0.692 | About 69.2% of actual arrests are correctly detected |
+| Specificity | 0.574 | About 57.4% of non-arrests are correctly identified |
+| Precision | 0.098 | Only about 9.8% of observations predicted as arrests are actual arrests |
+| F1 | 0.172 | Low harmonic mean of precision and recall, mainly constrained by low precision |
+| Balanced Accuracy | 0.633 | Moderate performance after giving equal weight to both classes |
 
-Overall, the confusion matrix confirms that the model provides **meaningful but limited classification performance**: it captures a majority of arrests, but it accepts a greater false-positive rate.
+Overall, the confusion matrix confirms that the model identifies most arrests,
+but generates many false alarms. The 15,516 false positives substantially limit
+precision, despite the model detecting 1,694 of the 2,449 actual arrests.
 
 ### 3.4.3) Performance Analysis
 
@@ -1021,11 +1023,11 @@ eval_quad_plot(test$arrested, prob_logit, thr_logit, "Logistic Regression")
 | **PR-AUC** | 0.1207 | Clearly above the no-skill baseline of $\approx 0.063$, but still low in absolute terms |
 | **Log-Loss** | 0.2257 | Predicted probabilities contain useful information, with a modest improvement over a prevalence-only model |
 | **Brier** | 0.0576 | Reasonably accurate probability estimates, but only slightly better than the prevalence baseline |
-| Threshold | 0.0605 | Low cutoff, selected on the training set via Youden's criterion, to balance sensitivity and specificity for the rare positive class |
-| **MCC** | 0.141 | Weak positive association between predicted and observed classes |
-| Balanced Accuracy | 0.638 | Moderate ability to distinguish both classes when they are weighted equally |
+| Threshold | 0.0491 | Low cutoff, selected on the training set via Youden's criterion and then applied unchanged to the test set |
+| **MCC** | 0.130 | Weak positive association between predicted and observed classes |
+| Balanced Accuracy | 0.633 | Moderate ability to distinguish both classes when they are weighted equally |
 
-The main conclusion is that the Logistic Regression captures **meaningful but limited predictive signal**. It performs clearly better than chance, but its ability to identify arrests remains moderate and precision is low because arrests are relatively rare.
+The main conclusion is that the Logistic Regression captures **meaningful but limited predictive signal**. It performs clearly better than chance, but its ability to identify arrests remains moderate and precision is low because arrests are a rare class.
 
 #### 3.4.3.2) AUC
 
@@ -1081,7 +1083,7 @@ $$\text{Brier} = 0.0576$$
 
 A prevalence-only prediction of approximately $0.063$ would produce a Brier score of about $0.0590$. The logistic regression therefore provides a **small improvement in probability accuracy** over the baseline.
 
-The calibration plot is also broadly consistent with this result: predicted and observed arrest rates remain relatively close over most of the probability range, although some deviations are visible, particularly at lower and intermediate predicted probabilities.
+The calibration plot is broadly consistent with this result: the mean predicted probabilities and observed arrest rates remain reasonably close to the perfect-calibration diagonal overall, although deviations are visible in some probability ranges. This supports cautious interpretation of the Brier score and log-loss rather than a claim of perfect calibration.
 
 #### 3.4.3.6) MCC
 
@@ -1095,17 +1097,17 @@ $$MCC = \frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}} \in [-
 
 Our result is:
 
-$$MCC = 0.141$$
+$$MCC = 0.130$$
 
 This represents a **weak but positive association** between the predicted and observed classes. The classifier therefore performs better than random classification, but the relatively low MCC confirms that its threshold-based predictions remain limited.
 
-This is consistent with the low precision of $0.110$: although the model identifies a meaningful proportion of arrests, many observations classified as arrests are actually non-arrests.
+This is consistent with the low precision of $0.098$: although the model identifies a meaningful proportion of arrests, many observations classified as arrests are actually non-arrests.
 
 #### 3.4.3.7) Thresholds
 
 Using Youden's criterion, the selected classification threshold is
 
-$$t^* = 0.0605$$
+$$t^* = 0.0491$$
 
 This threshold is selected once by maximising Youden's $J$ on the training-set ROC curve, then frozen and applied unchanged to the test set, so no test-set information is used in choosing the cutoff.
 
@@ -1113,23 +1115,23 @@ This value is much lower than the conventional $0.5$ cutoff because the positive
 
 At the selected threshold, the model achieves:
 
-$$\text{Sensitivity}=0.607,
+$$\text{Sensitivity}=0.692,
 \qquad
-\text{Specificity}=0.668$$
+	ext{Specificity}=0.574$$
 
 resulting in
 
-$$\text{Balanced Accuracy}=0.638$$
+$$\text{Balanced Accuracy}=0.633$$
 
-Thus, approximately **60.7% of actual arrests are detected**, while approximately **66.8% of non-arrests are correctly excluded**.
+Thus, approximately **69.2% of actual arrests are detected**, while approximately **57.4% of non-arrests are correctly excluded**. Detecting more arrests at this low cutoff comes at the cost of a substantial number of false positives.
 
 The threshold analysis shows the expected trade-off: lowering the threshold increases sensitivity but reduces specificity, while increasing it has the opposite effect.
 
 Precision at this threshold remains low,
 
-$$\text{Precision}=0.110$$
+$$\text{Precision}=0.098$$
 
-meaning that only about 11% of observations classified as arrests are actually arrests. This is an important consequence of the low prevalence of the positive class.
+meaning that only about 9.8% of observations classified as arrests are actually arrests. This is an important consequence of the strong class imbalance.
 
 #### 3.4.3.8) Final Remarks
 
@@ -1138,8 +1140,8 @@ Let us put the metrics together:
 - **Discrimination**, $\text{AUC} \approx 0.687$: the model ranks arrests above non-arrests better than chance, but discrimination remains modest.
 - **Rare-class performance**, $\text{PR-AUC} \approx 0.121$: performance is clearly above the no-skill baseline of $\approx 0.063$, although precision remains limited.
 - **Probability predictions**, $\text{Brier} \approx 0.058, \,\, \text{LogLoss} \approx 0.226$: the estimated probabilities improve on prevalence-only predictions, but only moderately.
-- **Classification**, $\text{MCC} \approx 0.141$: threshold-based predictions show a weak but genuine positive association with the observed outcome.
-- **Class balance**, $\text{ACC}_{\text{Balanced}} \approx 0.638$: the model achieves moderate performance when sensitivity and specificity are given equal importance.
+- **Classification**, $\text{MCC} \approx 0.130$: threshold-based predictions show a weak but genuine positive association with the observed outcome.
+- **Class balance**, $\text{ACC}_{\text{Balanced}} \approx 0.633$: the model achieves moderate performance when sensitivity and specificity are given equal importance.
 
 Now for the final conclusions:
 

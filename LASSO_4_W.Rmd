@@ -1118,7 +1118,7 @@ met_lasso_1se   <- class_metrics(y_test, class_lasso_1se)
 p_cm_min <- plot_cm(y_test, class_lasso_min, "LASSO (λ.min) — Confusion Matrix (Youden threshold, train-selected)")
 p_cm_1se <- plot_cm(y_test, class_lasso_1se, "LASSO (λ.1se) — Confusion Matrix (Youden threshold, train-selected)")
 
-p_cm_min | p_cm_1se
+p_cm_min / p_cm_1se
 
 cat(sprintf(
   "λ.min — AUC: %.4f  |  Threshold (Youden, train-selected): %.4f  |  Sens: %.3f  |  Spec: %.3f  |  Bal.Acc: %.3f\n",
@@ -1133,6 +1133,15 @@ cat(sprintf(
 ))
 ```
 
+The test-set confusion matrices contain the following counts:
+
+| Metric | $\lambda_{\min}$ | $\lambda_{1se}$ | Interpretation |
+|----------------------|------:|------:|----------------|
+| True positives | 11,045 | 11,093 | Actual arrests correctly predicted as Arrest |
+| False negatives | 3,676 | 3,628 | Actual arrests incorrectly predicted as No arrest |
+| True negatives | 255,301 | 253,934 | Actual non-arrests correctly predicted as No arrest |
+| False positives | 160,563 | 161,930 | Actual non-arrests incorrectly predicted as Arrest |
+
 The two LASSO specifications show almost identical discrimination on the held-out test set:
 
 $$
@@ -1141,14 +1150,15 @@ $$
 
 The small difference $\Delta AUC=0.0011$ confirms that the stronger regularisation of $\lambda_{1se}$produces essentially no loss in out-of-sample discrimination. Test AUC is moderately lower than the cross-validated values ($0.7524$ and $0.7515$), suggesting a small decline in generalisation performance.
 
-At the selected thresholds, the models (again) exhibit a clear sensitivity–specificity trade-off:
+At the training-selected thresholds, which are then applied unchanged to the
+test set, the models exhibit a small sensitivity-specificity trade-off:
 
-- The $\lambda_{\min}$ model achieves **73.6% sensitivity and 63.1% specificity**, corresponding to a **26.4% miss rate** and **36.9% false-alarm rate**;
-- The $\lambda_{1se}$ model increases sensitivity to **75.7%**, reducing the miss rate to **24.3%**, but specificity falls to **60.8%**, increasing the false-alarm rate to **39.2%**.
+- The $\lambda_{\min}$ model achieves **75.0% sensitivity and 61.4% specificity**;
+- The $\lambda_{1se}$ model increases sensitivity slightly to **75.4%**, while specificity falls slightly to **61.1%**.
 
-In absolute terms, $\lambda_{1se}$ correctly detects **310 additional arrests**, but generates **9,362 additional false positives**. The large number of false positives is partly a consequence of the strong class imbalance: only $3.42\%$ of test observations are arrests.
+In absolute terms, $\lambda_{1se}$ correctly detects **48 additional arrests**, but generates **1,367 additional false positives**. The large number of false positives is partly a consequence of the strong class imbalance: only $3.42\%$ of test observations are arrests.
 
-Despite these differences, balanced accuracy is virtually identical $0.683 \quad \text{vs.} \quad 0.682$.
+Both models have balanced accuracy of approximately **0.682**, so these differences are small in practical terms.
 
 ### 5.4.2) Performance Analysis
 
@@ -1188,15 +1198,15 @@ eval_quad_plot(y_test, prob_lasso_1se, thr_lasso_1se, "LASSO (λ.1se)")
 | **PR-AUC**            |         **0.0773** |            0.0763 | Similar rare-class ranking performance                |
 | **Log-Loss**          |         **0.1373** |            0.1374 | Essentially identical probability performance         |
 | **Brier**             |             0.0322 |            0.0322 | Identical probability accuracy                        |
-| **Threshold**         |             0.0313 |            0.0294 | Both low cutoffs, selected on the training set via Youden's criterion |
-| **Sensitivity**       |              0.736 |         **0.757** | 1-SE detects more actual arrests                      |
-| **Specificity**       |          **0.631** |             0.608 | $\lambda_{\min}$ rejects more non-arrests correctly |
-| **Precision**         |          **0.066** |             0.064 | Low for both models                                   |
-| **F1**                |          **0.121** |             0.118 | Similar; limited by low precision                     |
-| **MCC**               |                 NA |                NA | Should be investigated rather than interpreted        |
-| **Balanced Accuracy** |          **0.683** |             0.682 | Essentially identical                                 |
+| **Threshold**         |             0.0295 |            0.0296 | Low cutoffs, selected on the training set via Youden's criterion and then applied unchanged to the test set |
+| **Sensitivity**       |              0.750 |         **0.754** | $\lambda_{1se}$ detects slightly more actual arrests |
+| **Specificity**       |          **0.614** |             0.611 | $\lambda_{\min}$ rejects slightly more non-arrests correctly |
+| **Precision**         |          **0.064** |             0.064 | Low for both models                                   |
+| **F1**                |          **0.119** |             0.118 | Similar; limited by low precision                     |
+| **MCC**               |             0.135 |             0.135 | Weak positive association for both models             |
+| **Balanced Accuracy** |          **0.682** |             0.682 | Essentially identical                                 |
 
-The main conclusion is that **the two LASSO models have almost indistinguishable predictive performance on the held-out test set**. The principal difference is in the sensitivity-specificity trade-off: $\lambda_{1se}$ identifies slightly more arrests, while $\lambda_{\min}$ produces fewer false alarms.
+The main conclusion is that **the two LASSO models have almost indistinguishable predictive performance on the held-out test set**. The principal difference is small: $\lambda_{1se}$ identifies slightly more arrests, while $\lambda_{\min}$ correctly rejects slightly more non-arrests.
 
 Since the 1-SE model achieves essentially the same discrimination with **50 rather than 63 non-zero coefficients**, it remains attractive from the perspective of parsimony. However, the choice also depends on whether false positives or false negatives are considered more costly.
 
@@ -1240,7 +1250,7 @@ Overall, the model exhibits **moderate out-of-sample discrimination**.
 PR-AUC is particularly important because the test set is strongly imbalanced:
 
 $$
-P(Y=1)=0.0342.
+P(Y=1)\approx0.034.
 $$
 
 The two models achieve:
@@ -1265,7 +1275,7 @@ $$
 \frac{0.0773}{0.034}\approx2.27.
 $$
 
-The $\lambda_{\min}$ model achieves a PR-AUC approximately **2.3 times the no-skill baseline**; the conclusion for $\lambda_{1se}$ is essentially the same.
+The $\lambda_{\min}$ model achieves a PR-AUC approximately **2.3 times the no-skill baseline**; the conclusion for $\lambda_{1se}$ is essentially the same. The difference between the two models is marginal.
 
 This means that the model extracts meaningful information about the rare positive class.
 
@@ -1320,7 +1330,7 @@ Thus, according to the Brier score, the two models have **identical probability-
 Because the outcome is rare, the raw value should again be compared with a simple baseline. A model predicting the test-set prevalence,
 
 $$
-p=0.0342,
+p\approx0.034,
 $$
 
 for every observation would have approximately:
@@ -1330,13 +1340,13 @@ BS_{\text{null}}
 =
 p(1-p)
 =
-0.0342(0.9658)
+0.034(0.966)
 \approx0.0330.
 $$
 
 The LASSO score of $0.0322$ is therefore better, although the improvement is relatively modest.
 
-The calibration plots provide additional information. For both models, the observed positive rates lie reasonably close to the dashed perfect-calibration line over most probability bins.
+The calibration plots provide additional information. For both models, the observed positive rates lie generally close to the dashed perfect-calibration line over most probability bins, although some deviations are visible and neither model should be considered perfectly calibrated.
 
 > In other words, the predicted probabilities appear **reasonably calibrated**: groups of observations assigned similar predicted arrest probabilities tend to exhibit observed arrest rates of approximately the same magnitude.
 
@@ -1350,41 +1360,41 @@ A model can provide reasonably calibrated probabilities while still having only 
 
 #### 5.4.2.6) Sensitivity and Specificity
 
-At the selected thresholds, the models achieve:
+At the training-selected thresholds, which are then applied unchanged to the test set, the models achieve:
 
 $$
 \begin{aligned}
-Sensitivity_{\min}&=0.736,
+Sensitivity_{\min}&=0.750,
 &
-Specificity_{\min}&=0.631,\\
-Sensitivity_{1se}&=0.757,
+Specificity_{\min}&=0.614,\\
+Sensitivity_{1se}&=0.754,
 &
-Specificity_{1se}&=0.608.
+Specificity_{1se}&=0.611.
 \end{aligned}
 $$
 
 Thus, $\lambda_{1se}$ correctly detects a larger proportion of actual arrests:
 
 $$
-73.6\%\rightarrow75.7\%.
+75.0\%\rightarrow75.4\%.
 $$
 
 Equivalently, its miss rate decreases from
 
 $$
-26.4\%\rightarrow24.3\%.
+25.0\%\rightarrow24.6\%.
 $$
 
 However, this improvement comes at the expense of specificity:
 
 $$
-63.1\%\rightarrow60.8\%.
+61.4\%\rightarrow61.1\%.
 $$
 
 The corresponding false-alarm rates are:
 
 $$
-36.9\%\quad\text{and}\quad39.2\%.
+38.6\%\quad\text{and}\quad38.9\%.
 $$
 
 Therefore,
@@ -1406,7 +1416,7 @@ This is exactly the trade-off visible in the confusion matrices.
 Precision is:
 
 $$
-Precision_{\min}=0.066
+Precision_{\min}=0.064
 \qquad\text{vs}\qquad
 Precision_{1se}=0.064.
 $$
@@ -1434,7 +1444,7 @@ The classifier is consequently enriching the positive class, but because arrests
 The corresponding F1 scores are:
 
 $$
-F1_{\min}=0.121
+F1_{\min}=0.119
 \qquad\text{vs}\qquad
 F1_{1se}=0.118.
 $$
@@ -1456,9 +1466,9 @@ Again, the difference between the two models is negligible.
 Using Youden's criterion, the selected thresholds are:
 
 $$
-t_{\min}=0.0313
+t_{\min}=0.0295
 \qquad\text{vs}\qquad
-t_{1se}=0.0294.
+t_{1se}=0.0296.
 $$
 
 Each threshold is selected once by maximising Youden's $J$ on the corresponding lambda's training-set ROC curve, then frozen and applied unchanged to the test set, so no test-set information is used in choosing the cutoff.
@@ -1478,7 +1488,7 @@ For the two models:
 $$
 J_{\min}
 =
-0.736+0.631-1
+=0.364,
 =
 0.367,
 $$
@@ -1488,7 +1498,7 @@ and
 $$
 J_{1se}
 =
-0.757+0.608-1
+0.754+0.611-1
 =
 0.365.
 $$
@@ -1510,7 +1520,7 @@ $$
 The results are:
 
 $$
-BA_{\min}=0.683
+BA_{\min}=0.682
 \qquad\text{vs}\qquad
 BA_{1se}=0.682.
 $$
@@ -1526,7 +1536,7 @@ The important distinction is how that balanced accuracy is obtained:
 $$
 \lambda_{\min}:
 \quad
-Sens=0.736,\quad Spec=0.631
+Sens=0.750,\quad Spec=0.614
 $$
 
 versus
@@ -1534,14 +1544,14 @@ versus
 $$
 \lambda_{1se}:
 \quad
-Sens=0.757,\quad Spec=0.608.
+Sens=0.754,\quad Spec=0.611.
 $$
 
 Thus, the 1-SE solution shifts performance slightly toward detecting arrests, while $\lambda_{\min}$ performs somewhat better at correctly identifying non-arrests.
 
 #### 5.4.2.10) MCC
 
-The reported MCC values are currently `NA`, so they should **not yet be interpreted as model performance**.
+The MCC values are approximately $0.135$ for both models.
 
 The confusion matrices contain non-zero values for all four cells, meaning MCC should be mathematically defined:
 
@@ -1551,11 +1561,7 @@ MCC =
 {\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}}.
 $$
 
-Therefore, the `NA` result is more likely to indicate an implementation or numerical issue than an undefined statistic.
-
-Given the very large confusion-matrix counts, one possibility is **integer overflow during multiplication** if the computation is performed using integer-valued counts.
-
-I would correct the MCC computation before including this metric in the final results table.
+The non-zero confusion-matrix cells make MCC well-defined, and the similar values indicate a weak positive association between predictions and the observed classes.
 
 #### 5.4.2.11) Final Remarks
 
@@ -1565,15 +1571,15 @@ Putting the diagnostics together:
 * **Rare-class ranking — $PR\text{-}AUC\approx0.077$:** Performance is substantially above the no-skill baseline of approximately $0.034$, indicating meaningful signal for the rare positive class. Nevertheless, absolute precision-recall performance remains limited.
 * **Probability prediction — $Brier=0.0322,\ LogLoss\approx0.137$:** The two models are essentially identical. Calibration plots additionally suggest that predicted probabilities are reasonably aligned with observed arrest frequencies.
 * **Positive-class detection — $Sensitivity\approx0.74-0.76$:** The models identify a substantial majority of actual arrests.
-* **False alarms — $FPR\approx0.37-0.39$:** This sensitivity comes at the cost of incorrectly flagging a substantial proportion of actual non-arrests.
-* **Precision — $\approx0.064-0.066$:** Only about 6–7% of predicted arrests correspond to actual arrests, reflecting the severe class imbalance and the sensitivity-oriented operating point.
-* **Class balance — $BA\approx0.683$:** Both models perform meaningfully above chance when sensitivity and specificity receive equal weight, with virtually identical balanced accuracy.
+* **False alarms — $FPR=0.386$ and $0.389$:** This sensitivity comes at the cost of incorrectly flagging a substantial proportion of actual non-arrests.
+* **Precision — $\approx0.064$ for both models:** Only about 6.4% of predicted arrests correspond to actual arrests, reflecting the severe class imbalance and the sensitivity-oriented operating point.
+* **Class balance — $BA\approx0.682$:** Both models perform meaningfully above chance when sensitivity and specificity receive equal weight, with virtually identical balanced accuracy.
 
 ### Final conclusions
 
 The LASSO models demonstrate **moderate out-of-sample discrimination**, with test AUC around $0.735$, and contain meaningful predictive information about the rare arrest outcome, as demonstrated by a PR-AUC more than twice the no-skill baseline.
 
-However, the severe class imbalance remains a major limitation for hard classification. At the Youden-selected thresholds, the models recover approximately **74–76% of actual arrests**, but this comes at the cost of a **37–39% false-alarm rate** and precision of only approximately **6–7%**. The model therefore has substantially greater utility as a **risk-ranking/probability model than as a high-precision binary classifier** at the selected operating point.
+However, the severe class imbalance remains a major limitation for hard classification. At the Youden-selected thresholds, the models recover approximately **75.0–75.4% of actual arrests**, but this comes at the cost of a **38.6–38.9% false-alarm rate** and precision of only approximately **6.4%**. The model therefore has substantially greater utility as a **risk-ranking/probability model than as a high-precision binary classifier** at the selected operating point.
 
 Most importantly, the two regularisation choices are almost indistinguishable across AUC, PR-AUC, log-loss, Brier score, F1 and balanced accuracy. The principal difference is that $\lambda_{1se}$ trades slightly higher sensitivity for lower specificity.
 

@@ -1045,16 +1045,28 @@ cat(sprintf(
 
 Let us start from the derived metrics:
 
+The test-set confusion matrix contains 11,018 true positives, 3,703 false
+negatives, 256,440 true negatives, and 159,424 false positives (430,585
+observations in total):
+
+| Actual / Predicted | No arrest | Arrest |
+|--------------------|----------:|-------:|
+| Arrest             | 3,703     | 11,018 |
+| No arrest          | 256,440   | 159,424|
+
 | Metric | Value | Interpretation |
 |------------------------|-----------------------:|------------------------|
-| Accuracy | 0.634 | About 63.4% of all observations are classified correctly, although this metric is strongly influenced by the dominant non-arrest class |
-| Sensitivity / Recall | 0.736 | The model correctly identifies about 73.6% of actual arrests |
-| Specificity | 0.630 | The model correctly identifies about 63.0% of actual non-arrests |
-| Precision | 0.066 | Only about 6.6% of observations predicted as arrests are actually arrests |
-| F1 | 0.121 | Low overall balance between precision and recall for the arrest class |
-| Balanced Accuracy | 0.683 | Moderate classification performance when arrests and non-arrests are weighted equally |
+| Accuracy | 0.621 | About 62.1% of all test observations are correctly classified, but accuracy alone is not very informative because of class imbalance |
+| Sensitivity / Recall | 0.748 | About 74.8% of actual arrests are correctly detected |
+| Specificity | 0.617 | About 61.7% of non-arrests are correctly identified |
+| Precision | 0.065 | Only about 6.5% of predicted arrests correspond to actual arrests |
+| F1 | 0.119 | Low harmonic mean of precision and recall, mainly limited by low precision |
+| Balanced Accuracy | 0.683 | Moderate performance when arrests and non-arrests receive equal weight |
 
-Overall, the confusion matrix confirms that the model provides **meaningful but limited classification performance**: it captures a majority of arrests, but it accepts a greater false-positive rate.
+Overall, the confusion matrix confirms that the model detects most arrests but
+produces a large number of false alarms. Of the 14,721 actual arrests, 11,018
+are correctly identified and 3,703 are missed. Among non-arrests, 256,440 are
+correctly rejected while 159,424 are incorrectly predicted as arrests.
 
 ### 3.4.3) Performance Analysis
 
@@ -1082,13 +1094,14 @@ eval_quad_plot(test$arrested, prob_logit, thr_logit, "Logistic Regression")
 | **PR-AUC** | 0.0774 | More than twice the no-skill baseline of $\approx 0.034$, although still low in absolute terms |
 | **Log-Loss** | 0.1373 | Predicted probabilities improve on a prevalence-only model and contain useful predictive information |
 | **Brier** | 0.0322 | Probability estimates are slightly more accurate than the prevalence-only baseline |
-| Threshold | 0.0311 | Low cutoff, selected on the training set via Youden's criterion, to balance sensitivity and specificity for the rare positive class |
-| **MCC** | $\approx 0.137$ | Weak positive association between predicted and observed classes |
+| Threshold | 0.0297 | Low cutoff, selected on the training set via Youden's criterion and then applied unchanged to the test set |
+| **MCC** | 0.136 | Weak positive association between predicted and observed classes |
 | Balanced Accuracy | 0.683 | Moderate ability to distinguish both classes when they are weighted equally |
 
-The main conclusion is that the Logistic Regression captures **meaningful but still limited predictive signal**. Its discrimination is substantially better than chance, and it detects a relatively large proportion of arrests. However, precision remains very low because arrests represent only about **3.4% of the test set**.
-
-> **Note:** the evaluation table reports `MCC = NA`. However, using the confusion matrix values, the MCC is approximately **0.137**. Therefore, the `NA` appears to come from the implementation used to calculate the metric rather than from the confusion matrix itself.
+The main conclusion is that the Logistic Regression captures **meaningful but
+limited predictive signal**. Its discrimination is clearly better than chance,
+and it detects a relatively large proportion of arrests. However, precision
+remains very low because arrests represent only about **3.4% of the test set**.
 
 #### 3.4.3.2) AUC
 
@@ -1098,7 +1111,7 @@ $$\text{AUC} = 0.7352.$$
 
 This means that, when randomly comparing one arrested and one non-arrested observation, the model assigns the arrested case a higher predicted probability approximately **73.5% of the time**.
 
-This is clearly above the random-classification value of $0.5$, indicating that the predictors contain meaningful information about arrest risk. Compared with a value close to 0.7, the discrimination can be considered **moderate**, although there is still substantial overlap between arrests and non-arrests.
+This is clearly above the random-classification value of $0.5$, indicating that the predictors contain useful information about arrest risk. The discrimination can be considered **moderate**, although class separation is still imperfect and there is substantial overlap between arrests and non-arrests.
 
 The ROC curve confirms this result: it remains clearly above the diagonal no-skill line over the full range of thresholds, although it is still some distance from the upper-left corner associated with very strong discrimination.
 
@@ -1118,7 +1131,7 @@ $$\text{PR-AUC}_{\text{baseline}} \approx 0.034.$$
 
 Thus, the model achieves a PR-AUC approximately **2.3 times the prevalence baseline**.
 
-This indicates that the model provides meaningful information for ranking observations according to arrest risk. However, the absolute PR-AUC remains low. The Precision-Recall curve makes this limitation clear: precision is highest when recall is very low and progressively decreases as the model attempts to identify a larger proportion of actual arrests.
+This indicates that the model provides useful information for ranking observations in the minority class. However, the absolute PR-AUC remains low because arrests are rare. The Precision-Recall curve makes this limitation clear: precision is highest when recall is very low and progressively decreases as the model attempts to identify a larger proportion of actual arrests.
 
 Therefore, although the model performs considerably better than random ranking, **identifying many arrests while maintaining high precision remains difficult**.
 
@@ -1177,7 +1190,7 @@ Where:
 
 Although the evaluation output reports `NA`, using the confusion matrix values gives approximately
 
-$$MCC \approx 0.137.$$
+$$MCC = 0.136.$$
 
 This represents a **weak but positive association** between the predicted and observed classes.
 
@@ -1187,37 +1200,37 @@ Therefore, the classifier performs better than random classification, but the re
 
 Using Youden's criterion, the selected classification threshold is
 
-$$t^* = 0.0311.$$
+$$t^* = 0.0297.$$
 
 This threshold is selected once by maximising Youden's $J$ on the training-set ROC curve, then frozen and applied unchanged to the test set, so no test-set information is used in choosing the cutoff.
 
-This is much lower than the conventional $0.5$ cutoff, which is expected given that arrests represent only about **3.4% of observations**. Using $0.5$ would classify very few cases as arrests and would consequently result in extremely poor sensitivity.
+This is much lower than the conventional $0.5$ cutoff, which reflects the rarity of arrests (about **3.4% of observations**). The low threshold prioritizes detection of the positive class, whereas using $0.5$ would classify very few cases as arrests and would consequently result in extremely poor sensitivity.
 
 At the selected threshold, the model achieves
 
-$$\text{Sensitivity}=0.736,
+$$\text{Sensitivity}=0.748,
 \qquad
-\text{Specificity}=0.630,$$
+	ext{Specificity}=0.617,$$
 
 resulting in
 
 $$\text{Balanced Accuracy}=0.683.$$
 
-Thus, approximately **73.6% of actual arrests are detected**, while approximately **63.0% of actual non-arrests are correctly classified as non-arrests**.
+Thus, approximately **74.8% of actual arrests are detected**, while approximately **61.7% of actual non-arrests are correctly classified as non-arrests**. This sensitivity comes at the cost of many false-positive arrest predictions.
 
 The threshold-analysis plot illustrates the expected trade-off clearly. At very low thresholds, sensitivity is close to 1 but specificity is poor because many observations are classified as arrests. As the threshold increases, **specificity increases while sensitivity decreases**.
 
-Youden's criterion selects approximately $0.031$, close to the point where a relatively favorable balance between these two measures is obtained.
+Youden's criterion selects approximately $0.03$, close to the point where a relatively favorable balance between these two measures is obtained.
 
 Precision at this threshold remains very low:
 
-$$\text{Precision}=0.066.$$
+$$\text{Precision}=0.065.$$
 
-Therefore, only about **6.6% of observations classified as arrests are actually arrests**. This is a direct consequence of combining a rare positive class with a threshold designed to maintain relatively high sensitivity.
+Therefore, only about **6.5% of observations classified as arrests are actually arrests**. This is a direct consequence of combining a rare positive class with a threshold designed to maintain relatively high sensitivity.
 
 The F1 score is consequently also low:
 
-$$F1 = 0.121.$$
+$$F1 = 0.119.$$
 
 Overall, the chosen threshold favors **detecting a large proportion of arrests at the cost of a substantial number of false alarms**.
 
@@ -1228,17 +1241,17 @@ Let us put the metrics together:
 - **Discrimination**, $\text{AUC} \approx 0.735$: the model ranks arrests above non-arrests substantially better than chance, although discrimination remains moderate.
 - **Rare-class performance**, $\text{PR-AUC} \approx 0.077$: performance is approximately **2.3 times the no-skill baseline of** $\approx 0.034$, but precision remains low in absolute terms.
 - **Probability predictions**, $\text{Brier} \approx 0.032$ and $\text{LogLoss} \approx 0.137$: both improve on prevalence-only predictions, while the calibration plot suggests broadly reasonable agreement between predicted and observed probabilities.
-- **Classification**, $\text{MCC} \approx 0.137$: threshold-based predictions show a weak but genuine positive association with the observed outcome.
+- **Classification**, $\text{MCC} \approx 0.136$: threshold-based predictions show a weak but genuine positive association with the observed outcome.
 - **Class balance**, $\text{ACC}_{\text{Balanced}} \approx 0.683$: the model achieves moderate performance when sensitivity and specificity are given equal importance.
-- **Sensitivity**, $0.736$: the model detects almost three quarters of actual arrests, although this comes at the cost of low precision.
+- **Sensitivity**, $0.748$: the model detects about three quarters of actual arrests, although this comes at the cost of low precision.
 
 Now for the final conclusions:
 
 - The Logistic Regression captures **meaningful predictive structure** in the arrest outcome, with noticeably better discrimination than random classification.
 - The ROC curve confirms a moderate ability to distinguish arrests from non-arrests, while the PR curve shows that the severe class imbalance makes positive-class prediction considerably more difficult.
 - The predicted probabilities are **reasonably calibrated overall**, and both Log-Loss and Brier score improve on the corresponding prevalence-only baselines.
-- The selected Youden threshold of $0.0311$ substantially increases the ability to detect arrests compared with a conventional $0.5$ cutoff.
-- However, the resulting **precision of only 6.6%** means that most predicted arrests are false positives.
+- The selected Youden threshold of $0.0297$ substantially increases the ability to detect arrests compared with a conventional $0.5$ cutoff.
+- However, the resulting **precision of only 6.5%** means that most predicted arrests are false positives.
 - Therefore, the selected threshold should be interpreted as a compromise between **sensitivity and specificity**, rather than as a cutoff capable of producing highly reliable individual classifications.
 - Overall, the Logistic Regression provides a useful **interpretable baseline and risk-ranking model**, but its predictions are not sufficiently precise to treat individual arrest classifications as highly reliable.
 

@@ -3281,21 +3281,24 @@ uncertainty, consistent with the number of observations).</p>
 ## Sensitivity: 0.697  |  Specificity: 0.576  |  Balanced accuracy: 0.637</code></pre>
 <p>The confusion matrix shows</p>
 <ul>
-<li><strong>1,496 true positives</strong>;</li>
-<li><strong>816 false negatives</strong>;</li>
-<li><strong>22,008 true negatives</strong>;</li>
-<li>And <strong>12,729 false positives</strong>.</li>
+<li><strong>1,612 true positives</strong>;</li>
+<li><strong>700 false negatives</strong>;</li>
+<li><strong>20,008 true negatives</strong>;</li>
+<li>And <strong>14,729 false positives</strong>.</li>
 </ul>
-<p>The model therefore identifies a relatively large proportion of the
-actual arrests, but this comes at the cost of a very large number of
-false-positive arrest predictions.</p>
-<p>The Youden threshold is <strong>0.0554</strong>, way below the 0.5
-cutoff. This value is selected by maximising Youden’s <span class="math inline">\(J\)</span> on the training-set ROC curve, then
-frozen and applied unchanged to the test set below, so no test-set
-information enters the cutoff choice.</p>
-<p>Moreover, the <strong>AUC of 0.6897</strong> indicates
-<strong>moderate discriminatory ability</strong>: the GAM separates
-arrest from non-arrest cases a bit better than chance.</p>
+<p>The model therefore detects most arrests, but generates a substantial
+number of false alarms. Of the 2,312 actual arrests, 1,612 are correctly
+identified and 700 are missed. Among non-arrests, 20,008 are correctly
+rejected while 14,729 are incorrectly predicted as arrests.</p>
+<p>The Youden threshold is <strong>0.0483</strong>, approximately 0.048
+in the threshold plot and well below the 0.5 cutoff. This value is
+selected by maximising Youden’s <span class="math inline">\(J\)</span>
+on the training-set ROC curve, then frozen and applied unchanged to the
+test set below, so no test-set information enters the cutoff choice.</p>
+<p>Moreover, the <strong>AUC of 0.6897</strong> indicates <strong>modest
+discriminatory ability</strong>: the GAM performs better than random
+classification, but separation between arrests and non-arrests remains
+limited.</p>
 <p>Now for the derived metrics:</p>
 <table>
 <colgroup>
@@ -3313,35 +3316,37 @@ arrest from non-arrest cases a bit better than chance.</p>
 <tbody>
 <tr class="odd">
 <td>Accuracy</td>
-<td align="right">0.634</td>
-<td>About 63.4% of all observations are classified correctly</td>
+<td align="right">0.584</td>
+<td>About 58.4% of all test observations are correctly classified, but
+accuracy alone is not very informative because of class imbalance</td>
 </tr>
 <tr class="even">
 <td>Sensitivity / Recall</td>
-<td align="right">0.647</td>
-<td>The model correctly identifies about 64.7% of actual arrests</td>
+<td align="right">0.697</td>
+<td>About 69.7% of actual arrests are correctly detected</td>
 </tr>
 <tr class="odd">
 <td>Specificity</td>
-<td align="right">0.634</td>
-<td>About 63.4% of actual non-arrests are correctly classified</td>
+<td align="right">0.576</td>
+<td>About 57.6% of non-arrests are correctly identified</td>
 </tr>
 <tr class="even">
 <td>Precision</td>
-<td align="right">0.105</td>
-<td>Only about 10.5% of predicted arrests are actual arrests</td>
+<td align="right">0.099</td>
+<td>Only about 9.9% of predicted arrests correspond to actual
+arrests</td>
 </tr>
 <tr class="odd">
 <td>F1</td>
-<td align="right">0.181</td>
-<td>The low value reflects the difficult trade-off between recall and
-precision for the minority class</td>
+<td align="right">0.173</td>
+<td>Low harmonic mean of precision and recall, mainly limited by low
+precision</td>
 </tr>
 <tr class="even">
 <td>Balanced Accuracy</td>
-<td align="right">0.640</td>
-<td>Averaging sensitivity and specificity gives a more appropriate
-summary than ordinary accuracy in this imbalanced setting</td>
+<td align="right">0.637</td>
+<td>Moderate ability to distinguish the two classes when they receive
+equal weight</td>
 </tr>
 </tbody>
 </table>
@@ -3486,28 +3491,29 @@ the prevalence-only baseline</td>
 </tr>
 <tr class="odd">
 <td>Threshold</td>
-<td align="right">0.0554</td>
-<td>Low cutoff, selected on the training set via Youden’s criterion,
-appropriate for the rare positive class</td>
+<td align="right">0.0483</td>
+<td>Low cutoff, selected on the training set via Youden’s criterion and
+then applied unchanged to the test set</td>
 </tr>
 <tr class="even">
 <td><strong>MCC</strong></td>
-<td align="right">0.140</td>
+<td align="right">0.133</td>
 <td>Weak positive association between predicted and observed
 classes</td>
 </tr>
 <tr class="odd">
 <td>Balanced Accuracy</td>
-<td align="right">0.640</td>
+<td align="right">0.637</td>
 <td>Moderate performance when both classes are weighted equally</td>
 </tr>
 </tbody>
 </table>
 <p>The main conclusion is that the GAM captures <strong>meaningful but
-limited predictive signal</strong>. It manages to discriminate arrests
-from non-arrests better than chance and produces reasonably calibrated
-probabilities, but its <strong>ability to make precise positive
-classifications is still weak</strong>.</p>
+limited predictive signal</strong>. It performs better than chance and
+produces probabilities that are generally close to the calibration
+diagonal, but its <strong>ability to make precise positive
+classifications is still weak</strong> because arrests are a rare
+class.</p>
 </div>
 <div id="auc" class="section level4">
 <h4>6.4.2.2) AUC</h4>
@@ -3517,11 +3523,11 @@ classifications is still weak</strong>.</p>
 arrest occurred, and (ii) one observation where an arrest did not occur,
 the model assigns a higher predicted probability to the arrest
 observation about 69% of the time.</p>
-<p>The ROC curve <strong>remains consistently above the main
-diagonal</strong>, indicating that the model contains useful ranking
-information. However, an AUC below <span class="math inline">\(0.70\)</span> also shows that there is still a
-great deal of overlap between the predicted probabilities of the two
-classes.</p>
+<p>The ROC curve <strong>remains above the main diagonal</strong>,
+indicating that the model contains useful ranking information. However,
+the AUC also shows that separation between the two classes remains
+limited, with substantial overlap between their predicted
+probabilities.</p>
 </div>
 <div id="pr-auc" class="section level4">
 <h4>6.4.2.3) PR-AUC</h4>
@@ -3536,10 +3542,11 @@ trade-off between precision and recall.</p>
 prevalence:</p>
 <p><span class="math display">\[\text{PR-AUC}_{\text{baseline}}\approx0.062\]</span></p>
 <p><em>But how good is</em> <span class="math inline">\(0.1247\)</span>?
-It is roughly <strong>twice the baseline</strong>, indicating that the
-<strong>GAM does provide useful information for ranking observations
-according to arrest risk</strong>. However, the precision is still very
-low.</p>
+It is clearly above the no-skill baseline, indicating that the
+<strong>GAM provides useful information for ranking observations in the
+minority class</strong>. However, the absolute PR-AUC remains low
+because of the strong class imbalance, and precision is still
+limited.</p>
 </div>
 <div id="log-loss" class="section level4">
 <h4>6.4.2.4) Log-Loss</h4>
@@ -3574,9 +3581,11 @@ probabilities (the lower, the better).</p>
 <p><span class="math display">\[0.0585\]</span></p>
 <p>so the GAM performs just slightly better.</p>
 <p>Together with the calibration plot, this suggests that the predicted
-probabilities are <strong>reasonably calibrated overall</strong>:
-<strong>groups assigned higher arrest probabilities tend to show
-correspondingly higher observed arrest rates</strong>.</p>
+probabilities are <strong>reasonably calibrated overall</strong>: the
+calibration points are generally close to the perfect-calibration
+diagonal. Some deviations are visible across probability ranges, but
+there is no major systematic departure from the diagonal. This should be
+interpreted cautiously rather than as perfect calibration.</p>
 </div>
 <div id="mcc" class="section level4">
 <h4>6.4.2.6) MCC</h4>
@@ -3596,7 +3605,7 @@ predictions and outcomes</li>
 prediction</li>
 </ul>
 <p>Our result is:</p>
-<p><span class="math display">\[MCC=0.140\]</span></p>
+<p><span class="math display">\[MCC=0.133\]</span></p>
 <p>Thus, there is a <strong>positive but weak association between
 predictions and actual outcomes</strong> (consistent with CM). Simply
 put:</p>
@@ -3610,7 +3619,7 @@ classification;</li>
 <h4>6.4.2.7) Thresholds</h4>
 <p>The classification threshold selected using <strong>Youden’s
 index</strong> is</p>
-<p><span class="math display">\[t^*=0.0554\]</span></p>
+<p><span class="math display">\[t^*=0.0483\]</span></p>
 <p>This threshold is selected once by maximising Youden’s <span class="math inline">\(J\)</span> on the training-set ROC curve, then
 frozen and applied unchanged to the test set, so no test-set information
 is used in choosing the cutoff.</p>
@@ -3618,6 +3627,15 @@ is used in choosing the cutoff.</p>
 the threshold increases sensitivity but reduces specificity, while
 increasing it improves specificity at the cost of missing more
 arrests.</p>
+<p>At this training-selected threshold, the model achieves</p>
+<p><span class="math display">\[\text{Sensitivity}=0.697,
+\qquad
+    ext{Specificity}=0.576.\]</span></p>
+<p>Thus, approximately <strong>69.7% of actual arrests are
+detected</strong>, but this comes at the cost of many false-positive
+arrest predictions. The low threshold reflects the rarity of the
+positive class and increases sensitivity relative to the conventional
+<span class="math inline">\(0.5\)</span> cutoff.</p>
 </div>
 <div id="final-remarks" class="section level4">
 <h4>6.4.2.8) Final Remarks</h4>
@@ -3632,10 +3650,10 @@ difficult;</li>
 <li><strong>Probability predictions</strong>, <span class="math inline">\(\text{Brier} \approx 0.057,\; \text{LogLoss}
 \approx 0.224\)</span>: probabilities are reasonably calibrated and
 improve modestly over a prevalence-only model;</li>
-<li><strong>Classification</strong>, <span class="math inline">\(\text{MCC} \approx 0.140\)</span>: binary
+<li><strong>Classification</strong>, <span class="math inline">\(\text{MCC} \approx 0.133\)</span>: binary
 predictions show only a weak association with the true outcomes;</li>
 <li><strong>Class balance</strong>, <span class="math inline">\(\text{ACC}_{\text{Balanced}} \approx
-0.640\)</span>: sensitivity and specificity are reasonably balanced, but
+0.637\)</span>: sensitivity and specificity are reasonably balanced, but
 overall classification performance remains moderate.</li>
 </ul>
 <p>Now for the final conclusions:</p>
@@ -3647,7 +3665,7 @@ variables.</li>
 relative arrest risk</strong>, rather than to produce highly accurate
 binary classifications.</li>
 <li>The low positive-class prevalence strongly affects precision:
-obtaining a sensitivity of <span class="math inline">\(0.647\)</span>
+obtaining a sensitivity of <span class="math inline">\(0.697\)</span>
 requires accepting a substantial number of false positives.</li>
 <li>The probability estimates appear more useful than the thresholded
 classifications, particularly given the reasonably good

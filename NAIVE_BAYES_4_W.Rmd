@@ -837,12 +837,14 @@ Let us start from the derived metrics:
 
 | Metric | Value | Interpretation |
 |-------------------------------|-----------------:|-----------------------|
-| Accuracy | 0.628 | About $62.8\%$ of all observations are classified correctly |
-| Sensitivity / Recall | 0.738 | The model correctly identifies about $73.8\%$ of actual arrests |
-| Specificity | 0.624 | The model correctly identifies about $62.4\%$ of actual non-arrests |
-| Precision | 0.065 | Only about $6.5\%$ of observations predicted as arrests are actually arrests |
-| F1 | 0.119 | The combined precision-recall performance for the positive class is low |
-| Balanced Accuracy | 0.681 | Averaging sensitivity and specificity indicates moderate classification performance across the two classes |
+| Accuracy | 0.604 | About $60.4\%$ of all observations are correctly classified, but accuracy alone is not very informative because of the strong class imbalance |
+| Sensitivity / Recall | 0.762 | About $76.2\%$ of actual arrests are correctly detected |
+| Specificity | 0.598 | About $59.8\%$ of non-arrests are correctly identified |
+| Precision | 0.063 | Only about $6.3\%$ of predicted arrests correspond to actual arrests |
+| F1 | 0.116 | Low harmonic mean of precision and recall, mainly constrained by low precision |
+| Balanced Accuracy | 0.680 | Moderate classification performance when the two classes receive equal weight |
+
+The confusion matrix shows that the model detects most arrests, but generates many false alarms. Of the 14,721 actual arrests, 11,219 are correctly identified and 3,502 are missed. Among non-arrests, 248,817 are correctly rejected while 167,047 are incorrectly predicted as arrests.
 
 This behavior is partly a consequence of the low classification threshold selected for the rare positive class. The model is willing to classify observations as arrests in order to increase sensitivity, but doing this reduces precision and specificity.
 
@@ -941,13 +943,13 @@ eval_quad_plot(test$arrested, prob_nb, thr_nb, "Naive Bayes")
 | **PR-AUC** | 0.0761 | Clearly above the no-skill baseline of $\approx 0.034$, but still low in absolute terms |
 | **Log-Loss** | 0.1394 | Predicted probabilities improve on a prevalence-only model, although the improvement remains modest |
 | **Brier** | 0.0325 | Probability predictions are slightly better than the prevalence-only baseline |
-| Threshold | 0.0299 | Low cutoff, selected on the training set via Youden's criterion, to increase detection of the rare positive class |
-| **MCC** | $\approx 0.135$ | Weak positive association between predicted and observed classes |
-| Balanced Accuracy | 0.681 | Moderate ability to classify both classes when they are weighted equally |
+| Threshold | 0.0270 | Low cutoff, selected on the training set via Youden's criterion and then applied unchanged to the test set |
+| **MCC** | 0.133 | Weak positive association between predicted and observed classes |
+| Balanced Accuracy | 0.680 | Moderate ability to classify both classes when they are weighted equally |
 
 The main conclusion is that Naive Bayes captures **meaningful but still limited predictive signal**.
 
-The model achieves moderate discrimination, with an AUC above $0.73$, and its PR-AUC is more than twice the no-skill baseline. Its probability predictions also improve on prevalence-only predictions. However, the strong class imbalance results in very low precision despite relatively high sensitivity.
+The model achieves moderate discrimination, with an AUC above $0.73$, and its PR-AUC is clearly above the no-skill baseline. Its probability predictions also improve on prevalence-only predictions. However, the strong class imbalance results in very low precision despite relatively high sensitivity.
 
 #### 4.4.3.2) AUC
 
@@ -955,7 +957,7 @@ The test-set AUC is $\text{AUC}=0.7322$
 
 This means that, when randomly selecting one arrested and one non-arrested observation, the model assigns a higher predicted probability to the arrested case approximately $73.2\%$ of the time.
 
-This represents **moderate discrimination**: the model performs clearly better than random guessing, for which $\text{AUC}=0.5$, but it does not provide strong separation between the two classes. This is also visible in the ROC curve, which lies clearly above the diagonal but remains some distance from the ideal upper-left corner.
+This represents **moderate discrimination**: the model performs clearly better than random guessing, for which $\text{AUC}=0.5$, although separation between the two classes remains imperfect. This is also visible in the ROC curve, which lies clearly above the diagonal but remains some distance from the ideal upper-left corner.
 
 #### 4.4.3.3) PR-AUC
 
@@ -973,7 +975,7 @@ $$\text{PR-AUC}_{\text{baseline}}\approx0.034$$
 
 Therefore, the model achieves a PR-AUC approximately **2.2 times the no-skill baseline**.
 
-*But how good is* $0.0761$? It indicates that the model contains meaningful information for detecting arrests, since it performs substantially above the prevalence baseline. However, its absolute value remains low, reflecting the difficulty of obtaining high precision when arrests account for only about $3.4\%$ of observations.
+*But how good is* $0.0761$? It indicates that the model contains useful information for detecting the rare positive class, since it performs clearly above the prevalence baseline. However, its absolute value remains low, reflecting the difficulty of obtaining high precision under the strong class imbalance.
 
 #### 4.4.3.4) Log-Loss
 
@@ -1007,7 +1009,7 @@ $$0.0330$$
 
 Therefore, Naive Bayes performs **slightly better than the prevalence baseline**, although the improvement is small.
 
-The calibration plot provides additional information. The estimated probabilities are reasonably aligned with observed arrest rates in the lower-probability region, where most observations are concentrated. At higher predicted probabilities, however, the curve tends to fall below the perfect-calibration diagonal, indicating some **overestimation of arrest risk**. Thus, calibration is reasonably good at low probabilities but deteriorates somewhat toward the upper end of the model's predicted range.
+The calibration plot provides additional information. The calibration points are reasonably close to the perfect-calibration diagonal over much of the probability range. Some deviations are visible, particularly toward the higher predicted-probability bins, so calibration should not be considered perfect. This is broadly consistent with the Brier score and log-loss, but should be interpreted cautiously.
 
 #### 4.4.3.6) MCC
 
@@ -1021,7 +1023,7 @@ $$MCC = \frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}} \in [-
 
 Using the confusion matrix, we obtain approximately:
 
-$$MCC\approx0.135$$
+$$MCC=0.133$$
 
 This represents a **weak but positive association** between predicted and observed classes. Therefore, the classification contains genuine predictive information, but the distinction between arrests and non-arrests remains limited.
 
@@ -1031,22 +1033,22 @@ This is consistent with the low precision and F1 score produced by the model.
 
 Using Youden's criterion, the selected classification threshold is
 
-$$t^*=0.0299$$
+$$t^*=0.0270$$
 
 This threshold is selected once by maximising Youden's $J$ on the training-set ROC curve, then frozen and applied unchanged to the test set, so no test-set information is used in choosing the cutoff.
 
 At this threshold, the model obtains:
 
 $$
-\text{Sensitivity}=0.738, \,
-\text{Specificity}=0.624, \,
-\text{Precision}=0.065, \,
-F1=0.119
+	ext{Sensitivity}=0.762, \,
+	ext{Specificity}=0.598, \,
+	ext{Precision}=0.063, \,
+F1=0.116
 $$
 
-The model therefore identifies approximately **73.8% of actual arrests**, while correctly identifying approximately **62.4% of non-arrests**.
+The model therefore identifies approximately **76.2% of actual arrests**, while correctly identifying approximately **59.8% of non-arrests**.
 
-However, precision is only **6.5%**, meaning that only about one in fifteen observations classified as arrests is actually an arrest. This reflects the large number of false positives generated when attempting to detect a rare positive class.
+However, precision is only **6.3%**, meaning that only about one in sixteen observations classified as arrests is actually an arrest. This reflects the large number of false positives generated when attempting to detect a rare positive class.
 
 This trade-off is expected in a strongly imbalanced problem. The threshold analysis shows that increasing the threshold improves specificity and precision but rapidly reduces sensitivity. The Youden threshold therefore represents a compromise that gives comparable importance to sensitivity and specificity rather than maximizing overall accuracy.
 
@@ -1055,16 +1057,16 @@ This trade-off is expected in a strongly imbalanced problem. The threshold analy
 Let us put the metrics together:
 
 - **Discrimination**, $\text{AUC}\approx0.732$: the model has moderate ability to rank arrested observations above non-arrested ones.
-- **Rare-class performance**, $\text{PR-AUC}\approx0.076$: performance is substantially above the no-skill baseline of $\approx0.034$, although precision remains low in absolute terms.
-- **Probability predictions**, $\text{Brier}\approx0.0325,\,\,\text{LogLoss}\approx0.1394$: predicted probabilities improve on a prevalence-only model, although the improvements are relatively modest.
-- **Classification**, $\text{MCC}\approx0.135$: there is a weak but meaningful association between predictions and the true classes.
-- **Class balance**, $\text{ACC}_{\text{Balanced}}\approx0.681$: the model achieves moderate performance when sensitivity and specificity are given equal importance.
+- **Rare-class performance**, $\text{PR-AUC}\approx0.076$: performance is clearly above the no-skill baseline of $\approx0.034$, although precision remains low in absolute terms.
+- **Probability predictions**, $\text{Brier}\approx0.0325,\,\,\text{LogLoss}\approx0.1394$: predicted probabilities improve on a prevalence-only model, although the improvements are relatively modest and calibration is not perfect.
+- **Classification**, $\text{MCC}\approx0.133$: there is a weak but meaningful association between predictions and the true classes.
+- **Class balance**, $\text{ACC}_{\text{Balanced}}\approx0.680$: the model achieves moderate performance when sensitivity and specificity are given equal importance.
 
 Now for the final conclusions:
 
 - Naive Bayes captures **meaningful predictive structure** in the data, achieving moderate discrimination with an AUC of approximately $0.73$.
 - Its performance is clearly better than random ranking and prevalence-only prediction, although the improvement in probability estimation remains modest.
-- At the selected threshold, the model prioritizes detection of the minority class, identifying approximately **73.8% of arrests**, while maintaining a specificity of **62.4%**.
-- This increased detection comes at the cost of a large number of false positives: precision is only **6.5%**, highlighting the substantial effect of the class imbalance.
+- At the selected threshold, the model prioritizes detection of the minority class, identifying approximately **76.2% of arrests**, while maintaining a specificity of **59.8%**.
+- This increased detection comes at the cost of a large number of false positives: precision is only **6.3%**, highlighting the substantial effect of the class imbalance.
 - The PR-AUC nevertheless exceeds the no-skill baseline by more than a factor of two, indicating that the model contains useful information for identifying the rare positive class.
 - Overall, Naive Bayes provides a **useful probabilistic benchmark with moderate discriminatory performance**, but the substantial overlap between the classes, low precision, and weak MCC indicate that its classification ability remains limited.

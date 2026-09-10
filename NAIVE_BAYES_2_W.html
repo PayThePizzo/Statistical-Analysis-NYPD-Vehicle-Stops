@@ -3172,40 +3172,48 @@ arrest.</p>
 <tbody>
 <tr class="odd">
 <td>Accuracy</td>
-<td align="right">0.595</td>
-<td>About <span class="math inline">\(59.5\%\)</span> of all
-observations are classified correctly</td>
+<td align="right">0.525</td>
+<td>About <span class="math inline">\(52.5\%\)</span> of all test
+observations are correctly classified, but accuracy alone is not very
+informative because of class imbalance</td>
 </tr>
 <tr class="even">
 <td>Sensitivity / Recall</td>
-<td align="right">0.676</td>
-<td>The model correctly identifies about <span class="math inline">\(67.6\%\)</span> of actual arrests</td>
+<td align="right">0.748</td>
+<td>About <span class="math inline">\(74.8\%\)</span> of actual arrests
+are correctly detected</td>
 </tr>
 <tr class="odd">
 <td>Specificity</td>
-<td align="right">0.589</td>
-<td>The model correctly identifies about <span class="math inline">\(58.9\%\)</span> of actual non-arrests</td>
+<td align="right">0.510</td>
+<td>About <span class="math inline">\(51.0\%\)</span> of non-arrests are
+correctly identified</td>
 </tr>
 <tr class="even">
 <td>Precision</td>
-<td align="right">0.100</td>
-<td>Only about <span class="math inline">\(10.0\%\)</span> of
-observations predicted as arrests are actually arrests</td>
+<td align="right">0.093</td>
+<td>Only about <span class="math inline">\(9.3\%\)</span> of predicted
+arrests correspond to actual arrests</td>
 </tr>
 <tr class="odd">
 <td>F1</td>
-<td align="right">0.174</td>
-<td>The combined precision-recall performance for the positive class is
-low</td>
+<td align="right">0.166</td>
+<td>Low harmonic mean of precision and recall, mainly constrained by low
+precision</td>
 </tr>
 <tr class="even">
 <td>Balanced Accuracy</td>
-<td align="right">0.633</td>
-<td>Averaging sensitivity and specificity gives moderate classification
-performance across the two classes</td>
+<td align="right">0.629</td>
+<td>Moderate but limited performance when arrests and non-arrests
+receive equal weight</td>
 </tr>
 </tbody>
 </table>
+<p>The confusion matrix shows that the model detects most arrests but
+produces many false alarms. Of the 2,449 actual arrests, 1,833 are
+correctly identified and 616 are missed. Among non-arrests, 18,566 are
+correctly rejected while 17,836 are incorrectly predicted as
+arrests.</p>
 <p>This behavior is partly a consequence of the low classification
 threshold selected for the rare positive class. The model is willing to
 classify observations as arrests in order to increase sensitivity, but
@@ -3495,19 +3503,19 @@ better than the prevalence baseline</td>
 </tr>
 <tr class="odd">
 <td>Threshold</td>
-<td align="right">0.0489</td>
-<td>Low cutoff, selected on the training set via Youden’s criterion, to
-increase detection of the rare positive class</td>
+<td align="right">0.0370</td>
+<td>Low cutoff, selected on the training set via Youden’s criterion and
+then applied unchanged to the test set</td>
 </tr>
 <tr class="even">
 <td><strong>MCC</strong></td>
-<td align="right">0.131</td>
+<td align="right">0.126</td>
 <td>Weak positive association between predicted and observed
 classes</td>
 </tr>
 <tr class="odd">
 <td>Balanced Accuracy</td>
-<td align="right">0.633</td>
+<td align="right">0.629</td>
 <td>Moderate ability to classify both classes when they are weighted
 equally</td>
 </tr>
@@ -3529,10 +3537,9 @@ sensitivity.</p>
 non-arrested observation, the model assigns a higher predicted
 probability to the arrested case approximately <span class="math inline">\(68.2\%\)</span> of the time.</p>
 <p>This represents <strong>modest discrimination</strong>: the model
-performs clearly better than random guessing, for which <span class="math inline">\(\text{AUC}=0.5\)</span>, but it does not provide
-strong separation between the two classes. This is also visible in the
-ROC curve, which lies above the diagonal but relatively far from the
-upper-left corner.</p>
+performs better than random guessing, for which <span class="math inline">\(\text{AUC}=0.5\)</span>, but class separation
+remains limited. This is also visible in the ROC curve, which lies above
+the diagonal but relatively far from the upper-left corner.</p>
 </div>
 <div id="pr-auc" class="section level4">
 <h4>4.4.3.3) PR-AUC</h4>
@@ -3550,10 +3557,11 @@ of the positive class,</p>
 <p>Therefore, the model achieves a PR-AUC roughly <span class="math inline">\(1.86\)</span> times the no-skill baseline.</p>
 <p><em>But how good is</em> <span class="math inline">\(0.1169\)</span>?
 It indicates that the model contains meaningful information for
-detecting arrests, since it clearly exceeds the prevalence baseline.
-However, its absolute value remains low, reflecting the difficulty of
-obtaining high precision when arrests are rare. The Precision-Recall
-curve confirms that precision decreases as recall increases.</p>
+detecting the rare positive class, since it clearly exceeds the
+prevalence baseline. However, its absolute value remains low, reflecting
+the difficulty of obtaining high precision under the strong class
+imbalance. The Precision-Recall curve confirms that precision decreases
+as recall increases.</p>
 </div>
 <div id="log-loss" class="section level4">
 <h4>4.4.3.4) Log-Loss</h4>
@@ -3594,11 +3602,11 @@ Brier score of about</p>
 <p><span class="math display">\[0.0590\]</span></p>
 <p>Therefore, the model again performs <strong>slightly better than the
 prevalence baseline</strong>, although the improvement is modest.</p>
-<p>The calibration plot is broadly close to the perfect-calibration
-line, suggesting that the predicted probabilities are reasonably aligned
-with observed arrest rates. Some deviations are nevertheless present,
-particularly in the higher-probability regions where fewer observations
-are available.</p>
+<p>The calibration points are reasonably close to the
+perfect-calibration diagonal in some probability ranges, but deviations
+are visible, particularly toward the higher predicted-probability bins.
+This should not be interpreted as perfect calibration and is consistent
+only cautiously with the Brier score and log-loss.</p>
 </div>
 <div id="mcc" class="section level4">
 <h4>4.4.3.6) MCC</h4>
@@ -3615,7 +3623,7 @@ association</li>
 prediction</li>
 </ul>
 <p>Our result is:</p>
-<p><span class="math display">\[MCC=0.131\]</span></p>
+<p><span class="math display">\[MCC=0.126\]</span></p>
 <p>This represents a <strong>weak but positive association</strong>
 between predicted and observed classes. Therefore, the classification
 contains genuine predictive information, but the separation between
@@ -3627,22 +3635,21 @@ produced by the model.</p>
 <h4>4.4.3.7) Thresholds</h4>
 <p>Using Youden’s criterion, the selected classification threshold
 is</p>
-<p><span class="math display">\[t^*=0.0489\]</span></p>
+<p><span class="math display">\[t^*=0.0370\]</span></p>
 <p>This threshold is selected once by maximising Youden’s <span class="math inline">\(J\)</span> on the training-set ROC curve, then
 frozen and applied unchanged to the test set, so no test-set information
 is used in choosing the cutoff.</p>
 <p>This is considerably below the conventional threshold of <span class="math inline">\(0.5\)</span>, which would be inappropriate for
 such an imbalanced outcome because predicted probabilities of arrest are
 generally low.</p>
-<p>At this threshold, the model obtains:</p>
-<p><span class="math display">\[\text{Sensitivity}=0.676, \,
-\text{Specificity}=0.589, \, \text{Precision}=0.100, \,
-F1=0.174\]</span></p>
-<p>The model therefore identifies approximately <span class="math inline">\(67.6\%\)</span> of actual arrests, at the cost of
-a relatively large number of false positives. Specificity remains
-moderate at <span class="math inline">\(58.9\%\)</span>, while precision
-of <span class="math inline">\(10.0\%\)</span> means that only about one
-in ten observations classified as arrests is actually an arrest.</p>
+<p>At this training-selected threshold, the model obtains:</p>
+<p><span class="math display">\[\text{Sensitivity}=0.748, \,
+\text{Specificity}=0.510, \, \text{Precision}=0.093, \,
+F1=0.166\]</span></p>
+<p>The model therefore identifies approximately <span class="math inline">\(74.8\%\)</span> of actual arrests, but specificity
+is only <span class="math inline">\(51.0\%\)</span>, producing a large
+number of false-positive arrest predictions. Precision of <span class="math inline">\(9.3\%\)</span> means that only about one in eleven
+observations classified as arrests is actually an arrest.</p>
 <p>This trade-off is expected in a strongly imbalanced problem. The
 threshold analysis shows that increasing the threshold improves
 specificity and precision but rapidly reduces sensitivity. The Youden
@@ -3655,20 +3662,21 @@ accuracy.</p>
 <p>Let us put the metrics together:</p>
 <ul>
 <li><strong>Discrimination</strong>, <span class="math inline">\(\text{AUC} \approx 0.682\)</span>: the model has
-modest ability to rank arrested observations above non-arrested
-ones.</li>
+modest ability to rank arrested observations above non-arrested ones,
+with class separation remaining limited.</li>
 <li><strong>Rare-class performance</strong>, <span class="math inline">\(\text{PR-AUC} \approx 0.117\)</span>: performance
 is clearly above the no-skill baseline of <span class="math inline">\(\approx 0.063\)</span>, although precision remains
 limited in absolute terms.</li>
 <li><strong>Probability predictions</strong>, <span class="math inline">\(\text{Brier} \approx 0.0584, \,\, \text{LogLoss}
 \approx 0.2306\)</span>: predicted probabilities improve slightly over a
-prevalence-only model and appear reasonably calibrated overall.</li>
-<li><strong>Classification</strong>, <span class="math inline">\(\text{MCC} \approx 0.131\)</span>: there is a weak
+prevalence-only model, although calibration deviations remain
+visible.</li>
+<li><strong>Classification</strong>, <span class="math inline">\(\text{MCC} \approx 0.126\)</span>: there is a weak
 but meaningful association between predictions and the true
 classes.</li>
 <li><strong>Class balance</strong>, <span class="math inline">\(\text{ACC}_{\text{Balanced}} \approx
-0.633\)</span>: the model achieves moderate performance when sensitivity
-and specificity are given equal importance.</li>
+0.629\)</span>: the model achieves moderate but limited performance when
+sensitivity and specificity are given equal importance.</li>
 </ul>
 <p>Now for the final conclusions:</p>
 <ul>
@@ -3678,8 +3686,9 @@ structure</strong> in the data.</li>
 prevalence-only prediction, but the improvement is moderate rather than
 strong.</li>
 <li>The model prioritizes detection of the minority class at the
-selected threshold, achieving a sensitivity of <span class="math inline">\(67.6\%\)</span>, but this comes at the cost of
-lower specificity and particularly low precision.</li>
+selected threshold, achieving a sensitivity of <span class="math inline">\(74.8\%\)</span>, but this comes at the cost of
+specificity of only <span class="math inline">\(51.0\%\)</span> and
+particularly low precision.</li>
 <li>The PR-AUC and precision results show that the <strong>class
 imbalance remains a major limitation</strong>: even when the model
 successfully identifies many arrests, false positives remain

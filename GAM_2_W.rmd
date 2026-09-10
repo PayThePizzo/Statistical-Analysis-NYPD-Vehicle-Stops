@@ -876,27 +876,27 @@ cat(sprintf(
 
 The confusion matrix shows
 
-- **1,496 true positives**;
-- **816 false negatives**;
-- **22,008 true negatives**;
-- And **12,729 false positives**.
+- **1,612 true positives**;
+- **700 false negatives**;
+- **20,008 true negatives**;
+- And **14,729 false positives**.
 
-The model therefore identifies a relatively large proportion of the actual arrests, but this comes at the cost of a very large number of false-positive arrest predictions.
+The model therefore detects most arrests, but generates a substantial number of false alarms. Of the 2,312 actual arrests, 1,612 are correctly identified and 700 are missed. Among non-arrests, 20,008 are correctly rejected while 14,729 are incorrectly predicted as arrests.
 
-The Youden threshold is **0.0554**, way below the 0.5 cutoff. This value is selected by maximising Youden's $J$ on the training-set ROC curve, then frozen and applied unchanged to the test set below, so no test-set information enters the cutoff choice.
+The Youden threshold is **0.0483**, approximately 0.048 in the threshold plot and well below the 0.5 cutoff. This value is selected by maximising Youden's $J$ on the training-set ROC curve, then frozen and applied unchanged to the test set below, so no test-set information enters the cutoff choice.
 
-Moreover, the **AUC of 0.6897** indicates **moderate discriminatory ability**: the GAM separates arrest from non-arrest cases a bit better than chance.
+Moreover, the **AUC of 0.6897** indicates **modest discriminatory ability**: the GAM performs better than random classification, but separation between arrests and non-arrests remains limited.
 
 Now for the derived metrics:
 
 | Metric | Value | Interpretation |
 |-------------------------------|-----------------:|-----------------------|
-| Accuracy | 0.634 | About 63.4% of all observations are classified correctly |
-| Sensitivity / Recall | 0.647 | The model correctly identifies about 64.7% of actual arrests |
-| Specificity | 0.634 | About 63.4% of actual non-arrests are correctly classified |
-| Precision | 0.105 | Only about 10.5% of predicted arrests are actual arrests |
-| F1 | 0.181 | The low value reflects the difficult trade-off between recall and precision for the minority class |
-| Balanced Accuracy | 0.640 | Averaging sensitivity and specificity gives a more appropriate summary than ordinary accuracy in this imbalanced setting |
+| Accuracy | 0.584 | About 58.4% of all test observations are correctly classified, but accuracy alone is not very informative because of class imbalance |
+| Sensitivity / Recall | 0.697 | About 69.7% of actual arrests are correctly detected |
+| Specificity | 0.576 | About 57.6% of non-arrests are correctly identified |
+| Precision | 0.099 | Only about 9.9% of predicted arrests correspond to actual arrests |
+| F1 | 0.173 | Low harmonic mean of precision and recall, mainly limited by low precision |
+| Balanced Accuracy | 0.637 | Moderate ability to distinguish the two classes when they receive equal weight |
 
 ### 6.4.2) Performance Analysis
 
@@ -924,11 +924,11 @@ eval_quad_plot(test$arrested, prob_gam, thr_gam, "GAM")
 | **PR-AUC** | 0.1247 | Above the no-skill baseline of $\approx 0.062$, but still low in absolute terms |
 | **Log-Loss** | 0.2235 | Predicted probabilities contain useful information, though improvement over a prevalence-only model is modest |
 | **Brier** | 0.0570 | Reasonably accurate probability estimates and slightly better than the prevalence-only baseline |
-| Threshold | 0.0554 | Low cutoff, selected on the training set via Youden's criterion, appropriate for the rare positive class |
-| **MCC** | 0.140 | Weak positive association between predicted and observed classes |
-| Balanced Accuracy | 0.640 | Moderate performance when both classes are weighted equally |
+| Threshold | 0.0483 | Low cutoff, selected on the training set via Youden's criterion and then applied unchanged to the test set |
+| **MCC** | 0.133 | Weak positive association between predicted and observed classes |
+| Balanced Accuracy | 0.637 | Moderate performance when both classes are weighted equally |
 
-The main conclusion is that the GAM captures **meaningful but limited predictive signal**. It manages to discriminate arrests from non-arrests better than chance and produces reasonably calibrated probabilities, but its **ability to make precise positive classifications is still weak**.
+The main conclusion is that the GAM captures **meaningful but limited predictive signal**. It performs better than chance and produces probabilities that are generally close to the calibration diagonal, but its **ability to make precise positive classifications is still weak** because arrests are a rare class.
 
 #### 6.4.2.2) AUC
 
@@ -936,7 +936,7 @@ The test-set AUC is $\approx 0.690$.
 
 This means that if we randomly select (i) one observation where an arrest occurred, and (ii) one observation where an arrest did not occur, the model assigns a higher predicted probability to the arrest observation about 69% of the time.
 
-The ROC curve **remains consistently above the main diagonal**, indicating that the model contains useful ranking information. However, an AUC below $0.70$ also shows that there is still a great deal of overlap between the predicted probabilities of the two classes.
+The ROC curve **remains above the main diagonal**, indicating that the model contains useful ranking information. However, the AUC also shows that separation between the two classes remains limited, with substantial overlap between their predicted probabilities.
 
 #### 6.4.2.3) PR-AUC
 
@@ -952,7 +952,7 @@ The baseline PR-AUC is approximately equal to the positive-class prevalence:
 
 $$\text{PR-AUC}_{\text{baseline}}\approx0.062$$
 
-*But how good is* $0.1247$? It is roughly **twice the baseline**, indicating that the **GAM does provide useful information for ranking observations according to arrest risk**. However, the precision is still very low.
+*But how good is* $0.1247$? It is clearly above the no-skill baseline, indicating that the **GAM provides useful information for ranking observations in the minority class**. However, the absolute PR-AUC remains low because of the strong class imbalance, and precision is still limited.
 
 #### 6.4.2.4) Log-Loss
 
@@ -982,7 +982,7 @@ $$0.0585$$
 
 so the GAM performs just slightly better.
 
-Together with the calibration plot, this suggests that the predicted probabilities are **reasonably calibrated overall**: **groups assigned higher arrest probabilities tend to show correspondingly higher observed arrest rates**.
+Together with the calibration plot, this suggests that the predicted probabilities are **reasonably calibrated overall**: the calibration points are generally close to the perfect-calibration diagonal. Some deviations are visible across probability ranges, but there is no major systematic departure from the diagonal. This should be interpreted cautiously rather than as perfect calibration.
 
 #### 6.4.2.6) MCC
 
@@ -1001,7 +1001,7 @@ where:
 
 Our result is:
 
-$$MCC=0.140$$
+$$MCC=0.133$$
 
 Thus, there is a **positive but weak association between predictions and actual outcomes** (consistent with CM). Simply put:
 
@@ -1012,11 +1012,19 @@ Thus, there is a **positive but weak association between predictions and actual 
 
 The classification threshold selected using **Youden's index** is
 
-$$t^*=0.0554$$
+$$t^*=0.0483$$
 
 This threshold is selected once by maximising Youden's $J$ on the training-set ROC curve, then frozen and applied unchanged to the test set, so no test-set information is used in choosing the cutoff.
 
 The threshold analysis also shows the expected trade-off: lowering the threshold increases sensitivity but reduces specificity, while increasing it improves specificity at the cost of missing more arrests.
+
+At this training-selected threshold, the model achieves
+
+$$\text{Sensitivity}=0.697,
+\qquad
+	ext{Specificity}=0.576.$$
+
+Thus, approximately **69.7% of actual arrests are detected**, but this comes at the cost of many false-positive arrest predictions. The low threshold reflects the rarity of the positive class and increases sensitivity relative to the conventional $0.5$ cutoff.
 
 #### 6.4.2.8) Final Remarks
 
@@ -1025,14 +1033,14 @@ Let us put the metrics together:
 - **Discrimination**, $\text{AUC} \approx 0.690$: the GAM has moderate ability to rank arrests above non-arrests;
 - **Rare-class performance**, $\text{PR-AUC} \approx 0.125$: clearly better than the $\approx0.062$ no-skill baseline, but positive-class identification remains difficult;
 - **Probability predictions**, $\text{Brier} \approx 0.057,\; \text{LogLoss} \approx 0.224$: probabilities are reasonably calibrated and improve modestly over a prevalence-only model;
-- **Classification**, $\text{MCC} \approx 0.140$: binary predictions show only a weak association with the true outcomes;
-- **Class balance**, $\text{ACC}_{\text{Balanced}} \approx 0.640$: sensitivity and specificity are reasonably balanced, but overall classification performance remains moderate.
+- **Classification**, $\text{MCC} \approx 0.133$: binary predictions show only a weak association with the true outcomes;
+- **Class balance**, $\text{ACC}_{\text{Balanced}} \approx 0.637$: sensitivity and specificity are reasonably balanced, but overall classification performance remains moderate.
 
 Now for the final conclusions:
 
 - The GAM captures a **real but limited predictive signal** in the available demographic, temporal, and geographical variables.
 - Its strongest result is its ability to **rank observations by relative arrest risk**, rather than to produce highly accurate binary classifications.
-- The low positive-class prevalence strongly affects precision: obtaining a sensitivity of $0.647$ requires accepting a substantial number of false positives.
+- The low positive-class prevalence strongly affects precision: obtaining a sensitivity of $0.697$ requires accepting a substantial number of false positives.
 - The probability estimates appear more useful than the thresholded classifications, particularly given the reasonably good calibration.
 - Consequently, the GAM is best interpreted as a model of **relative arrest propensity and estimated probability**, rather than as a highly accurate classifier of individual arrests.
 
