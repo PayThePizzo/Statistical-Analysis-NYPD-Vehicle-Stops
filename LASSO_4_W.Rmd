@@ -23,7 +23,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 These `.Rmd` files represent the project submission for the course [Statistical Inference and Learning](https://www.unive.it/data/course/521944) by Professor [Cristiano Varin](https://www.unive.it/data/people/5592728) at [Ca' Foscari University of Venice](https://www.unive.it/) for the year 2025/2026.
 
----
+------------------------------------------------------------------------
 
 # 0) Environment
 
@@ -509,7 +509,7 @@ extract_coefs <- function(cv_fit, s_name) {
 }
 ```
 
----
+------------------------------------------------------------------------
 
 # 1) Data Loading and Preparation
 
@@ -562,26 +562,21 @@ vehstop$age_bracket <- relevel(vehstop$age_bracket, ref = "25–34")
 rm(wday_levels, tbkt_levels, abkt_levels)
 ```
 
-
 ## 1.2) Stratified Train / Test Split
 
-For the train/test split, a **stratified sampling approach** is used to ensure that the training and test sets have comparable distributions of the outcome variable (`arrested`) and relevant contextual variables. 
+For the train/test split, a **stratified sampling approach** is used to ensure that the training and test sets have comparable distributions of the outcome variable (`arrested`) and relevant contextual variables.
 
-This is particularly important because the target variable is imbalanced, with arrested cases representing only a small proportion of all observations. Rather than stratifying only on `arrested`, the code constructs a **joint stratification variable** from `arrested`, `area`, `sex`, `ethnicity`, and `hour` using `interaction()`. Thus, each observation is assigned to a stratum corresponding to a particular combination of these variables. 
+This is particularly important because the target variable is imbalanced, with arrested cases representing only a small proportion of all observations. Rather than stratifying only on `arrested`, the code constructs a **joint stratification variable** from `arrested`, `area`, `sex`, `ethnicity`, and `hour` using `interaction()`. Thus, each observation is assigned to a stratum corresponding to a particular combination of these variables.
 
 Formally, the strata can be represented as
 
-$$
-S_i = (\text{arrested}_i,\text{area}_i,\text{sex}_i,\text{ethnicity}_i,\text{hour}_i),
-$$
+$$S_i = (\text{arrested}_i,\text{area}_i,\text{sex}_i,\text{ethnicity}_i,\text{hour}_i),$$
 
 where $S_i$ denotes the stratum to which observation $i$ belongs. The objective is to sample approximately 80% of observations within each stratum for the training set and retain the remaining 20% for testing:
 
-$$
-P(i \in \mathcal{D}_{train} \mid S_i=s) \approx 0.8,
+$$P(i \in \mathcal{D}_{train} \mid S_i=s) \approx 0.8,
 \qquad
-P(i \in \mathcal{D}_{test} \mid S_i=s) \approx 0.2.
-$$
+P(i \in \mathcal{D}_{test} \mid S_i=s) \approx 0.2.$$
 
 ```{r stratified-split}
 set.seed(2026)
@@ -605,31 +600,25 @@ vehstop <- vehstop %>% dplyr::select(-.strat)
 
 In the code, `group_by(.strat) %>% slice_sample(prop = 0.8)` performs this within-stratum sampling, while the observations not selected for training form the test set. This approach aims to preserve not only the overall prevalence of the outcome,
 
-$$
-P_{\text{train}}(\text{arrested}=1) \approx P_{\text{test}}(\text{arrested}=1),
-$$
+$$P_{\text{train}}(\text{arrested}=1) \approx P_{\text{test}}(\text{arrested}=1),$$
 
-but also the composition of the data across geographic, demographic, and temporal characteristics. This is desirable because differences in these characteristics could otherwise introduce an unintended distributional difference between the training and test sets. The temporary `.strat` variable is removed after the split because it is used solely to define the sampling groups and is not intended to be used as a predictor in the subsequent modelling. 
+but also the composition of the data across geographic, demographic, and temporal characteristics. This is desirable because differences in these characteristics could otherwise introduce an unintended distributional difference between the training and test sets. The temporary `.strat` variable is removed after the split because it is used solely to define the sampling groups and is not intended to be used as a predictor in the subsequent modelling.
 
 Finally, the verification code compares the empirical marginal distributions of `arrested`, `area`, `sex`, and `ethnicity` in the two datasets. For a variable $X$ and level $k$, the proportion in each dataset is calculated as
 
-$$
-\hat{P}_{train}(X=k)
+$$\hat{P}_{train}(X=k)
 =
 \frac{\sum_{i \in \mathcal{D}_{train}} \mathbb{I}(X_i=k)}
-{|\mathcal{D}_{train}|},
-$$
+{|\mathcal{D}_{train}|},$$
 
 and analogously for the test set. The difference is then reported in **percentage points**:
 
-$$
-\Delta_k =
+$$\Delta_k =
 100\left[
 \hat{P}_{test}(X=k)
 -
 \hat{P}_{train}(X=k)
-\right].
-$$
+\right].$$
 
 Small values of $\Delta_k$ indicate that the corresponding characteristic is similarly represented in the two datasets. The final summary additionally compares the number of observations and the proportion of arrested cases in the training and test sets, providing a direct check that the intended approximately 80/20 split and the class distribution have been maintained.
 
@@ -664,21 +653,21 @@ The maximum absolute discrepancy between the two sets is on the order of fractio
 rm(vehstop)
 ```
 
----
+------------------------------------------------------------------------
 
 # 5) LASSO
 
-**Why did we choose this model?** Given the size of the dataset and the rarity of the target, a penalised logistic regression is a trivial choice: 
+**Why did we choose this model?** Given the size of the dataset and the rarity of the target, a penalised logistic regression is a trivial choice:
 
-- It scales linearly in $n$, 
+- It scales linearly in $n$,
 - It handles many correlated dummy-encoded predictors, and
-- It performs feature selection (derived from the $\ell_1$ penalty). 
+- It performs feature selection (derived from the $\ell_1$ penalty).
 
 **Modus Operandi:** In this section we fit a LASSO logistic regression on `arrested` using the reduced predictor set (see below), then we compare the model obtained at $\lambda_{\min}$ against the more parsimonious one at $\lambda_{\text{1se}}$.
 
 ## 5.1) Assumptions and Setup
 
-**LASSO (Least Absolute Shrinkage and Selection Operator)** is a regularization method that extends logistic regression by adding a penalty on the absolute size of the model coefficients. 
+**LASSO (Least Absolute Shrinkage and Selection Operator)** is a regularization method that extends logistic regression by adding a penalty on the absolute size of the model coefficients.
 
 In binary classification, it is particularly useful when there are many potentially relevant predictors and we want to identify a smaller set of variables associated with the probability of the positive outcome.
 
@@ -688,11 +677,11 @@ $$ P(Y=1\mid X)=\frac{1}{1+\exp(-\eta)}, $$
 
 where
 
-$$ \eta=\beta_0+\beta_1X_1+\cdots+\beta_pX_p. $$
+$$ \eta=\beta_0+\beta_1X_1+\cdots+\beta_pX_p $$
 
 Instead of simply maximizing the logistic likelihood, LASSO minimizes the penalized negative log-likelihood:
 
-$$ \hat{\beta} = \arg\min_{\beta} \left\{ -\ell(\beta) + \lambda\sum_{j=1}^{p}|\beta_j| \right\}. $$
+$$ \hat{\beta} = \arg\min_{\beta} \left\{ -\ell(\beta) + \lambda\sum_{j=1}^{p}|\beta_j| \right\} $$
 
 Here, $\lambda \geq 0$ controls the strength of regularization.
 
@@ -708,9 +697,9 @@ f_final <- arrested ~ year + month + weekday + hour + boro + sex + ethnicity + a
 
 Unlike `glm()`, `glmnet()` does not accept a formula and factor predictors directly: it requires a numeric design matrix, so every categorical predictor must be dummy-encoded first via `model.matrix()` (see also section 1.1).
 
-Then, the intercept column produced by `model.matrix()` is dropped (`[, -1]`) because `glmnet` fits its own unpenalised intercept internally. 
+Then, the intercept column produced by `model.matrix()` is dropped (`[, -1]`) because `glmnet` fits its own unpenalised intercept internally.
 
-Standardisation of the columns before penalisation is handled automatically by `glmnet` (`standardize = TRUE` is the default), so no manual scaling is needed here. 
+Standardisation of the columns before penalisation is handled automatically by `glmnet` (`standardize = TRUE` is the default), so no manual scaling is needed here.
 
 ```{r lasso-matrix}
 mm_train <- model.frame(f_final, data = train, na.action = na.omit)
@@ -805,21 +794,20 @@ At $\lambda_{\text{min}} = 0.000048$
 
 At $\lambda_{\text{1se}} = 0.000256$
 
-- The model is much more strongly regularised as it retains only **50** non-zero coefficients, 
+- The model is much more strongly regularised as it retains only **50** non-zero coefficients,
 - But its CV AUC decreases only slightly: $0.7524 \rightarrow 0.7515$
 
 That's a reduction of only $0.7524 - 0.7515 = 0.0009$ in AUC points at $\lambda_{\text{min}}$.
 
 Meanwhile, the number of coefficients falls from 63 to 50:
 
-$$ \frac{63-50}{63} \cdot 100 \approx 20.6\%. $$
+$$ \frac{63-50}{63} \cdot 100 \approx 20.6\% $$
 
-So the 1-SE model "removes" approximately one-fifth of the non-zero coefficients while changing CV-AUC by less than one-thousandth. This is an even stronger complexity-performance trade-off than in our other dataset.
+So the 1-SE model "removes" (sets to 0) approximately one-fifth of the non-zero coefficients while changing CV-AUC by less than one-thousandth. This is an even stronger complexity-performance trade-off than in our other dataset.
 
 The standard errors are:
 
-$$ SE_{\text{min}} = 0.001025 \,\, \text{and} \,\, SE_{\text{1se}} = 0.001057 $$
-So the difference is smaller than either reported standard error. This reinforces the idea that there is no practically meaningful evidence that $\lambda_{\text{min}$ predicts better than $\lambda_{\text{1se}$. 
+$$ SE_{\text{min}} = 0.001025 \,\, \text{and} \,\, SE_{\text{1se}} = 0.001057 $$ So the difference is smaller than either reported standard error. This reinforces the idea that there is no practically meaningful evidence that $\lambda_{\text{min}$ predicts better than $\lambda_{\text{1se}$.
 
 **What does this say about the training?** The 1-SE model reduces the number of non-zero coefficients from 63 to 50, a reduction of approximately $21\%$, while reducing cross-validated AUC by only $0.0009$. The substantially stronger regularisation therefore achieves essentially the same estimated predictive discrimination with a considerably more parsimonious model.
 
@@ -859,7 +847,7 @@ ggplot(path_df, aes(x = log_lambda, y = coef, group = feature,
   theme(panel.grid.minor = element_blank())
 ```
 
-What is visible here? Between the red and orange lines, the coefficient's paths change very little. The larger positive and negative coefficients remain clearly separated from zero, although their magnitudes are reduced somewhat. At the same time, several of the smaller coefficients are pushed toward or exactly to zero. This suggests that the 13 coefficients eliminated by moving from $\lambda_{\text{min}}$ to $\lambda_{\text{1se}}$ are predominantly coefficients with comparatively weak contributions under the penalised model.
+What is visible here? Between the red and orange lines, the coefficient's paths change very little. The larger positive and negative coefficients remain clearly separated from zero, although their magnitudes are reduced somewhat. At the same time, several of the smaller coefficients are pushed toward or exactly to zero. This suggests that the 13 coefficients set to 0 by moving from $\lambda_{\text{min}}$ to $\lambda_{\text{1se}}$ are predominantly coefficients with comparatively weak contributions under the penalised model.
 
 **Some coefficients are much more resistant to shrinkage**, in particular, the two large positive paths at the top and several large negative paths at the bottom survive against a stronger regularisation. These predictors appear to contain more persistent predictive signal: the model retains them even when the penalty becomes considerably stronger (we will see them later).
 
@@ -902,7 +890,7 @@ coef_min %>%
 
 #### 5.3.2.1) General Interpretation
 
-At $\lambda_{\text{min}}$, LASSO retains 62 non-zero coefficients. The coefficient is on the log-odds scale:
+At $\lambda_{\text{min}}$, LASSO retains 63 non-zero coefficients. The coefficient is on the log-odds scale:
 
 $$ \log\left(\frac{P(\text{arrested}=1)}{1-P(\text{arrested}=1)}\right) = \beta_0+\sum_j\beta_jX_j. $$
 
@@ -934,7 +922,7 @@ This means that, `hour7` is associated with circa $(1-0.173) \times 100 = 82.7\%
 
 A similar pattern occurs across the whole "morning":
 
-$$
+\$\$
 
 \begin{aligned}
 OR_{6} & = 0.231 \rightarrow 76.9\% \\
@@ -945,7 +933,7 @@ OR_{10} & = 0.262 \rightarrow 73.8\% \\
 OR_{11} & = 0.408 \rightarrow 59.2\%
 \end{aligned}
 
-$$
+\$\$
 
 The important result is therefore not specifically that *7 AM* has a large coefficient, but that **a broad block of morning hours has substantially lower predicted arrest odds relative to the reference hour** (midnight). This temporal pattern then weakens later in the day and by hours 18–23, most coefficients are much closer to zero.
 
@@ -959,14 +947,12 @@ Conditional on the other predictors, the estimated odds for the 65+ category are
 
 From the following
 
-$$
-\begin{aligned}
+$$\begin{aligned}
 OR_{55-64} & = 0.356 \rightarrow -64.4\% \\
 OR_{45-54} & = 0.560 \rightarrow -44\% \\
 OR_{35-44} & = 0.790 \rightarrow -21\% \\
 OR_{18-24} & = 0.887 \rightarrow -11.3\%
-\end{aligned}
-$$
+\end{aligned}$$
 
 there seems to be pattern whereby **older age categories receive progressively more negative coefficients** relative to the reference category.
 
@@ -974,22 +960,18 @@ Again, this is an **association with predicted arrest odds**, not evidence that 
 
 Then, `ethnicity` has two of the largest positive coefficients. The two main coefficients that stand out are:
 
-$$
-\begin{aligned}
+$$\begin{aligned}
 \beta_{\text{Black}} = 1.217, \quad \text{OR}_{\text{Black}} = 3.377 \rightarrow (337.7 - 100) = +237.7 \% \\
 \beta_{\text{Hispanic}} = 1.168, \quad \text{OR}_{\text{Hispanic}} = 3.215 \rightarrow (321.5 - 100) = +221.5 \% \\
-\end{aligned}
-$$
+\end{aligned}$$
 
 Thus, relative to the reference ethnicity category (`White`) and conditional on the other model variables, the estimated odds of the observed arrest outcome are approximately **3.38 and 3.22 times as large**, respectively.
 
 What can we say here? Black and Hispanic ethnicity categories exhibit some of the largest positive coefficients in the fitted LASSO model, **corresponding to substantially higher predicted odds of the observed arrest outcome relative to the reference ethnicity category after conditioning on the included covariates**.
 
-Let us consider `sex` now
-- For `sexF`, we have $\beta= -0.891, \, OR = 0.410$. Therefore, relative to the reference sex category (male), female observations have approximately $1-0.410 = 0.590$ or **59% lower estimated odds of the observed arrest outcome**, conditional on the included predictors. 
-- By contrast, $OR_{\text{sexU}} = 1.131 \rightarrow (113.1 - 100) = +13.1\%$ is much closer to one.
+Let us consider `sex` now - For `sexF`, we have $\beta= -0.891, \, OR = 0.410$. Therefore, relative to the reference sex category (male), female observations have approximately $1-0.410 = 0.590$ or **59% lower estimated odds of the observed arrest outcome**, conditional on the included predictors. - By contrast, $OR_{\text{sexU}} = 1.131 \rightarrow (113.1 - 100) = +13.1\%$ is much closer to one.
 
-Geography contributes predictive information, although its coefficients are generally less extreme than the strongest temporal, age, and ethnicity coefficients. 
+Geography contributes predictive information, although its coefficients are generally less extreme than the strongest temporal, age, and ethnicity coefficients.
 
 - For example, $OR_{\text{Manhattan South}} = 0.566, \, OR_{\text{Queens North}}=0.571$. These indicate ($43.5\%$ and $42.9\%$ respectively) lower predicted arrest odds relative to the omitted geographic reference category.
 - On the other hand $OR_{\text{Brooklyn South}}=0.939, \, OR_{\text{Staten Island}}=0.923$ are much closer to one and therefore have comparatively small penalised coefficients.
@@ -1040,23 +1022,23 @@ coef_1se %>%
   theme(legend.position = "bottom", panel.grid.minor = element_blank())
 ```
 
-This confirms the interpretation from the coefficient paths quite well. Moving from $\lambda_{\min}$ to $\lambda_{1se}$ removes **13 coefficients**, but the structure of the model remains largely unchanged.
+This confirms the interpretation from the coefficient paths quite well. Moving from $\lambda_{\min}$ to $\lambda_{1se}$ sets to 0, **13 coefficients**, but the structure of the model remains largely unchanged.
 
 #### 5.3.3.1) The strongest coefficients remain stable
 
 For the main predictors, the signs and approximate ranking are highly consistent:
 
-| Feature     | $\beta_{\min}$ | $\beta_{1se}$ | OR $\lambda_{\min}$ | OR $\lambda_{1se}$ |
-| ----------- | ---------------: | --------------: | --------------------: | -------------------: |
-| `hour7`     |           -1.752 |          -1.476 |                 0.173 |                0.228 |
-| `age 65+`   |           -1.565 |          -1.411 |                 0.209 |                0.244 |
-| `hour8`     |           -1.495 |          -1.296 |                 0.224 |                0.274 |
-| `hour9`     |           -1.428 |          -1.239 |                 0.240 |                0.290 |
-| `hour6`     |           -1.467 |          -1.200 |                 0.231 |                0.301 |
-| `Black`     |           +1.217 |          +1.164 |                 3.377 |                3.202 |
-| `Hispanic`  |           +1.168 |          +1.117 |                 3.215 |                3.057 |
-| `age 55–64` |           -1.032 |          -0.964 |                 0.356 |                0.381 |
-| `sexF`      |           -0.891 |          -0.867 |                 0.410 |                0.420 |
+| Feature | $\beta_{\min}$ | $\beta_{1se}$ | OR $\lambda_{\min}$ | OR $\lambda_{1se}$ |
+|---------------|--------------:|--------------:|--------------:|--------------:|
+| `hour7` | -1.752 | -1.476 | 0.173 | 0.228 |
+| `age 65+` | -1.565 | -1.411 | 0.209 | 0.244 |
+| `hour8` | -1.495 | -1.296 | 0.224 | 0.274 |
+| `hour9` | -1.428 | -1.239 | 0.240 | 0.290 |
+| `hour6` | -1.467 | -1.200 | 0.231 | 0.301 |
+| `Black` | +1.217 | +1.164 | 3.377 | 3.202 |
+| `Hispanic` | +1.168 | +1.117 | 3.215 | 3.057 |
+| `age 55–64` | -1.032 | -0.964 | 0.356 | 0.381 |
+| `sexF` | -0.891 | -0.867 | 0.410 | 0.420 |
 
 This is a useful result because they remain strong under the more aggressive 1-SE regularisation. In particular, the Black, Hispanic and Female Sex coefficients are remarkably stable.
 
@@ -1065,7 +1047,6 @@ Furthermore,
 - Time of day remains one of the dominant dimensions and the temporal pattern is preserved very clearly, with morning hours that remain strongly negative and a progressive more weak effects when reaching 11 PM;
 - Age also remains structurally important, as well as its pattern where older groups generally have lower predicted odds of arrest.
 - Geographic coefficients remain, but their magnitudes vary considerably.
-
 
 #### 5.3.3.2) What disappeared?
 
@@ -1136,7 +1117,7 @@ cat(sprintf(
 The test-set confusion matrices contain the following counts:
 
 | Metric | $\lambda_{\min}$ | $\lambda_{1se}$ | Interpretation |
-|----------------------|------:|------:|----------------|
+|------------------------|---------------:|---------------:|----------------|
 | True positives | 11,045 | 11,093 | Actual arrests correctly predicted as Arrest |
 | False negatives | 3,676 | 3,628 | Actual arrests incorrectly predicted as No arrest |
 | True negatives | 255,301 | 253,934 | Actual non-arrests correctly predicted as No arrest |
@@ -1144,14 +1125,11 @@ The test-set confusion matrices contain the following counts:
 
 The two LASSO specifications show almost identical discrimination on the held-out test set:
 
-$$
-AUC_{\min}=0.7351,\qquad AUC_{1se}=0.7340.
-$$
+$$AUC_{\min}=0.7351,\qquad AUC_{1se}=0.7340$$
 
-The small difference $\Delta AUC=0.0011$ confirms that the stronger regularisation of $\lambda_{1se}$produces essentially no loss in out-of-sample discrimination. Test AUC is moderately lower than the cross-validated values ($0.7524$ and $0.7515$), suggesting a small decline in generalisation performance.
+The small difference $\Delta AUC=0.0011$ confirms that the **stronger regularisation** of $\lambda_{1se}$produces almost no loss in out-of-sample discrimination. Test AUC is moderately lower than the cross-validated values ($0.7524$ and $0.7515$), suggesting a small decline in generalisation performance.
 
-At the training-selected thresholds, which are then applied unchanged to the
-test set, the models exhibit a small sensitivity-specificity trade-off:
+At the training-selected thresholds, which are then applied unchanged to the test set, the models exhibit a small sensitivity-specificity trade-off:
 
 - The $\lambda_{\min}$ model achieves **75.0% sensitivity and 61.4% specificity**;
 - The $\lambda_{1se}$ model increases sensitivity slightly to **75.4%**, while specificity falls slightly to **61.1%**.
@@ -1192,19 +1170,19 @@ eval_quad_plot(y_test, prob_lasso_1se, thr_lasso_1se, "LASSO (λ.1se)")
 
 #### 5.4.2.1) Overall performance
 
-| Metric                | $\lambda_{\min}$ | $\lambda_{1se}$ | Interpretation                                        |
-| --------------------- | -----------------: | ----------------: | ----------------------------------------------------- |
-| **AUC**               |         **0.7351** |            0.7340 | Virtually identical, moderate discrimination          |
-| **PR-AUC**            |         **0.0773** |            0.0763 | Similar rare-class ranking performance                |
-| **Log-Loss**          |         **0.1373** |            0.1374 | Essentially identical probability performance         |
-| **Brier**             |             0.0322 |            0.0322 | Identical probability accuracy                        |
-| **Threshold**         |             0.0295 |            0.0296 | Low cutoffs, selected on the training set via Youden's criterion and then applied unchanged to the test set |
-| **Sensitivity**       |              0.750 |         **0.754** | $\lambda_{1se}$ detects slightly more actual arrests |
-| **Specificity**       |          **0.614** |             0.611 | $\lambda_{\min}$ rejects slightly more non-arrests correctly |
-| **Precision**         |          **0.064** |             0.064 | Low for both models                                   |
-| **F1**                |          **0.119** |             0.118 | Similar; limited by low precision                     |
-| **MCC**               |             0.135 |             0.135 | Weak positive association for both models             |
-| **Balanced Accuracy** |          **0.682** |             0.682 | Essentially identical                                 |
+| Metric | $\lambda_{\min}$ | $\lambda_{1se}$ | Interpretation |
+|---------------|--------------:|--------------:|---------------------------|
+| **AUC** | **0.7351** | 0.7340 | Virtually identical, moderate discrimination |
+| **PR-AUC** | **0.0773** | 0.0763 | Similar rare-class ranking performance |
+| **Log-Loss** | **0.1373** | 0.1374 | Essentially identical probability performance |
+| **Brier** | 0.0322 | 0.0322 | Identical probability accuracy |
+| **Threshold** | 0.0295 | 0.0296 | Low cutoffs, selected on the training set via Youden's criterion and then applied unchanged to the test set |
+| **Sensitivity** | 0.750 | **0.754** | $\lambda_{1se}$ detects slightly more actual arrests |
+| **Specificity** | **0.614** | 0.611 | $\lambda_{\min}$ rejects slightly more non-arrests correctly |
+| **Precision** | **0.064** | 0.064 | Low for both models |
+| **F1** | **0.119** | 0.118 | Similar; limited by low precision |
+| **MCC** | 0.135 | 0.135 | Weak positive association for both models |
+| **Balanced Accuracy** | **0.682** | 0.682 | Essentially identical |
 
 The main conclusion is that **the two LASSO models have almost indistinguishable predictive performance on the held-out test set**. The principal difference is small: $\lambda_{1se}$ identifies slightly more arrests, while $\lambda_{\min}$ correctly rejects slightly more non-arrests.
 
@@ -1214,32 +1192,18 @@ Since the 1-SE model achieves essentially the same discrimination with **50 rath
 
 The test-set AUCs are:
 
-$$
-\text{AUC}_{\min}=0.7351
-\qquad\text{vs}\qquad
-\text{AUC}_{1se}=0.7340.
-$$
+$$\text{AUC}_{\min}=0.7351 \,\, \text{vs} \,\, \text{AUC}_{1se}=0.7340 \rightarrow |\Delta_{AUC}| = 0.0011$$
 
 An AUC of approximately $0.735$ means that, if we randomly select one observation where an arrest occurred and one where no arrest occurred, the model assigns a higher predicted probability to the arrest observation approximately **73.5% of the time**.
 
 > **Note:** AUC measures **discrimination/ranking ability** across all possible classification thresholds. It does not mean that 73.5% of individual predictions are correct.
 
-The difference between the two models is only
-
-$$
-0.7351-0.7340=0.0011,
-$$
-
-which is negligible in practical terms.
-
 It is also useful to compare these results with cross-validation:
 
-$$
-\begin{aligned}
+$$\begin{aligned}
 \lambda_{\min}:&\quad 0.7524_{\text{CV}}\rightarrow0.7351_{\text{test}},\\
-\lambda_{1se}:&\quad 0.7515_{\text{CV}}\rightarrow0.7340_{\text{test}}.
-\end{aligned}
-$$
+\lambda_{1se}:&\quad 0.7515_{\text{CV}}\rightarrow0.7340_{\text{test}}
+\end{aligned}$$
 
 There is therefore a modest reduction in discrimination on unseen data, but the test-set AUC remains reasonably close to the CV estimate. More importantly, **the relative performance of the two regularisation choices remains unchanged**.
 
@@ -1249,43 +1213,24 @@ Overall, the model exhibits **moderate out-of-sample discrimination**.
 
 PR-AUC is particularly important because the test set is strongly imbalanced:
 
-$$
-P(Y=1)\approx0.034.
-$$
+$$P(Y=1)\approx0.034$$
 
 The two models achieve:
 
-$$
-\text{PR-AUC}_{\min}=0.0773
+$$\text{PR-AUC}_{\min}=0.0773
 \qquad\text{vs}\qquad
-\text{PR-AUC}_{1se}=0.0763.
-$$
+\text{PR-AUC}_{1se}=0.0763$$
 
-Again, there is virtually no difference between the models.
+Again, there is almost no difference.
 
-However, the absolute value needs to be interpreted relative to the **no-skill baseline**. For a random ranking, average precision is approximately equal to the positive-class prevalence:
+However, the absolute value needs to be interpreted relative to the **no-skill baseline**. 
 
-$$
-\text{PR-AUC}_{\text{baseline}}\approx0.034.
-$$
+For a random ranking, average precision is approximately equal to the positive-class prevalence: $\text{PR-AUC}_{\text{baseline}}\approx0.034$$. Therefore,
+$\frac{0.0773}{0.034}\approx2.27$ and we can say that $\lambda_{\min}$ model achieves a PR-AUC approximately **2.3 times the no-skill baseline** (the conclusion for $\lambda_{1se}$ is basically the same).
 
-Therefore,
+This means that the model extracts meaningful information about the rare positive class, but at the same time $\text{PR-AUC}\approx0.077$ remains low in absolute terms. 
 
-$$
-\frac{0.0773}{0.034}\approx2.27.
-$$
-
-The $\lambda_{\min}$ model achieves a PR-AUC approximately **2.3 times the no-skill baseline**; the conclusion for $\lambda_{1se}$ is essentially the same. The difference between the two models is marginal.
-
-This means that the model extracts meaningful information about the rare positive class.
-
-At the same time,
-
-$$
-\boxed{\text{PR-AUC}\approx0.077}
-$$
-
-remains low in absolute terms. This is an important complement to the more favourable ROC-AUC of approximately $0.735$: **the model ranks arrests reasonably well, but distinguishing a very rare positive class with high precision remains difficult.**
+So what we can say is that **the model ranks arrests reasonably well, but distinguishing a very rare positive class with high precision remains difficult.**
 
 #### 5.4.2.4) Log-Loss
 
@@ -1293,19 +1238,9 @@ remains low in absolute terms. This is an important complement to the more favou
 
 The two models obtain:
 
-$$
-\text{LogLoss}_{\min}=0.1373
-\qquad\text{vs}\qquad
-\text{LogLoss}_{1se}=0.1374.
-$$
+$$\text{LogLoss}_{\min}=0.1373 \,\, \text{vs} \,\, \text{LogLoss}_{1se}=0.1374 \rightarrow |\Delta_{\text{LogLoss}}| = 0.0001$$
 
-The difference is only
-
-$$
-0.0001.
-$$
-
-Therefore, there is effectively **no meaningful difference in probabilistic performance** between the two LASSO specifications according to log-loss.
+So, **no meaningful difference in probabilistic performance** between the two LASSO specifications according to this metric.
 
 Unlike the confusion matrix, log-loss does not depend on the classification threshold. This further supports the conclusion that the underlying probability predictions produced by the two models are extremely similar.
 
@@ -1313,38 +1248,17 @@ Unlike the confusion matrix, log-loss does not depend on the classification thre
 
 The Brier score measures squared error between predicted probabilities and observed outcomes:
 
-$$
-BS=\frac{1}{n}\sum_{i=1}^{n}(p_i-y_i)^2,
-$$
+$$BS=\frac{1}{n}\sum_{i=1}^{n}(p_i-y_i)^2$$
 
 where lower values are preferable.
 
 Both models obtain:
 
-$$
-\boxed{BS=0.0322}.
-$$
+$$\text{Brier}=0.0322$$
 
-Thus, according to the Brier score, the two models have **identical probability-prediction accuracy**.
+Thus, according to the Brier score, the two models have **identical probability-prediction accuracy**. But, because the outcome is rare, the raw value should again be compared with a simple baseline. 
 
-Because the outcome is rare, the raw value should again be compared with a simple baseline. A model predicting the test-set prevalence,
-
-$$
-p\approx0.034,
-$$
-
-for every observation would have approximately:
-
-$$
-BS_{\text{null}}
-=
-p(1-p)
-=
-0.034(0.966)
-\approx0.0330.
-$$
-
-The LASSO score of $0.0322$ is therefore better, although the improvement is relatively modest.
+A model predicting the test-set prevalence, $p\approx0.034$, for every observation would have approximately: $\text{Brier}_{\text{baseline}} = p(1-p) = 0.034(0.966) \approx0.0330$. The LASSO score of $0.0322$ is better, although the improvement is relatively modest.
 
 The calibration plots provide additional information. For both models, the observed positive rates lie generally close to the dashed perfect-calibration line over most probability bins, although some deviations are visible and neither model should be considered perfectly calibrated.
 
@@ -1352,9 +1266,7 @@ The calibration plots provide additional information. For both models, the obser
 
 This highlights an important distinction:
 
-$$
-\boxed{\text{Calibration} \neq \text{Discrimination}}
-$$
+$$\boxed{\text{Calibration} \neq \text{Discrimination}}$$
 
 A model can provide reasonably calibrated probabilities while still having only moderate ability to separate arrests from non-arrests. That appears to be the case here.
 
@@ -1364,50 +1276,23 @@ At the training-selected thresholds, which are then applied unchanged to the tes
 
 $$
 \begin{aligned}
-Sensitivity_{\min}&=0.750,
-&
-Specificity_{\min}&=0.614,\\
-Sensitivity_{1se}&=0.754,
-&
-Specificity_{1se}&=0.611.
+Sensitivity_{\min}&=0.750 & Specificity_{\min}&=0.614,\\
+Sensitivity_{1se}&=0.754 & Specificity_{1se}&=0.611 \\
+|\Delta_{Sensitivity}|&= 0.004 & |\Delta_{Specificity}|&= 0.003
 \end{aligned}
 $$
 
-Thus, $\lambda_{1se}$ correctly detects a larger proportion of actual arrests:
+Thus, 
 
-$$
-75.0\%\rightarrow75.4\%.
-$$
+- $\lambda_{1se}$ 
+  - It orrectly detects a larger proportion of actual arrests $75.0\% \rightarrow 75.4\%$. Alternatively, we can say that its miss rate decreases from $25.0\% \rightarrow 24.6\%$
+  - However, this comes at the cost of specificity $61.4\% \rightarrow 61.1\%$. 
+  
+Let us look at the corresponding false-alarm rates 
 
-Equivalently, its miss rate decreases from
+$$38.6\% \quad \text{and} \quad38.9\%$$
 
-$$
-25.0\%\rightarrow24.6\%.
-$$
-
-However, this improvement comes at the expense of specificity:
-
-$$
-61.4\%\rightarrow61.1\%.
-$$
-
-The corresponding false-alarm rates are:
-
-$$
-38.6\%\quad\text{and}\quad38.9\%.
-$$
-
-Therefore,
-
-$$
-\boxed{
-\lambda_{1se}
-\rightarrow
-\text{higher sensitivity but higher false-alarm rate}
-}
-$$
-
-whereas $\lambda_{\min}$ is somewhat more conservative.
+Therefore, $\lambda_{1se}$ achieves higher sensitivity but higher false-alarm rate, while $\lambda_{\min}$ is more conservative.
 
 This is exactly the trade-off visible in the confusion matrices.
 
@@ -1415,182 +1300,84 @@ This is exactly the trade-off visible in the confusion matrices.
 
 Precision is:
 
-$$
-Precision_{\min}=0.064
+$$Precision_{\min}=0.064
 \qquad\text{vs}\qquad
-Precision_{1se}=0.064.
-$$
+Precision_{1se}=0.064$$
 
-Thus, only about **6–7% of observations classified as arrests are actual arrests**.
+This means that, only about **6–7% of observations classified as arrests are actual arrests**.
 
 This is the main limitation of the thresholded classifier.
 
-However, precision must be interpreted relative to the test-set prevalence:
+However, precision must be interpreted relative to the test-set prevalence $P(Y=1)=3.42\%$. For both models, we have that observations classified as arrests contain roughly $\frac{6.4\%}{3.42\%} \approx 1.9 \times$ **times the arrest prevalence of the overall test population**.
 
-$$
-P(Y=1)=3.42\%.
-$$
-
-For $\lambda_{\min}$,
-
-$$
-\frac{6.6\%}{3.42\%}\approx1.93.
-$$
-
-Therefore, the observations classified as arrests contain roughly **1.9 times the arrest prevalence of the overall test population**.
-
-The classifier is consequently enriching the positive class, but because arrests are extremely rare, the absolute precision remains low.
+So, even though the **classifiers show improvement, the absolute precision remains low** due to the rarity of `arrested = 1`.
 
 The corresponding F1 scores are:
 
-$$
-F1_{\min}=0.119
-\qquad\text{vs}\qquad
-F1_{1se}=0.118.
-$$
+$$F1_{\min}=0.119 \qquad \text{vs} \qquad F1_{1se}=0.118$$
 
-Since
-
-$$
-F1=
-2\frac{Precision\cdot Recall}
-{Precision+Recall},
-$$
-
-the relatively low F1 is largely driven by the imbalance between **high recall (~74–76%) and low precision (~6%)**.
-
-Again, the difference between the two models is negligible.
+Since $F1= 2 \frac{Precision \cdot Recall} {Precision+Recall}$, the **low F1 is largely driven by the imbalance between high recall and low precision**.
 
 #### 5.4.2.8) Thresholds
 
-Using Youden's criterion, the selected thresholds are:
+Using Youden's criterion, the (train) selected thresholds are:
 
-$$
-t_{\min}=0.0295
-\qquad\text{vs}\qquad
-t_{1se}=0.0296.
-$$
+$$t_{\min}=0.0295 \qquad \text{vs} \qquad t_{1se}=0.0296$$
 
 Each threshold is selected once by maximising Youden's $J$ on the corresponding lambda's training-set ROC curve, then frozen and applied unchanged to the test set, so no test-set information is used in choosing the cutoff.
 
-These values are much lower than the conventional threshold of $0.5$, but this is unsurprising given that only approximately **3.4% of observations correspond to arrests**.
-
-Importantly, these are **Youden's $J$-selected thresholds**, where
-
-$$
-J=Sensitivity+Specificity-1.
-$$
-
-The criterion attempts to find a balance between sensitivity and specificity.
-
-For the two models:
-
-$$
-J_{\min}
-=
-=0.364,
-=
-0.367,
-$$
-
-and
-
-$$
-J_{1se}
-=
-0.754+0.611-1
-=
-0.365.
-$$
-
-These are essentially identical.
-
-> Therefore, the selected threshold should be described as **Youden-optimal**, rather than universally "optimal." A different threshold would be preferable if false positives and false negatives have different substantive costs.
-
-This point is particularly relevant to the project's excessive-enforcement framing. If false positives are considered especially undesirable, a **higher classification threshold** could be chosen to increase specificity and reduce the false-alarm rate, at the cost of missing more actual arrests.
+These values are much lower than the conventional threshold of $0.5$, but this is normal given that only approximately **3.4% of observations correspond to arrests**. The low cutoffs favor sensitivity and inevitably generate many false positives (see the Confusion Matrix for the trade-off).
 
 #### 5.4.2.9) Balanced Accuracy
 
 Balanced accuracy is:
 
-$$
-BA=\frac{Sensitivity+Specificity}{2}.
-$$
-
-The results are:
-
-$$
-BA_{\min}=0.682
-\qquad\text{vs}\qquad
-BA_{1se}=0.682.
-$$
-
-So both models achieve approximately **68% average class-specific accuracy**.
+$$BA=\frac{Sensitivity+Specificity}{2}$$
 
 This metric is more informative than ordinary accuracy under severe class imbalance because it gives equal weight to performance on arrests and non-arrests.
 
-Once again, there is effectively no difference between the two models.
+The results are:
 
-The important distinction is how that balanced accuracy is obtained:
+$$BA_{\min}=0.682 \qquad \text{vs} \qquad BA_{1se}=0.682$$
 
-$$
-\lambda_{\min}:
-\quad
-Sens=0.750,\quad Spec=0.614
-$$
+So both models achieve approximately **68% average class-specific accuracy**. 
 
-versus
+Once again, there is no difference between the two models, but the important distinction is how that balanced accuracy is obtained: 
 
-$$
-\lambda_{1se}:
-\quad
-Sens=0.754,\quad Spec=0.611.
-$$
-
-Thus, the 1-SE solution shifts performance slightly toward detecting arrests, while $\lambda_{\min}$ performs somewhat better at correctly identifying non-arrests.
+- The 1-SE is more oriented toward detecting arrests, 
+- On the other hand, $\lambda_{\min}$ is better at identifying non-arrests.
 
 #### 5.4.2.10) MCC
 
+The **Matthews Correlation Coefficient (MCC)** is particularly useful for imbalanced classification because it incorporates all four components of the confusion matrix:
+
+$$MCC = \frac{TP\cdot TN-FP\cdot FN}{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}} \in [-1, 1]$$ Where,
+
+- $1$ = perfect prediction
+- $0$ = no better than random association
+- $-1$ = completely incorrect prediction
+
 The MCC values are approximately $0.135$ for both models.
 
-The confusion matrices contain non-zero values for all four cells, meaning MCC should be mathematically defined:
+Thus, there is a **positive but weak association between predictions and actual outcomes**. Simply put:
 
-$$
-MCC =
-\frac{TP\cdot TN-FP\cdot FN}
-{\sqrt{(TP+FP)(TP+FN)(TN+FP)(TN+FN)}}.
-$$
-
-The non-zero confusion-matrix cells make MCC well-defined, and the similar values indicate a weak positive association between predictions and the observed classes.
+- The model is doing meaningfully better than random classification and better than 2-Wheels-based models;
+- But that its classification performance is limited.
 
 #### 5.4.2.11) Final Remarks
 
 Putting the diagnostics together:
 
-* **Discrimination — $AUC\approx0.735$:** The models demonstrate **moderate ability to distinguish arrests from non-arrests**. Test discrimination is somewhat below the CV estimate of approximately $0.752$, but remains reasonably consistent out of sample.
-* **Rare-class ranking — $PR\text{-}AUC\approx0.077$:** Performance is substantially above the no-skill baseline of approximately $0.034$, indicating meaningful signal for the rare positive class. Nevertheless, absolute precision-recall performance remains limited.
-* **Probability prediction — $Brier=0.0322,\ LogLoss\approx0.137$:** The two models are essentially identical. Calibration plots additionally suggest that predicted probabilities are reasonably aligned with observed arrest frequencies.
-* **Positive-class detection — $Sensitivity\approx0.74-0.76$:** The models identify a substantial majority of actual arrests.
-* **False alarms — $FPR=0.386$ and $0.389$:** This sensitivity comes at the cost of incorrectly flagging a substantial proportion of actual non-arrests.
-* **Precision — $\approx0.064$ for both models:** Only about 6.4% of predicted arrests correspond to actual arrests, reflecting the severe class imbalance and the sensitivity-oriented operating point.
-* **Class balance — $BA\approx0.682$:** Both models perform meaningfully above chance when sensitivity and specificity receive equal weight, with virtually identical balanced accuracy.
+- **Discrimination —** $AUC\approx0.735$: The models demonstrate **moderate ability to distinguish arrests from non-arrests**. Test discrimination is somewhat below the CV estimate of approximately $0.752$, but remains reasonably consistent out of sample.
+- **Rare-class ranking —** $PR\text{-}AUC\approx0.077$: Performance is substantially above the no-skill baseline of approximately $0.034$, indicating meaningful signal for the rare positive class. Nevertheless, absolute precision-recall performance remains limited.
+- **Probability prediction —** $Brier=0.0322,\ LogLoss\approx0.137$: The two models are essentially identical. Calibration plots additionally suggest that predicted probabilities are reasonably aligned with observed arrest frequencies.
+- **Positive-class detection —** $Sensitivity\approx0.74-0.76$: The models identify a substantial majority of actual arrests.
+- **False alarms —** $FPR=0.386$ and $0.389$: This sensitivity comes at the cost of incorrectly flagging a substantial proportion of actual non-arrests.
+- **Precision —** $\approx0.064$ for both models: Only about 6.4% of predicted arrests correspond to actual arrests, reflecting the severe class imbalance and the sensitivity-oriented operating point.
+- **Class balance —** $BA\approx0.682$: Both models perform meaningfully above chance when sensitivity and specificity receive equal weight, with virtually identical balanced accuracy.
 
-### Final conclusions
+Now for the final conclusions:
 
-The LASSO models demonstrate **moderate out-of-sample discrimination**, with test AUC around $0.735$, and contain meaningful predictive information about the rare arrest outcome, as demonstrated by a PR-AUC more than twice the no-skill baseline.
-
-However, the severe class imbalance remains a major limitation for hard classification. At the Youden-selected thresholds, the models recover approximately **75.0–75.4% of actual arrests**, but this comes at the cost of a **38.6–38.9% false-alarm rate** and precision of only approximately **6.4%**. The model therefore has substantially greater utility as a **risk-ranking/probability model than as a high-precision binary classifier** at the selected operating point.
-
-Most importantly, the two regularisation choices are almost indistinguishable across AUC, PR-AUC, log-loss, Brier score, F1 and balanced accuracy. The principal difference is that $\lambda_{1se}$ trades slightly higher sensitivity for lower specificity.
-
-Since
-
-$$
-63\text{ coefficients at }\lambda_{\min}
-\quad\rightarrow\quad
-50\text{ coefficients at }\lambda_{1se}
-$$
-
-with almost no deterioration in predictive performance, the results provide strong support for the **more parsimonious $\lambda_{1se}$ solution** when model simplicity is the primary criterion.
-
-However, under the project's **excessive-enforcement framing**, the choice is not purely statistical. Because $\lambda_{\min}$ has a lower false-alarm rate, it may be preferable if false-positive classifications are considered substantively more problematic than missed arrests. This motivates the subsequent group-level FP/FN analysis: aggregate performance alone cannot determine whether these errors are distributed uniformly across demographic, geographic, and temporal groups.
+- The LASSO models demonstrate **moderate out-of-sample discrimination**, with test AUC around $0.735$, and contain meaningful predictive information about the rare arrest outcome, as demonstrated by a PR-AUC more than twice the no-skill baseline.
+- However, the severe class imbalance remains a major limitation for hard classification. At the selected thresholds, the models recover approximately **75.0–75.4% of actual arrests**, but this comes at the cost of a **38.6–38.9% false-alarm rate** and precision of only approximately **6.4%**. Thus, the model has is better at being **risk-probability model than as a high-precision binary classifier** at the selected operating point.
+- Furthermore, the two models are almost indistinguishable across AUC, PR-AUC, log-loss, Brier score, F1 and balanced accuracy. Given that we have 13 coefficients set to 0 with $\lambda_{1se}$ and almost no deterioration in predictive power, the results seem to indicate that we might be better off by choosing the **more parsimonious** $\lambda_{1se}$.

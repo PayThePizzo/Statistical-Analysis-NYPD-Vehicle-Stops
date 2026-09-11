@@ -673,7 +673,7 @@ f_final <- arrested ~ year + month + weekday + hour + boro + sex + ethnicity + a
 
 ## 4.2) Model Fit
 
-```{r fit-nb}
+```{r fit-nb, cache=TRUE}
 mod_nb <- e1071::naiveBayes(f_final, data = train)
 ```
 

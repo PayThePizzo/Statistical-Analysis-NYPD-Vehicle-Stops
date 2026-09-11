@@ -305,7 +305,6 @@ compute_metrics <- function(actual, prob, thr, model_name = "Model") {
 }
 ```
 
-
 ### 0.2.3) Model Evaluation Plot Functions
 
 ```{r fn-plot-roc-single}
@@ -699,7 +698,7 @@ f_final <- arrested ~ year + month + weekday + hour + boro + sex + ethnicity + a
 
 ## 4.2) Model Fit
 
-```{r fit-nb}
+```{r fit-nb, cache=TRUE}
 mod_nb <- e1071::naiveBayes(f_final, data = train)
 ```
 
@@ -1039,12 +1038,10 @@ This threshold is selected once by maximising Youden's $J$ on the training-set R
 
 At this threshold, the model obtains:
 
-$$
-	ext{Sensitivity}=0.762, \,
-	ext{Specificity}=0.598, \,
-	ext{Precision}=0.063, \,
-F1=0.116
-$$
+$$    ext{Sensitivity}=0.762, \,
+    ext{Specificity}=0.598, \,
+    ext{Precision}=0.063, \,
+F1=0.116$$
 
 The model therefore identifies approximately **76.2% of actual arrests**, while correctly identifying approximately **59.8% of non-arrests**.
 

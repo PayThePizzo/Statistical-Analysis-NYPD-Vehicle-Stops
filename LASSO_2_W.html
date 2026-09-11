@@ -2802,11 +2802,11 @@ outcome.</p>
 \]</span></p>
 <p>where</p>
 <p><span class="math display">\[
-\eta=\beta_0+\beta_1X_1+\cdots+\beta_pX_p. \]</span></p>
+\eta=\beta_0+\beta_1X_1+\cdots+\beta_pX_p \]</span></p>
 <p>Instead of simply maximizing the logistic likelihood, LASSO minimizes
 the penalized negative log-likelihood:</p>
 <p><span class="math display">\[ \hat{\beta} = \arg\min_{\beta} \left\{
--\ell(\beta) + \lambda\sum_{j=1}^{p}|\beta_j| \right\}. \]</span></p>
+-\ell(\beta) + \lambda\sum_{j=1}^{p}|\beta_j| \right\} \]</span></p>
 <p>Here, <span class="math inline">\(\lambda \geq 0\)</span> controls
 the strength of regularization.</p>
 <blockquote>
@@ -2936,8 +2936,8 @@ non-zero coefficients,</li>
 <p>That’s a reduction of only <span class="math inline">\(0.7394 -
 0.7373 = 0.0021\)</span> in AUC points at <span class="math inline">\(\lambda_{\text{min}}\)</span>.</p>
 <p>Meanwhile, the number of coefficients falls from 62 to 53:</p>
-<p><span class="math display">\[ \frac{62-53}{62}\approx14.5\%.
-\]</span></p>
+<p><span class="math display">\[
+\frac{62-53}{62}\approx14.5\%\]</span></p>
 <p>So we have approximately a <span class="math inline">\(14.5\%\)</span> reduction in model complexity for
 a small change in cross-validated predictive performance (AUC).</p>
 <p>The SE makes the 1-SE choice even more meaningful. The standard
@@ -3739,9 +3739,9 @@ retains 62 non-zero coefficients. The coefficient is on the log-odds
 scale:</p>
 <p><span class="math display">\[
 \log\left(\frac{P(\text{arrested}=1)}{1-P(\text{arrested}=1)}\right) =
-\beta_0+\sum_j\beta_jX_j. \]</span></p>
+\beta_0+\sum_j\beta_jX_j \]</span></p>
 <p>The corresponding odds ratio is</p>
-<p><span class="math display">\[ OR_j=e^{\beta_j}. \]</span></p>
+<p><span class="math display">\[ OR_j=e^{\beta_j} \]</span></p>
 <p>Therefore:</p>
 <ul>
 <li><span class="math inline">\(\beta_j &gt; 0\)</span>, <span class="math inline">\(OR &gt; 1\)</span>: higher estimated odds of
@@ -5298,9 +5298,8 @@ remains limited, with low precision and MCC values of approximately
 in probabilistic prediction.</li>
 <li>Finally, the models exhibit almost identical test-set performance
 across these metrics. Therefore, the additional complexity of the <span class="math inline">\(\lambda_{\text{min}}\)</span> model provides
-little evidence of improved predictive performance, favouring the more
-parsimonious <span class="math inline">\(\lambda_{\text{1se}}\)</span>
-model.</li>
+little evidence of improved predictive performance, which favors the
+more parsimonious <span class="math inline">\(\lambda_{\text{1se}}\)</span> model.</li>
 </ul>
 </div>
 </div>

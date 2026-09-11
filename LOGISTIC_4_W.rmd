@@ -1043,16 +1043,9 @@ cat(sprintf(
 ))
 ```
 
-Let us start from the derived metrics:
+Overall, the confusion matrix confirms that the model detects most arrests but produces a large number of false alarms. Of the 14,721 actual arrests, 11,018 are correctly identified and 3,703 are missed. Among non-arrests, 256,440 are correctly rejected while 159,424 are incorrectly predicted as arrests.
 
-The test-set confusion matrix contains 11,018 true positives, 3,703 false
-negatives, 256,440 true negatives, and 159,424 false positives (430,585
-observations in total):
-
-| Actual / Predicted | No arrest | Arrest |
-|--------------------|----------:|-------:|
-| Arrest             | 3,703     | 11,018 |
-| No arrest          | 256,440   | 159,424|
+Let us see the derived metrics:
 
 | Metric | Value | Interpretation |
 |------------------------|-----------------------:|------------------------|
@@ -1062,11 +1055,6 @@ observations in total):
 | Precision | 0.065 | Only about 6.5% of predicted arrests correspond to actual arrests |
 | F1 | 0.119 | Low harmonic mean of precision and recall, mainly limited by low precision |
 | Balanced Accuracy | 0.683 | Moderate performance when arrests and non-arrests receive equal weight |
-
-Overall, the confusion matrix confirms that the model detects most arrests but
-produces a large number of false alarms. Of the 14,721 actual arrests, 11,018
-are correctly identified and 3,703 are missed. Among non-arrests, 256,440 are
-correctly rejected while 159,424 are incorrectly predicted as arrests.
 
 ### 3.4.3) Performance Analysis
 
@@ -1323,7 +1311,7 @@ ggplot(
   theme(legend.position = "bottom", panel.grid.minor = element_blank())
 ```
 
-In this model, all adjusted GVIF values are extremely close to 1, ranging from **1.002** for `hour` to **1.023** for `ethnicity`\*\*. Even the largest values, for `ethnicity` ($1.023$) and `boro` ($1.014$), are far below levels that would normally raise concern.
+In this model, all adjusted GVIF values are extremely close to 1, ranging from **1.002** for `hour` to **1.024** for `ethnicity`. Even the largest values, for `ethnicity` ($1.024$) and `sex` ($1.017$), are far below levels that would normally raise concern.
 
 Therefore, there is **no evidence of problematic multicollinearity among the predictors**. This is particularly relevant for predictors such as `hour`, `month`, and `boro`, which contain many factor levels but still show adjusted GVIF values essentially equal to 1.
 

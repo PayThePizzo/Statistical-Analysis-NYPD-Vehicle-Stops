@@ -2880,14 +2880,22 @@ optimally represents.</p>
 ## 
 ## R-sq.(adj) =  0.0268   Deviance explained = 9.31%
 ## -REML = 2.1492e+05  Scale est. = 1         n = 1619828</code></pre>
-<p>The model explains approximately <strong>9.31% of the null
-deviance</strong> (<span class="math inline">\(R^{2}_{adj} =
-0.0268\)</span>) in post-stop arrests in New York during the period
-2023–2025. These values indicate that the <strong>included variables
-explain only a limited proportion of the overall arrest
-outcome</strong>. This is not unexpected for a rare binary outcome such
-as <code>arrested</code>, where many determinants of an arrest may not
-be represented by the available predictors.</p>
+<p>The GAM achieves <span class="math inline">\(R^2_{adj} =
+0.0268\)</span> and explains approximately <span class="math inline">\(9.31\%\)</span> of the deviance in post-stop
+arrest outcomes in New York during 2023–2025.</p>
+<p>In other words:</p>
+<ul>
+<li>The adjusted <span class="math inline">\(R^2\)</span> indicates that
+the <strong>model has relatively low explanatory power</strong>: only a
+small proportion of the variability in the observed arrest outcome is
+accounted for by the included predictors.</li>
+<li>However, in this context, the <strong>deviance explained is the more
+informative measure of model fit</strong>: the model reduces the
+unexplained deviance by approximately <span class="math inline">\(9.31\%\)</span> relative to an intercept-only
+model.</li>
+</ul>
+<p>The model summary also indicates that there are nonlinear effects for
+<code>hour_num</code> and <code>age_num</code> (we will see later).</p>
 <div id="coefficients" class="section level3">
 <h3>6.3.1) Coefficients</h3>
 <div id="general-interpretation" class="section level4">

@@ -678,11 +678,11 @@ $$ P(Y=1\mid X)=\frac{1}{1+\exp(-\eta)}, $$
 
 where
 
-$$ \eta=\beta_0+\beta_1X_1+\cdots+\beta_pX_p. $$
+$$ \eta=\beta_0+\beta_1X_1+\cdots+\beta_pX_p $$
 
 Instead of simply maximizing the logistic likelihood, LASSO minimizes the penalized negative log-likelihood:
 
-$$ \hat{\beta} = \arg\min_{\beta} \left\{ -\ell(\beta) + \lambda\sum_{j=1}^{p}|\beta_j| \right\}. $$
+$$ \hat{\beta} = \arg\min_{\beta} \left\{ -\ell(\beta) + \lambda\sum_{j=1}^{p}|\beta_j| \right\} $$
 
 Here, $\lambda \geq 0$ controls the strength of regularization.
 
@@ -798,7 +798,7 @@ That's a reduction of only $0.7394 - 0.7373 = 0.0021$ in AUC points at $\lambda_
 
 Meanwhile, the number of coefficients falls from 62 to 53:
 
-$$ \frac{62-53}{62}\approx14.5\%. $$
+$$ \frac{62-53}{62}\approx14.5\%$$
 
 So we have approximately a $14.5\%$ reduction in model complexity for a small change in cross-validated predictive performance (AUC).
 
@@ -887,11 +887,11 @@ coef_min %>%
 
 At $\lambda_{\text{min}}$, LASSO retains 62 non-zero coefficients. The coefficient is on the log-odds scale:
 
-$$ \log\left(\frac{P(\text{arrested}=1)}{1-P(\text{arrested}=1)}\right) = \beta_0+\sum_j\beta_jX_j. $$
+$$ \log\left(\frac{P(\text{arrested}=1)}{1-P(\text{arrested}=1)}\right) = \beta_0+\sum_j\beta_jX_j $$
 
 The corresponding odds ratio is
 
-$$ OR_j=e^{\beta_j}. $$
+$$ OR_j=e^{\beta_j} $$
 
 Therefore:
 
@@ -1366,4 +1366,4 @@ Now for the final conclusions:
 - The LASSO models demonstrate **modest discrimination** on the held-out test set (AUC $0.6869$ and $0.6866$) and improve substantially over the positive-class prevalence baseline in terms of PR-AUC.
 - However, their threshold-dependent classification performance remains limited, with low precision and MCC values of approximately $0.130$ and $0.129$.
 - The Brier score and log-loss also indicate only modest improvement in probabilistic prediction.
-- Finally, the models exhibit almost identical test-set performance across these metrics. Therefore, the additional complexity of the $\lambda_{\text{min}}$ model provides little evidence of improved predictive performance, favouring the more parsimonious $\lambda_{\text{1se}}$ model.
+- Finally, the models exhibit almost identical test-set performance across these metrics. Therefore, the additional complexity of the $\lambda_{\text{min}}$ model provides little evidence of improved predictive performance, which favors the more parsimonious $\lambda_{\text{1se}}$ model.

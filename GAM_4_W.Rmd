@@ -687,7 +687,7 @@ All other predictors (`year`, `month`, `weekday`, `sex`, `ethnicity`, `boro`) re
 
 We fit with `mgcv::gam` using `family = binomial` and REML smoothness selection.
 
-```{r fit-gam}
+```{r fit-gam, cache=TRUE}
 mod_gam <- mgcv::gam(f_gam, family = binomial, data = train, method = "REML")
 ```
 
@@ -697,7 +697,14 @@ mod_gam <- mgcv::gam(f_gam, family = binomial, data = train, method = "REML")
 summary(mod_gam)
 ```
 
-The model explains approximately **9.31% of the null deviance** ($R^{2}_{adj} = 0.0268$) in post-stop arrests in New York during the period 2023–2025. These values indicate that the **included variables explain only a limited proportion of the overall arrest outcome**. This is not unexpected for a rare binary outcome such as `arrested`, where many determinants of an arrest may not be represented by the available predictors.
+The GAM achieves $R^2_{adj} = 0.0268$ and explains approximately $9.31\%$ of the deviance in post-stop arrest outcomes in New York during 2023–2025.
+
+In other words:
+
+- The adjusted $R^2$ indicates that the **model has relatively low explanatory power**: only a small proportion of the variability in the observed arrest outcome is accounted for by the included predictors.
+- However, in this context, the **deviance explained is the more informative measure of model fit**: the model reduces the unexplained deviance by approximately $9.31\%$ relative to an intercept-only model.
+
+The model summary also indicates that there are nonlinear effects for `hour_num` and `age_num` (we will see later).
 
 ### 6.3.1) Coefficients
 
