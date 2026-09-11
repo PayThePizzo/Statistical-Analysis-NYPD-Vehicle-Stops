@@ -1,0 +1,1205 @@
+\chapter{Statistical Modelling and Results}
+
+\section{Modelling Strategy}
+
+The exploratory analysis revealed substantial variation in arrest outcomes
+across demographic, temporal, and geographical characteristics. However,
+these descriptive comparisons are unconditional: differences observed for one
+variable may partly reflect the different composition of the stops with respect
+to the remaining predictors.
+
+The modelling stage therefore moves from descriptive comparisons to the
+conditional probability
+
+$$
+P(\texttt{arrested}=1 \mid X,\text{ recorded vehicle stop}),
+$$
+
+where $X$ contains the observed demographic, temporal, and
+geographical/organizational characteristics associated with a stop.
+
+Two objectives are pursued simultaneously. The first is
+\textbf{interpretative}: we investigate which characteristics remain associated
+with arrest when the other observed predictors are considered simultaneously.
+The second is \textbf{predictive}: we evaluate how much information these
+characteristics contain for distinguishing stops that resulted in an arrest from
+those that did not.
+
+The same general modelling strategy is applied independently to the
+two-wheeled and four-wheeled vehicle datasets. Four complementary models are
+considered:
+
+\begin{itemize}
+\item Logistic Regression provides the main interpretable conditional model;
+\item LASSO tests whether the main signals survive coefficient shrinkage and
+a more parsimonious representation;
+\item Generalized Additive Models relax the rigid functional representation
+of age and hour while preserving an additive structure;
+\item Naive Bayes provides a substantially different, generative view of the
+classification problem.
+\end{itemize}
+
+The models should therefore not be interpreted as four isolated attempts at
+classification. Instead, each model addresses a different aspect of the same
+research problem.
+
+% =============================================================================
+% LOGISTIC REGRESSION
+% =============================================================================
+
+\section{Logistic Regression}
+
+\subsection{Why Logistic Regression?}
+
+Logistic Regression provides the natural starting point for the modelling
+analysis because the response \texttt{arrested} is binary and the model directly
+estimates the conditional probability of an arrest.
+
+For a vector of predictors $X$,
+
+$$
+\log\left(
+\frac{P(\texttt{arrested}=1\mid X)}
+     {1-P(\texttt{arrested}=1\mid X)}
+\right)
+=
+\beta_0+\beta_1X_1+\cdots+\beta_pX_p.
+$$
+
+Its main advantage in this project is interpretability. Each coefficient
+describes how the conditional log-odds of arrest differ when one predictor
+changes while the remaining observed characteristics are held fixed. For
+categorical variables, exponentiating a coefficient produces an odds ratio
+relative to the corresponding reference category.
+
+This makes Logistic Regression particularly useful for moving beyond the raw
+differences identified during the EDA. The relevant question is no longer only
+whether two groups have different observed arrest rates, but whether that
+difference remains visible after adjustment for the other available
+characteristics.
+
+\subsection{Conditional Associations}
+
+The fitted models confirm that several of the strongest patterns observed
+during the EDA remain visible after simultaneous adjustment.
+
+Time of day is one of the clearest examples. In both datasets, the conditional
+odds of arrest decline sharply during the morning hours relative to midnight.
+For two-wheeled vehicles, the minimum occurs at approximately 07:00, with an
+odds ratio of only $0.035$. For four-wheeled vehicles, the corresponding
+odds ratio is $0.160$. In both cases, the effects progressively return toward
+the midnight reference during the afternoon and evening.
+
+Geography also remains relevant. Using the Bronx as reference, all estimated
+borough coefficients are negative in both datasets. For two-wheeled vehicles,
+Manhattan North and Manhattan South have odds ratios of $0.332$ and
+$0.344$, respectively. In the four-wheeled dataset the corresponding
+geographical differences are smaller, although Manhattan South
+($OR=0.554$) and Queens North ($OR=0.558$) remain substantially below
+the Bronx reference.
+
+The demographic coefficients provide an especially important connection with
+the descriptive analysis. With Male as the reference sex category, Female has
+
+$$
+OR_{\text{Female}}=0.300
+$$
+
+for two-wheeled vehicles and
+
+$$
+OR_{\text{Female}}=0.408
+$$
+
+for four-wheeled vehicles. Thus, the lower arrest proportions observed for
+female motorists in the EDA remain visible after conditioning on the remaining
+included predictors.
+
+The contrast across reported ethnicity is even more notable. Using White as
+the reference category, the two-wheeled model estimates
+
+$$
+OR_{\text{Black}}=1.451,
+\qquad
+OR_{\text{Hispanic}}=1.778,
+$$
+
+whereas the four-wheeled model estimates
+
+$$
+OR_{\text{Black}}=3.425,
+\qquad
+OR_{\text{Hispanic}}=3.258.
+$$
+
+Therefore, positive conditional associations for Black and Hispanic categories
+remain in both datasets, but their estimated magnitude is substantially larger
+among four-wheeled vehicle stops.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/logistic_odds_ratios_2w.png}
+\small (a) Two-wheeled vehicles
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/logistic_odds_ratios_4w.png}
+\small (b) Four-wheeled vehicles
+\end{minipage}
+\caption{Estimated Logistic Regression odds ratios and 95\% confidence
+intervals. Each estimate is conditional on the remaining predictors in the
+corresponding model.}
+\label{fig:logistic-odds-ratios}
+\end{figure}
+\FloatBarrier
+
+Age provides one of the clearest examples of why the two vehicle populations
+should not be treated as interchangeable. Among two-wheeled vehicles, the
+Under-18 category has higher estimated odds than the 25--34 reference group
+($OR=1.725$), while several middle-aged categories also remain above one.
+Among four-wheeled vehicles, instead, 25--34 represents the highest-risk
+reference category and the odds progressively decrease at older ages, reaching
+
+$$
+OR_{65+}=0.201.
+$$
+
+The conditional structure of arrest outcomes therefore differs materially
+between the two vehicle contexts.
+
+\subsection{Predictive Performance}
+
+Despite the large sample sizes and numerous statistically significant
+coefficients, predictive discrimination remains moderate.
+
+\begin{table}[H]
+\centering
+\caption{Logistic Regression performance on the held-out test sets.}
+\label{tab:logistic-performance}
+\begin{tabular}{lrr}
+\toprule
+Metric & 2 Wheels & 4 Wheels \\
+\midrule
+ROC-AUC             & 0.6868 & 0.7352 \\
+PR-AUC              & 0.1207 & 0.0774 \\
+Log-Loss            & 0.2257 & 0.1373 \\
+Brier Score         & 0.0576 & 0.0322 \\
+Sensitivity         & 0.692  & 0.748  \\
+Specificity         & 0.574  & 0.617  \\
+Precision           & 0.098  & 0.065  \\
+F1                  & 0.172  & 0.119  \\
+MCC                 & 0.130  & 0.136  \\
+Balanced Accuracy   & 0.633  & 0.683  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The four-wheeled model discriminates arrests from non-arrests more effectively,
+with an AUC of $0.7352$ compared with $0.6868$ for two-wheeled vehicles.
+At the same time, precision remains low in both cases. This is expected from
+the strong class imbalance and demonstrates an important distinction:
+statistically clear conditional associations do not imply that individual arrest
+outcomes are highly predictable.
+
+% =============================================================================
+% LASSO
+% =============================================================================
+
+\section{LASSO Logistic Regression}
+
+\subsection{Why Introduce Regularization?}
+
+The Logistic Regression contains many dummy coefficients generated by the
+categorical predictors. With a very large sample, even comparatively weak
+coefficients may become statistically significant. LASSO provides a useful
+complement because it asks a different question:
+
+\begin{quote}
+Which of the patterns identified by the full logistic model remain important
+when weak coefficients are progressively shrunk toward zero?
+\end{quote}
+
+For the binomial model, LASSO minimizes the negative log-likelihood together
+with an $L_1$ penalty,
+
+$$
+-\ell(\boldsymbol{\beta})
++
+\lambda\sum_{j=1}^{p}|\beta_j|.
+$$
+
+The penalty introduces bias but reduces model complexity and can set
+coefficients exactly to zero. Consequently, LASSO is particularly useful here
+as a robustness and parsimony check rather than merely as another classifier.
+
+\subsection{Regularization and Model Parsimony}
+
+The regularization parameter $\lambda$ was selected using cross-validated
+ROC-AUC. Two standard solutions were investigated:
+$\lambda_{\min}$, which maximizes cross-validated AUC, and
+$\lambda_{1se}$, which selects a more strongly regularized model whose
+performance remains within one standard error of the optimum.
+
+\begin{table}[H]
+\centering
+\caption{LASSO cross-validation results.}
+\label{tab:lasso-cv}
+\begin{tabular}{lrrrr}
+\toprule
+Dataset &
+$\lambda_{\min}$ &
+CV-AUC$*{\min}$ &
+$\lambda_{1se}$ &
+CV-AUC$*{1se}$ \\
+\midrule
+2 Wheels & 0.000053 & 0.7394 & 0.000711 & 0.7373 \\
+4 Wheels & 0.000048 & 0.7524 & 0.000256 & 0.7515 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For two-wheeled vehicles, moving to the 1-SE solution reduces the number of
+non-zero coefficients from $62$ to $53$, a reduction of approximately
+$14.5\%$, while cross-validated AUC decreases by only $0.0021$.
+
+The trade-off is even clearer for four-wheeled vehicles. The number of
+non-zero coefficients falls from $63$ to $50$, approximately $20.6\%$,
+while CV-AUC changes by only $0.0009$.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/lasso_cv_2w.png}
+\small (a) Two-wheeled vehicles
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/lasso_cv_4w.png}
+\small (b) Four-wheeled vehicles
+\end{minipage}
+\caption{Cross-validated AUC as a function of the LASSO penalty. The
+$\lambda_{\min}$ and $\lambda_{1se}$ solutions identify similar predictive
+optima despite substantially different levels of regularization.}
+\label{fig:lasso-cv}
+\end{figure}
+\FloatBarrier
+
+The 1-SE solutions are therefore particularly useful for interpretation:
+substantial simplification is achieved without materially reducing predictive
+discrimination.
+
+\subsection{Which Signals Survive Shrinkage?}
+
+The most important result is not which individual dummy variable happens to
+have the largest penalized coefficient, but whether the broad structure found
+with Logistic Regression survives stronger regularization.
+
+For two-wheeled vehicles, time of day remains dominant. At
+$\lambda_{\min}$,
+
+$$
+OR_{\text{hour 7}}=0.043,
+\qquad
+OR_{\text{hour 6}}=0.097,
+\qquad
+OR_{\text{hour 8}}=0.137.
+$$
+
+At the more strongly regularized $\lambda_{1se}$, these estimates are shrunk
+toward one but remain among the strongest coefficients:
+
+$$
+OR_{\text{hour 7}}=0.141,
+\qquad
+OR_{\text{hour 6}}=0.239,
+\qquad
+OR_{\text{hour 8}}=0.234.
+$$
+
+More importantly for the demographic analysis, the Black and Hispanic
+coefficients are remarkably stable:
+
+$$
+OR_{\text{Black}}:
+1.452 \rightarrow 1.473,
+\qquad
+OR_{\text{Hispanic}}:
+1.776 \rightarrow 1.780.
+$$
+
+For four-wheeled vehicles, the same phenomenon is even more pronounced.
+At $\lambda_{\min}$,
+
+$$
+OR_{\text{Black}}=3.377,
+\qquad
+OR_{\text{Hispanic}}=3.215,
+$$
+
+while at $\lambda_{1se}$,
+
+$$
+OR_{\text{Black}}=3.202,
+\qquad
+OR_{\text{Hispanic}}=3.057.
+$$
+
+The Female coefficient is similarly stable,
+
+$$
+OR_{\text{Female}}:
+0.410 \rightarrow 0.420.
+$$
+
+The major age and hourly patterns also survive regularization. In particular,
+the four-wheeled model retains strong negative coefficients for the morning
+hours and progressively lower estimated odds among older age groups.
+
+These results strengthen the interpretation of the Logistic Regression:
+the principal temporal and demographic patterns are not eliminated when
+coefficients with little incremental predictive contribution are aggressively
+shrunk toward zero.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/lasso_paths_2w.png}
+\small (a) Two-wheeled vehicles
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/lasso_paths_4w.png}
+\small (b) Four-wheeled vehicles
+\end{minipage}
+\caption{LASSO coefficient paths. Large temporal and demographic
+coefficients remain separated from zero over the region between
+$\lambda_{\min}$ and $\lambda_{1se}$, whereas weaker coefficients are
+progressively removed.}
+\label{fig:lasso-paths}
+\end{figure}
+\FloatBarrier
+
+\subsection{Predictive Performance}
+
+The test-set results confirm that the more parsimonious 1-SE solutions lose
+very little predictive information.
+
+\begin{table}[H]
+\centering
+\caption{Test performance for the preferred LASSO 1-SE models.}
+\label{tab:lasso-performance}
+\begin{tabular}{lrr}
+\toprule
+Metric & 2 Wheels & 4 Wheels \\
+\midrule
+ROC-AUC           & 0.6866 & 0.7340 \\
+PR-AUC            & 0.1203 & 0.0763 \\
+Log-Loss          & 0.2238 & 0.1374 \\
+Brier Score       & 0.0576 & 0.0322 \\
+Sensitivity       & 0.710  & 0.754  \\
+Specificity       & 0.553  & 0.611  \\
+Precision         & 0.097  & 0.064  \\
+F1                & 0.170  & 0.118  \\
+MCC               & 0.129  & 0.135  \\
+Balanced Accuracy & 0.632  & 0.682  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The results are almost indistinguishable from the corresponding
+$\lambda_{\min}$ fits. The value of LASSO in this project therefore lies less
+in improving discrimination than in demonstrating that the main findings are
+stable under stronger regularization.
+
+% =============================================================================
+% GAM
+% =============================================================================
+
+\section{Generalized Additive Models}
+
+\subsection{Why Move Beyond a Fully Categorical Logistic Model?}
+
+The previous models confirm that hour and age contain substantial information
+about arrest outcomes. However, the EDA also indicates that neither variable
+follows a simple monotonic pattern.
+
+Treating hour as 24 unrelated categories captures flexibility but ignores the
+continuous and cyclic structure of the day. Similarly, age brackets impose
+arbitrary boundaries on an intrinsically continuous variable.
+
+A Generalized Additive Model addresses this limitation while retaining an
+interpretable additive structure:
+
+$$
+\log\left(
+\frac{P(\texttt{arrested}=1\mid X)}
+     {1-P(\texttt{arrested}=1\mid X)}
+\right)
+=
+\beta_0+\mathbf{X}\boldsymbol{\beta}
++f_1(\text{hour})
++f_2(\text{age}).
+$$
+
+Hour is represented using a cyclic cubic regression spline, reflecting the
+continuity between 23:00 and 00:00, while age is represented by a cubic
+regression spline.
+
+The GAM therefore asks whether the temporal and age patterns already visible
+in the EDA and Logistic Regression can be represented more naturally as smooth
+non-linear relationships.
+
+\subsection{Overall Fit}
+
+For two-wheeled vehicles, the GAM obtains
+
+$$
+R^2_{\mathrm{adj}}=0.0391,
+\qquad
+\text{Deviance Explained}=9.61\%.
+$$
+
+For four-wheeled vehicles,
+
+$$
+R^2_{\mathrm{adj}}=0.0268,
+\qquad
+\text{Deviance Explained}=9.31\%.
+$$
+
+Thus, the included predictors explain a meaningful but still limited portion
+of the total variability in the arrest outcome. This distinction is important:
+large samples allow precise estimation of several associations, but the
+available predictors still leave most individual-level variation unexplained.
+
+\subsection{The Non-Linear Daily Cycle}
+
+The hour smooth is highly significant in both datasets.
+
+For two-wheeled vehicles,
+
+$$
+\text{edf}=7.52,
+\qquad
+\chi^2=1164,
+\qquad
+p<2\times10^{-16},
+$$
+
+while for four-wheeled vehicles,
+
+$$
+\text{edf}=7.925,
+\qquad
+\chi^2=6499,
+\qquad
+p<2\times10^{-16}.
+$$
+
+Effective degrees of freedom substantially larger than one confirm that the
+relationship cannot be summarized adequately by a linear effect.
+
+More importantly, the \textbf{shape is highly consistent across vehicle
+types}. Conditional arrest propensity is comparatively high during late-night
+and very early-morning hours, falls sharply toward its minimum around
+07:00--08:00, and subsequently rises through the afternoon and evening.
+
+For two-wheeled vehicles, the fitted smooth spans approximately $2.3$
+log-odds units between its minimum and maximum, corresponding to roughly a
+ten-fold difference in estimated odds across the daily curve, conditional on
+the remaining predictors. For four-wheeled vehicles the corresponding range is
+approximately $1.9$ log-odds units, or around $6.7$ times in the odds.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/gam_hour_2w.png}
+\small (a) Two-wheeled vehicles
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/gam_hour_4w.png}
+\small (b) Four-wheeled vehicles
+\end{minipage}
+\caption{GAM partial smooth for hour of day. Both datasets exhibit a strong
+non-linear daily cycle, with minimum conditional arrest propensity during
+the morning and substantially higher values at night.}
+\label{fig:gam-hour}
+\end{figure}
+\FloatBarrier
+
+This result is particularly useful for the overall narrative because the same
+temporal structure is visible at three different analytical stages:
+descriptively in the EDA, conditionally through Logistic Regression, and
+continuously through the GAM.
+
+\subsection{Age Reveals a Stronger Difference Between Vehicle Types}
+
+The age smooth is also highly significant in both models.
+
+For two-wheeled vehicles,
+
+$$
+\text{edf}=4.66,
+\qquad
+\chi^2=108,
+\qquad
+p<2\times10^{-16},
+$$
+
+whereas for four-wheeled vehicles,
+
+$$
+\text{edf}=4.878,
+\qquad
+\chi^2=4057,
+\qquad
+p<2\times10^{-16}.
+$$
+
+Unlike hour, however, the shape is not stable across datasets.
+
+For two-wheeled vehicles, conditional arrest propensity is relatively elevated
+among the youngest observations, reaches a local minimum around age 28--30,
+remains comparatively flat through much of middle age, rises toward a local
+maximum around age 60--62, and subsequently declines among the oldest
+observations.
+
+The four-wheeled pattern is substantially different. The smooth reaches its
+maximum around age 27--30 and then declines progressively. It crosses the
+zero-centered smooth around age 38--40 and becomes increasingly negative,
+with a particularly strong decline after approximately age 50--55.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/gam_age_2w.png}
+\small (a) Two-wheeled vehicles
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/gam_age_4w.png}
+\small (b) Four-wheeled vehicles
+\end{minipage}
+\caption{GAM partial smooth for motorist age. In contrast to the consistent
+hourly cycle, the age relationship differs substantially between the two
+vehicle populations.}
+\label{fig:gam-age}
+\end{figure}
+\FloatBarrier
+
+This reinforces the decision to analyze the two vehicle populations
+separately. A single pooled age effect would conceal substantially different
+conditional structures.
+
+\subsection{Demographic Associations Remain After the Flexible Specification}
+
+Introducing smooth effects for age and hour does not eliminate the principal
+demographic associations.
+
+In the two-wheeled GAM,
+
+$$
+OR_{\text{Black}}=1.563,
+\qquad
+OR_{\text{Hispanic}}=1.900,
+\qquad
+OR_{\text{Female}}=0.309.
+$$
+
+In the four-wheeled GAM,
+
+$$
+OR_{\text{Black}}=3.349,
+\qquad
+OR_{\text{Hispanic}}=3.185,
+\qquad
+OR_{\text{Female}}=0.403.
+$$
+
+The direction and approximate magnitude of these effects closely resemble
+those found by Logistic Regression and LASSO. The demographic disparities are
+therefore not removed simply by modelling age and time of day more flexibly.
+
+\subsection{Predictive Performance}
+
+\begin{table}[H]
+\centering
+\caption{GAM performance on the held-out test sets.}
+\label{tab:gam-performance}
+\begin{tabular}{lrr}
+\toprule
+Metric & 2 Wheels & 4 Wheels \\
+\midrule
+ROC-AUC           & 0.6897 & 0.7347 \\
+PR-AUC            & 0.1247 & 0.0790 \\
+Log-Loss          & 0.2235 & 0.1400 \\
+Brier Score       & 0.0570 & 0.0330 \\
+Sensitivity       & 0.697  & 0.759  \\
+Specificity       & 0.576  & 0.607  \\
+Precision         & 0.099  & 0.066  \\
+F1                & 0.173  & 0.121  \\
+MCC               & 0.133  & 0.137  \\
+Balanced Accuracy & 0.637  & 0.683  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The additional flexibility produces only limited predictive improvement over
+Logistic Regression. Its main contribution is therefore not a dramatic
+increase in AUC, but a more informative representation of the non-linear
+temporal and age-related structure.
+
+% =============================================================================
+% NAIVE BAYES
+% =============================================================================
+
+\section{Naive Bayes}
+
+\subsection{Why a Generative Model?}
+
+Logistic Regression, LASSO, and GAM directly model the conditional probability
+
+$$
+P(Y\mid X).
+$$
+
+Naive Bayes approaches the classification problem from the opposite direction:
+it models the distribution of the predictors within each outcome class,
+$P(X\mid Y)$, and combines these distributions with the class priors through
+Bayes' theorem.
+
+For class $k$,
+
+$$
+P(Y=k\mid X)
+=
+\frac{
+P(Y=k)\prod_{j=1}^{p}P(X_j\mid Y=k)
+}{
+\sum_h P(Y=h)\prod_{j=1}^{p}P(X_j\mid Y=h)
+}.
+$$
+
+The price of this simplification is the strong assumption that predictors are
+conditionally independent within each class. However, this makes Naive Bayes a
+useful robustness check: it asks whether the distinction between arrests and
+non-arrests is also visible from a fundamentally different modelling
+perspective.
+
+\subsection{Class Priors and Conditional Distributions}
+
+The estimated prior probability of arrest differs substantially between the
+two datasets:
+
+$$
+P(Y=1)=0.0538
+$$
+
+for two-wheeled vehicles, compared with
+
+$$
+P(Y=1)=0.0325
+$$
+
+for four-wheeled vehicles.
+
+Thus, before considering any predictor information, both models strongly favor
+the non-arrested class.
+
+The class-conditional distributions nevertheless contain useful structure.
+
+For two-wheeled vehicles, Hispanic motorists account for approximately
+$63.4\%$ of arrests but $46.9\%$ of non-arrests, while Black motorists
+account for $25.6\%$ and $20.4\%$, respectively. The Bronx accounts for
+approximately $34.9\%$ of arrests compared with only $14.6\%$ of
+non-arrests. Late-evening and nighttime observations are also substantially
+more represented among arrests than morning observations.
+
+For four-wheeled vehicles, the ethnicity contrast is even clearer. Black
+motorists constitute approximately $47.0\%$ of arrested observations but
+$30.0\%$ of non-arrests, while Hispanic motorists account for $37.5\%$
+and $26.0\%$, respectively. White motorists show the opposite pattern:
+approximately $6.9\%$ of arrests but $20.3\%$ of non-arrests.
+
+Age also separates the four-wheeled classes more clearly. The 25--34 category
+represents approximately $40.9\%$ of arrests but only $29.0\%$ of
+non-arrests, whereas the older age groups are progressively less represented
+among arrests.
+
+These quantities must not be confused with arrest probabilities. For example,
+
+$$
+P(\text{Black}\mid Y=1)
+$$
+
+describes the composition of the arrested class and is not the same quantity as
+
+$$
+P(Y=1\mid\text{Black}).
+$$
+
+Naive Bayes combines all such class-specific evidence to construct the final
+posterior probability.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/nb_conditional_2w.png}
+\small (a) Two-wheeled vehicles
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/nb_conditional_4w.png}
+\small (b) Four-wheeled vehicles
+\end{minipage}
+\caption{Selected class-conditional probabilities from Naive Bayes.
+Ethnicity, hour, and geographical context exhibit visible differences
+between the arrested and non-arrested classes.}
+\label{fig:nb-conditional}
+\end{figure}
+\FloatBarrier
+
+\subsection{Predictive Performance}
+
+\begin{table}[H]
+\centering
+\caption{Naive Bayes performance on the held-out test sets.}
+\label{tab:nb-performance}
+\begin{tabular}{lrr}
+\toprule
+Metric & 2 Wheels & 4 Wheels \\
+\midrule
+ROC-AUC           & 0.6818 & 0.7322 \\
+PR-AUC            & 0.1169 & 0.0761 \\
+Log-Loss          & 0.2306 & 0.1394 \\
+Brier Score       & 0.0584 & 0.0325 \\
+Sensitivity       & 0.748  & 0.762  \\
+Specificity       & 0.510  & 0.598  \\
+Precision         & 0.093  & 0.063  \\
+F1                & 0.166  & 0.116  \\
+MCC               & 0.126  & 0.133  \\
+Balanced Accuracy & 0.629  & 0.680  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Naive Bayes performs slightly worse than the discriminative models but remains
+within the same general performance range. The result is informative:
+meaningful arrest-related structure can be recovered under a very different
+modelling framework, but class separation remains incomplete.
+
+% =============================================================================
+% MODEL COMPARISON
+% =============================================================================
+
+\section{Overall Model Comparison}
+
+The most useful comparison is not whether one model improves AUC by a few
+thousandths, but whether the same substantive patterns remain visible under
+different modelling assumptions.
+
+\begin{table}[H]
+\centering
+\caption{Summary of held-out predictive performance across modelling
+approaches. LASSO results refer to the preferred 1-SE specification.}
+\label{tab:model-comparison}
+\begin{tabular}{llrrrr}
+\toprule
+Dataset & Model & ROC-AUC & PR-AUC & MCC & Bal. Acc. \\
+\midrule
+2 Wheels & Logistic    & 0.6868 & 0.1207 & 0.130 & 0.633 \\
+& LASSO       & 0.6866 & 0.1203 & 0.129 & 0.632 \\
+& GAM         & 0.6897 & 0.1247 & 0.133 & 0.637 \\
+& Naive Bayes & 0.6818 & 0.1169 & 0.126 & 0.629 \\
+\midrule
+4 Wheels & Logistic    & 0.7352 & 0.0774 & 0.136 & 0.683 \\
+& LASSO       & 0.7340 & 0.0763 & 0.135 & 0.682 \\
+& GAM         & 0.7347 & 0.0790 & 0.137 & 0.683 \\
+& Naive Bayes & 0.7322 & 0.0761 & 0.133 & 0.680 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three conclusions emerge.
+
+First, \textbf{no modelling approach dramatically dominates the others}.
+Logistic Regression, LASSO, and GAM produce almost identical discrimination,
+while Naive Bayes performs only slightly worse. Increasing model complexity
+therefore does not radically change the amount of predictive information
+available.
+
+Second, \textbf{four-wheeled arrest outcomes are consistently easier to rank}
+than two-wheeled outcomes. ROC-AUC is approximately $0.73$--$0.74$ for
+all four-wheeled models and approximately $0.68$--$0.69$ for two-wheeled
+models.
+
+Third, the apparently larger two-wheeled PR-AUC should not be interpreted as
+contradicting the previous result. Arrest prevalence is approximately $5\%-
+6\%$ in the two-wheeled population but only $3\%-4\%$ in the
+four-wheeled population, and the no-skill PR baseline changes accordingly.
+Relative to their respective baselines, both populations contain useful but
+limited positive-class information.
+
+Across all models, precision remains low. Consequently, the models are more
+useful for \textbf{conditional interpretation and relative risk ranking} than
+for high-confidence individual arrest classification.
+
+% =============================================================================
+% RESEARCH QUESTIONS
+% =============================================================================
+
+\chapter{Research Questions and Findings}
+
+The preceding analyses can now be combined to answer the research questions
+introduced by the project. The objective of this chapter is not to introduce
+additional models, but to synthesize evidence from the EDA and the different
+statistical-learning approaches.
+
+% -----------------------------------------------------------------------------
+\section{RQ1: Are Arrest Outcomes Distributed Uniformly Across Recorded Stops?}
+
+\textbf{Answer: No.} The descriptive analysis provides clear evidence that
+arrest outcomes are heterogeneous across demographic, temporal, and
+geographical characteristics.
+
+Among two-wheeled stops, the observed arrest rate is $12.1\%$ in the Bronx
+but only approximately $3.2\%$ in Manhattan. For four-wheeled stops the
+geographical range is narrower but remains substantial, from approximately
+$4.8\%$ in the Bronx to $2.5\%$ in Queens.
+
+Time of day produces an especially consistent pattern. At approximately
+07:00, arrest rates fall to $3.2\%$ for two-wheeled vehicles and $0.6\%$
+for four-wheeled vehicles. By 03:00, they rise to approximately $10.9\%$
+and $5.3\%$, respectively.
+
+Demographic differences are also substantial. For two-wheeled vehicles,
+Hispanic and Black motorists have observed arrest rates of $7.24\%$ and
+$6.86\%$, compared with $3.23\%$ for White motorists. For four-wheeled
+vehicles, the corresponding rates are $4.66\%$, $5.02\%$, and $1.15\%$.
+
+The EDA therefore rejects the hypothesis that arrest outcomes are uniformly
+distributed across the observed characteristics. These are, however,
+\textbf{unadjusted differences}; they do not establish which characteristics
+retain an association after accounting for the others.
+
+% -----------------------------------------------------------------------------
+\section{RQ2: Do Demographic Disparities Persist After Adjustment?}
+
+\textbf{Answer: Yes.} Several of the demographic differences identified by the
+EDA remain after conditioning on temporal, geographical, and other demographic
+characteristics.
+
+The clearest evidence comes from reported ethnicity. In the Logistic
+Regression for two-wheeled vehicles,
+
+$$
+OR_{\text{Black}}=1.451,
+\qquad
+OR_{\text{Hispanic}}=1.778,
+$$
+
+relative to the White reference category.
+
+For four-wheeled vehicles the estimated associations are much larger:
+
+$$
+OR_{\text{Black}}=3.425,
+\qquad
+OR_{\text{Hispanic}}=3.258.
+$$
+
+These findings are not dependent on a single model. In the four-wheeled LASSO
+1-SE model, the corresponding penalized odds ratios remain approximately
+
+$$
+3.202
+\quad\text{and}\quad
+3.057,
+$$
+
+while the GAM estimates
+
+$$
+3.349
+\quad\text{and}\quad
+3.185.
+$$
+
+The same consistency is visible for sex. Female observations have conditional
+odds ratios of $0.300$ and $0.408$ in the two Logistic models, and the
+direction and magnitude remain similar under LASSO and GAM.
+
+Therefore, demographic disparities do not disappear after controlling for the
+observed context included in the models. In particular, the Black and Hispanic
+coefficients remain large and resistant to regularization in the four-wheeled
+analysis.
+
+These results demonstrate \textbf{persistent conditional statistical
+disparities}. They do not, by themselves, identify the mechanism responsible
+for those disparities.
+
+% -----------------------------------------------------------------------------
+\section{RQ3: Are the Relationships with Hour and Age Non-Linear?}
+
+\textbf{Answer: Yes.} The GAM provides strong statistical and graphical
+evidence that both relationships are non-linear.
+
+For hour of day,
+
+$$
+\text{edf}_{2W}=7.52,
+\qquad
+\text{edf}_{4W}=7.925,
+$$
+
+with $p<2\times10^{-16}$ in both models. The smooth functions reproduce the
+same broad cycle observed during the EDA: elevated arrest propensity during
+late-night and early-morning hours, a pronounced minimum around 07:00--08:00,
+and a progressive increase during the afternoon and evening.
+
+The consistency of this curve across vehicle types makes time of day one of
+the most stable findings in the entire analysis.
+
+Age is also non-linear,
+
+$$
+\text{edf}_{2W}=4.66,
+\qquad
+\text{edf}_{4W}=4.878,
+$$
+
+again with $p<2\times10^{-16}$.
+
+Unlike hour, however, the age curves differ substantially between vehicle
+types. The four-wheeled smooth reaches its highest value around ages 27--30
+and subsequently declines, particularly after age 50. The two-wheeled curve
+has a more irregular structure, with elevated values among the youngest
+observations and another local increase at later ages.
+
+The hypothesis that age and hour can be represented adequately by simple
+linear effects is therefore rejected.
+
+% -----------------------------------------------------------------------------
+\section{RQ4: Do Two-Wheeled and Four-Wheeled Stops Exhibit the Same Patterns?}
+
+\textbf{Answer: Only partially.}
+
+Some results are remarkably consistent. Both datasets exhibit:
+
+\begin{itemize}
+\item a strong late-night versus morning arrest pattern;
+\item lower conditional odds for female motorists;
+\item positive conditional associations for Black and Hispanic categories
+relative to White;
+\item substantial geographical heterogeneity;
+\item only moderate individual-level predictability.
+\end{itemize}
+
+However, the magnitude and sometimes even the direction of specific
+associations differ considerably.
+
+The ethnicity contrast is substantially stronger among four-wheeled vehicles.
+For example,
+
+$$
+OR_{\text{Black}}:
+1.451\;(2W)
+\quad\text{vs.}\quad
+3.425\;(4W),
+$$
+
+and
+
+$$
+OR_{\text{Hispanic}}:
+1.778\;(2W)
+\quad\text{vs.}\quad
+3.258\;(4W).
+$$
+
+Age provides an even clearer difference. In the Logistic Regression, Under-18
+two-wheeled observations have higher estimated odds than the 25--34 reference
+group,
+
+$$
+OR=1.725,
+$$
+
+whereas the corresponding four-wheeled estimate is
+
+$$
+OR=0.756.
+$$
+
+Similarly, the four-wheeled model exhibits a strong progressive reduction at
+older ages, reaching $OR_{65+}=0.201$, while the corresponding two-wheeled
+65+ coefficient is not statistically distinguishable from the 25--34
+reference group.
+
+The GAM smooths confirm that this is not merely an artifact of the age
+brackets.
+
+Consequently, the data support the decision to maintain separate analyses.
+There appears to be a common temporal component, but the demographic
+structure of arrest outcomes is strongly dependent on the vehicle context.
+
+% -----------------------------------------------------------------------------
+\section{RQ5: How Predictable Is an Arrest from the Available Information?}
+
+\textbf{Answer: Arrest is moderately predictable as a ranking problem, but not
+with high reliability at the individual classification level. Predictability
+is consistently greater for four-wheeled stops.}
+
+Across two-wheeled models, ROC-AUC ranges approximately from
+
+$$
+0.682 \text{ to } 0.690,
+$$
+
+whereas for four-wheeled models it remains around
+
+$$
+0.732 \text{ to } 0.735.
+$$
+
+Thus, all models perform better than random ranking, but none achieves strong
+class separation.
+
+The PR-AUC results must be interpreted relative to the different class
+prevalences. For two-wheeled vehicles, PR-AUC is approximately
+$0.117$--$0.125$ against a no-skill baseline of approximately $0.063$.
+For four-wheeled vehicles it is approximately $0.076$--$0.079$ against a
+much lower baseline of approximately $0.034$.
+
+The principal limitation is precision. Around the selected operating points,
+precision is approximately $9\%-10\%$ for two-wheeled models and
+$6\%-7\%$ for four-wheeled models. Consequently, most observations
+classified as arrests are false positives even though sensitivity is generally
+around $70\%-76\%$.
+
+The models therefore contain genuine information about relative arrest
+propensity, but the observed characteristics are not sufficient to determine
+individual arrest outcomes with high certainty.
+
+The GAM fit reinforces this conclusion from another perspective: only about
+$9.61\%$ and $9.31\%$ of deviance is explained in the two vehicle
+populations. A substantial part of the outcome therefore depends on
+information that is either unobserved or not represented by the available
+predictors.
+
+% -----------------------------------------------------------------------------
+\section{RQ6: Do the Results Demonstrate Systematic or Excessive Enforcement?}
+
+\textbf{Answer: The results provide evidence of persistent systematic
+statistical disparities in post-stop arrest outcomes, but they are not
+sufficient to establish systematic discriminatory or excessive enforcement.}
+
+There is substantial empirical evidence that the observed differences are not
+purely descriptive artifacts. For example, among four-wheeled vehicle stops,
+the raw arrest rate is $5.02\%$ for Black motorists and $4.66\%$ for
+Hispanic motorists compared with $1.15\%$ for White motorists. After
+adjustment, the Logistic Regression still estimates odds ratios of $3.425$
+and $3.258$, respectively. LASSO and GAM produce very similar conditional
+relationships.
+
+Similarly, significant geographical, sex-related, age-related, and temporal
+differences remain after adjustment, and several of these patterns are
+recovered under multiple modelling assumptions.
+
+This constitutes evidence that the disparities are
+\textbf{persistent and structured within the recorded stop data}.
+
+However, three different statements must be distinguished:
+
+$$
+\boxed{
+\text{Observed disparity}
+\neq
+\text{causal demographic effect}
+\neq
+\text{proof of discriminatory enforcement}
+}
+$$
+
+The dataset contains only vehicle stops that have already occurred. It
+therefore allows the analysis of
+
+$$
+P(\text{arrest}\mid\text{recorded stop},X),
+$$
+
+but not the probability that a motorist is stopped in the first place.
+
+Furthermore, the records do not contain complete information about the reason
+for the stop, the legal circumstances leading to the arrest, the behavior
+during the encounter, or other operational factors that may influence the
+decision to arrest. Consequently, important confounding information is not
+available to the models.
+
+The strongest conclusion supported by the available evidence is therefore the
+following:
+
+\begin{quote}
+Among recorded NYPD vehicle stops, arrest outcomes exhibit persistent
+demographic, temporal, and geographical disparities. Several of these
+differences remain large after adjustment for the observed characteristics and
+are reproduced across alternative statistical models, particularly in the
+four-wheeled population. However, the available data are insufficient to
+determine whether these conditional disparities are caused by discriminatory
+or excessive police enforcement.
+\end{quote}
+
+This distinction is central to the interpretation of the project. The analysis
+does not confirm a predetermined claim of police bias, nor does it provide
+evidence that the observed disparities are innocuous. Instead, it identifies
+which disparities are present, quantifies their magnitude, tests their
+robustness across modelling assumptions, and establishes the boundary beyond
+which the available data cannot support stronger causal conclusions.
+
+% =============================================================================
+% FINAL SYNTHESIS
+% =============================================================================
+
+\section{Synthesis}
+
+Taken together, the exploratory and modelling analyses produce a coherent
+picture.
+
+The most stable finding is temporal: arrest propensity follows a pronounced
+daily cycle in both vehicle populations, with substantially lower conditional
+odds during morning hours and higher values during the night. The agreement
+between raw arrest rates, Logistic Regression coefficients, LASSO retention,
+Naive Bayes conditional distributions, and GAM smooths makes this the most
+robust cross-dataset pattern.
+
+Demographic variables also contain persistent information, but their effects
+are considerably more context-dependent. Reported ethnicity and sex remain
+associated with arrest after adjustment and regularization, while the magnitude
+of the ethnicity coefficients is substantially greater among four-wheeled
+vehicle stops. Age exhibits an even stronger vehicle-specific structure.
+
+At the same time, predictive performance places an important limit on the
+interpretation. The available predictors produce moderate ranking ability but
+low individual precision, and more flexible modelling does not substantially
+raise this performance ceiling.
+
+The principal contribution of the modelling stage is therefore not the
+identification of a single ``best'' classifier. It is the convergence of
+several modelling approaches toward the same broader conclusion:
+\textbf{post-stop arrest outcomes exhibit structured and persistent
+disparities, but much of the individual outcome remains unexplained by the
+information available in the dataset.}

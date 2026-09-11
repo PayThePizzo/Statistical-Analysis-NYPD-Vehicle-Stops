@@ -1,0 +1,20 @@
+\input{settings}
+
+\begin{document}
+    \input{000_frontpage}
+
+    \pagenumbering{arabic}
+    \setcounter{page}{1}
+    
+    \include{100_methods}
+
+    \include{200_experiments_results}
+
+    \include{300_discussion}
+
+    \bibliographystyle{plainnat}
+    {\footnotesize
+        \bibliography{bibliography}
+    }
+    
+\end{document}
