@@ -1770,7 +1770,7 @@ hourly_arrest_rate %>%
     plot.subtitle = element_text(color = "grey50", size = 10)
   ) +
   labs(
-    title = "Arrest Rate by Hour of Day for 2-Wheels Vehicles for 2-Wheels Vehicles Stopped in NYC",
+    title = "Arrest Rate by Hour of Day for 2-Wheels Vehicles Stopped in NYC",
     subtitle = "The hourly arrest rate follows a U-shaped diurnal pattern",
     x = "Hour of Day (0-23)",
     y = "Arrest Rate (%)"
