@@ -1,257 +1,64 @@
 \chapter{Methodology}
 
-\section{Introduction}
-
-The primary objective of this project is to evaluate whether police behavior during vehicle stops in New York City exhibits patterns of excessive enforcement. Specifically, we investigate relationships between escalation outcomes (focusing on arrests) and contextual factors such as geographical location, temporal windows, motorist demographic characteristics, and vehicle classification.
-
-As is typical in applied data science, our analytical strategy evolves as we gain deeper familiarity with the underlying data. Rather than restricting our scope to baseline descriptive summaries, our initial goal centers on converting, restructuring, and cleaning raw administrative records into a reliable tabular format. We engineer domain-specific features (including time-of-day brackets, age groupings, and jurisdictional aggregations) to uncover subtle patterns that raw predictors might obscure. Each transformation is systematically verified before proceeding to exploratory analysis and predictive modeling. Ultimately, we aim to construct and evaluate classification models capable of estimating the probability that a vehicle halt escalates into an arrest, quantifying both the predictive performance and the statistical confidence of our inferences.
-
-\section{Data Origin and Preparation}
-
-The dataset was published during February 27th 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in February 6th 2026 and downloaded less than 8000 times at the time of download (Mid March 2026).
-
-The raw file contains 2,488,293 individual vehicle stop records across 19 attributes.
-
-Prior domain literature and public reporting (such as descriptive summaries provided by civil liberties organizations) primarily emphasize univariate figures and broad citywide percentages. However, those summaries rarely address multivariable interactions or predictive escalation modeling. Our initial inspection reveals a rich, high-volume dataset that provides substantial statistical power. At the same time, the raw data presents noticeable structural inconsistencies, high categorical cardinality, and missing coordinate values that necessitate careful preprocessing before formal modeling can begin.
-
-\section{Initial State of the Data and Methodological Constraints}
-
-The raw dataset contains 19 attributes capturing spatial coordinates, occurrence dates and times, officer command codes, driver demographic traits, and binary flags indicating intermediate stop outcomes (such as vehicle searches, seizures, or the use of force). Initial inspection reveals several data representation issues. Attributes intended as binary flags exhibit inconsistent formatting: some variables use string literals ($\texttt{"true"}$ and $\texttt{"false"}$), whereas others use single-character flags ($\texttt{"Y"}$ and $\texttt{"N"}$). Numerical spatial variables are sparse, with approximately $8\%$ of latitude and longitude values recorded as zeroes or missing entries. Furthermore, the dataset exhibits severe target class imbalance: arrests occur in only $3.4\%$ of all stops, whereas judicial summonses appear in $59.2\%$ of records.
-
-Several structural constraints inherently limit this dataset and cannot be improved through processing:
-\begin{itemize}
-    \item The observational data spans a limited time window of approximately three years, restricting long-term longitudinal analysis.
-    \item The dataset lacks any information regarding the initial cause or reasonable suspicion that prompted the officer to conduct the stop.
-    \item Demographic attributes (age, sex, and ethnicity) rely on officer recording or driver self-reporting, introducing potential reporting error and ambiguity.
-    \item Spatial coordinates are partially anonymized or rounded to fixed checkpoint coordinates, imposing a ceiling on spatial precision.
-\end{itemize}
-
-\section{Step-by-Step Methodological Workflow and Data Transformations}
-
-To transform the raw administrative logs into an analytically sound dataset, we executed a chronological sequence of cleaning, filtering, and feature engineering operations.
-
-\subsection{Attribute Removal and Target Definition}
-
-We first removed the unique row identifier $\texttt{EVNT\_KEY}$ to eliminate the risk of target leakage in predictive models. Next, we refined the analytical scope regarding enforcement escalation. The dataset records multiple potential stop outcomes, including summonses ($\texttt{SUMMON\_ISSUED\_FLG}$), searches ($\texttt{VEH\_SEARCHED\_FLG}$), consent searches ($\texttt{VEH\_SEARCH\_CONSENT\_FLG}$), seizures ($\texttt{VEH\_SEIZED\_FLG}$), checkpoint flags ($\texttt{VEH\_CHECKPOINT\_FLG}$), and force usage ($\texttt{FORCE\_USED\_FLG}$). Modeling all intermediate escalation steps simultaneously as an ordinal sequence is unviable due to the lack of a clear causal pipeline and the absence of probable cause data. Therefore, we restricted our target scope exclusively to whether the stop resulted in an arrest ($\texttt{ARREST\_MADE\_FLG}$), dropping the remaining outcome flags to maintain a clear target definition. All remaining attributes were renamed to concise, lowercase identifiers (for example, renaming $\texttt{RACE\_DESC}$ to $\texttt{ethnicity}$ to better reflect self-reported cultural heritage).
-
-\subsection{Temporal Feature Engineering}
-
-Temporal attributes were transformed to extract seasonal, weekly, and daily cycles:
-\begin{itemize}
-    \item The raw date string $\texttt{date}$ was parsed into a standard date object, from which we extracted integer variables for year ($\texttt{year}$), month ($\texttt{month}$), day of the month ($\texttt{day}$), and day of the year ($\texttt{doy}$).
-    \item We derived the day of the week ($\texttt{weekday}$) and its corresponding integer index ($\texttt{dow}$, ordered from Monday as 1 to Sunday as 7).
-    \item Occurrence times ($\texttt{time}$) were split into numerical hour ($\texttt{hour}$) and minute ($\texttt{minute}$) features.
-    \item To capture daily operational dynamics (such as nighttime activity, rush-hour traffic, or standard working shifts) without introducing minute-level noise, we engineered an ordered factor variable named $\texttt{time\_bracket}$ consisting of six four-hour intervals: Late night (0–3), Early morning (4–7), Morning commute (8–11), Midday (12–15), Afternoon/evening (16–19), and Night (20–23).
-\end{itemize}
-Following this engineering step, the redundant raw date, time, and minute variables were removed.
-
-\subsection{Motorist Demographic Standardization}
-
-Driver demographic variables were processed to manage missing entries and reduce categorical sparsity:
-\begin{itemize}
-    \item Driver age was converted to numeric values ($\texttt{age}$) and segmented into seven criminologically meaningful age categories ($\texttt{age\_bracket}$): "Under 18", "18–24", "25–34", "35–44", "45–54", "55–64", "65+", and an explicit "Unknown" category for missing entries.
-    \item Rare ethnicity labels ("AMERICAN INDIAN/ALASKAN NATIVE" and "OTHER") were merged into a single "Other" category. We explicitly preserved the "UNKNOWN" ethnicity label as a distinct factor level after verifying that 2,279 arrests occurred among drivers with unknown ethnicity, demonstrating that removing these records would discard a non-random signal.
-\end{itemize}
-
-\subsection{Vehicle Type Filtering and Grouping}
-
-The raw vehicle category attribute ($\texttt{VEH\_CATEGORY}$) contained various transport descriptions. To isolate private motorists, we removed commercial trucks and buses ($\texttt{TRUCK/BUS}$), licensed taxis ($\texttt{TLC}$), and null records. The remaining private transport modes were grouped into a binary factor $\texttt{veh\_categ}$: "4 wheels" (passenger cars and SUVs) and "2 wheels" (motorcycles, mopeds, bicycles, and dirt bikes).
-
-\subsection{Geographical Aggregation and Coordinate Diagnostics}
-
-The officer command code ($\texttt{command}$) contains over 70 distinct numerical values. Mapping stop coordinates against command boundaries confirmed that command codes correspond directly to NYPD precinct jurisdictions.
-
-\textit{[Insert figure: Map of Staten Island vehicle stops colored by command code showing exact alignment between command identifiers and geographical precinct boundaries]}
-
-To avoid overfitting to high-cardinality precinct codes, we aggregated commands into broader geographical regions: five boroughs ($\texttt{area}$) and eight sub-borough zones ($\texttt{boro}$, such as Brooklyn North and Brooklyn South).
-
-We also evaluated projected planar map coordinates ($\texttt{x\_coord}$, $\texttt{y\_coord}$) against WGS84 geographic coordinates ($\texttt{latitude}$, $\texttt{longitude}$). We identified erroneous entries (such as coordinate values set to 0 or swapped between fields). Although we initially considered cross-imputing missing coordinates using lookup tables, detailed inspection revealed that numerical rendering precision in the computing environment masked one-to-many coordinate mapping discrepancies. To prevent spatial distortion, we dropped $\texttt{x\_coord}$, $\texttt{y\_coord}$, and the original $\texttt{command}$ attribute, retaining cleaned continuous $\texttt{latitude}$ and $\texttt{longitude}$ alongside the regional factors $\texttt{area}$ and $\texttt{boro}$.
-
-\subsection{Data Coherency and Missingness Intersection Analysis}
-
-To determine whether missing demographic records represented systematic data omission or driver non-compliance, we constructed binary missingness indicators ($\texttt{age\_unknown}$, $\texttt{ethnicity\_unknown}$, $\texttt{sex\_unknown}$) and evaluated their overlap with arrest outcomes using set intersection analysis.
-
-\textit{[Insert figure: UpSet plot displaying set intersections between missing demographic indicators and arrest outcomes]}
-
-Our analysis revealed that 5,013 stops resulting in an arrest (approximately $6\%$ of all arrest events) contained at least one missing demographic entry. Removing these rows under an assumption of administrative error or forgery would eliminate valid arrest records and distort the empirical baseline. Consequently, we preserved these observations, deferring any row-wise filtration until post-exploratory model formulation.
-
-\subsection{Target Recoding}
-
-Finally, the target attribute $\texttt{arrested}$ was converted from string boolean values ($\texttt{"true"}$ and $\texttt{"false"}$) into numerical binary indicators ($1$ and $0$).
-
-\section{Post-Processing Dataset State and Final Insights}
-
-Following all data cleaning and feature engineering steps, the refined dataset $\texttt{vehiclestops\_ord}$ comprises 18 structured variables:
-\begin{itemize}
-    \item \textbf{Temporal predictors}: $\texttt{year}$, $\texttt{month}$, $\texttt{day}$, $\texttt{doy}$, $\texttt{dow}$, $\texttt{weekday}$, $\texttt{hour}$, and $\texttt{time\_bracket}$.
-    \item \textbf{Spatial predictors}: $\texttt{latitude}$, $\texttt{longitude}$, $\texttt{area}$, and $\texttt{boro}$.
-    \item \textbf{Demographic predictors}: $\texttt{sex}$, $\texttt{ethnicity}$, $\texttt{age}$, and $\texttt{age\_bracket}$.
-    \item \textbf{Vehicle classification}: $\texttt{veh\_categ}$.
-    \item \textbf{Target variable}: $\texttt{arrested}$ (binary indicator).
-\end{itemize}
-
-During initial data inspection, we recognized fundamental structural differences between four-wheeled passenger automobiles and two-wheeled vehicles (such as motorcycles, mopeds, and bicycles) regarding stop frequencies, driver demographic distributions, and legal enforcement dynamics. To prevent confounding vehicle geometry with officer behavior, we partitioned the structured dataset into two distinct files for independent downstream analysis: $\texttt{veh\_4\_wheels.csv}$ (containing car stops) and $\texttt{veh\_2\_wheels.csv}$ (containing two-wheeled vehicle stops). This separation ensures that subsequent modeling evaluates homogeneous vehicle classes while allowing comparative inference across transport modes.
-
-\section{Univariate Exploratory Data Analysis}
-
-To establish a solid empirical foundation for modeling, we first examine the marginal distributions of our target variable and individual predictors. This univariate inspection allows us to evaluate data quality, identify structural imbalances, detect potential outliers, and contrast the operational footprints of two-wheeled vehicles (motorcycles, mopeds, and e-bikes) against four-wheeled passenger vehicles (cars and SUVs).
-
-\subsection{Target Outcome and Class Imbalance}
-
-The primary outcome of interest is the binary variable $\texttt{arrested}$, which records whether a vehicle stop resulted in a physical arrest. Both vehicle classes exhibit severe class imbalance, though the rarity of the event is even more pronounced among four-wheeled vehicles.
-
-\textit{[Insert figure: Distribution of Arrests for Two-Wheeled and Four-Wheeled Vehicles in NYC]}
-
-For two-wheeled vehicles, physical arrests occur in $5.6\%$ of all stops (10,560 arrests out of 189,610 records). For four-wheeled vehicles, the arrest rate drops to $3.3\%$ (70,600 arrests out of 2,157,445 records). Although four-wheeled vehicles generate over eleven times the total stop volume of two-wheeled vehicles, an encounter involving a car is significantly less likely to escalate into an arrest.
-
-From an analytical perspective, this extreme imbalance means that overall classification accuracy is an uninformative performance metric. A naive classifier predicting no arrest for every encounter would achieve over $94\%$ accuracy on two-wheelers and nearly $97\%$ accuracy on four-wheelers while completely failing to identify actual escalation events. Consequently, our modeling pipeline relies on stratified sampling, observation weighting within likelihood functions, and decision boundary optimization along the Precision-Recall curve.
-
-\subsection{Spatial Distributions and Geographical Variations}
-
-Aggregating stop counts across broad administrative regions ($\texttt{area}$) and localized zones ($\texttt{boro}$) reveals substantial geographical variation and highlights key structural differences between the two vehicle datasets.
-
-\textit{[Insert figure: Distribution of Vehicle Stops by Area across NYC]}
-
-For two-wheeled vehicles, stop volume is heavily concentrated across three primary areas: Brooklyn (56,081 stops), Queens (52,183 stops), and Manhattan (50,928 stops). The Bronx represents a medium-volume region (29,874 stops), whereas Staten Island is a sparse outlier with only 1,477 stops (under $1\%$ of the total two-wheeled volume). Examining the finer-grained $\texttt{boro}$ variable shows that North Queens is the single highest-volume sub-region for two-wheelers.
-
-For four-wheeled vehicles, stop volume follows a distinct "ladder" distribution across the five boroughs. Brooklyn leads with 640,658 stops, followed by Queens (550,563 stops), Manhattan (418,295 stops), the Bronx (381,239 stops), and Staten Island (166,690 stops). Unlike the two-wheeled dataset, Staten Island contains a substantial sample of over 166,000 car stops, eliminating the risk of extreme categorical sparsity. At the sub-borough level, Brooklyn South (398,062 stops) and the Bronx (381,239 stops) dominate four-wheeled stop volume.
-
-\textit{[Insert figure: Spatial Density Heatmaps of Vehicle Stops in NYC]}
-
-Continuous density heatmaps generated from continuous coordinates ($\texttt{latitude}$ and $\texttt{longitude}$) confirm that enforcement encounters for both vehicle classes concentrate heavily along primary commercial corridors and major traffic arteries. However, four-wheeled stops display a much denser and more continuous spatial coverage across the entire city grid.
-
-\subsection{Temporal Dynamics and Seasonal Patterns}
-
-Analyzing stop counts across annual, monthly, weekly, and hourly dimensions uncovers stark operational differences between commercial/recreational two-wheeler usage and standard passenger car traffic.
-
-\textit{[Insert figure: Annual Volume of Vehicle Stops (2023--2025)]}
-
-On an annual level ($\texttt{year}$), two-wheeled vehicle stops experienced an explosive 2.5x growth, surging from 33,268 stops in 2023 to 71,012 in 2024 (a $113.5\%$ increase), and reaching 85,330 in 2025. This sudden inflection point in 2024 aligns directly with citywide regulatory policy shifts, specifically the passage of municipal e-bike safety legislation in early 2024. In contrast, four-wheeled vehicle stops expanded at a steady baseline rate, growing from 611,734 stops in 2023 to 745,858 in 2024 (a $21.9\%$ increase) and 799,853 in 2025.
-
-\textit{[Insert figure: Monthly Stop Volume and Seasonal Trends]}
-
-Monthly stop volumes ($\texttt{month}$) reveal a complete counter-cyclical relationship between the two vehicle classes:
-\begin{itemize}
-    \item Two-wheeled vehicle stops display extreme weather-driven seasonality. Enforcement surges during warm weather, forming a sustained plateau between June and October (averaging 18,000 to 19,000 stops per month) before dropping sharply in winter (bottoming out in December and January). Constructing a binary indicator for the warm period ($\texttt{hot\_season}$, spanning April through October) captures $64\%$ to $68\%$ of all annual two-wheeled stops.
-    \item Four-wheeled vehicle stops exhibit no winter drop-off. Instead, car stops peak during the colder months of January (204,603 stops) and March (208,661 stops), followed by a gradual decline during summer and early autumn (bottoming out in September at 154,192 stops). This confirms that automobile enforcement is largely independent of meteorological conditions and is driven by routine police patrols and administrative cycles.
-\end{itemize}
-
-Evaluating granular temporal attributes revealed that day-of-month ($\texttt{day}$) and day-of-year ($\texttt{doy}$) introduce calendar artifacts (such as artificial dips at month-ends due to varying month lengths) and extreme daily volatility. To prevent model overfitting, these attributes were excluded.
-
-\textit{[Insert figure: Hourly Stop Volume Cycles]}
-
-Examining weekly ($\texttt{weekday}$) and diurnal ($\texttt{hour}$, $\texttt{time\_bracket}$) cycles reveals shared and distinct daily rhythms. Both vehicle types display a "mid-week peak" in total stop volume (peaking on Wednesday and Thursday) and lower volume on weekends, pointing to heavy interaction with workday traffic. Hourly distributions, however, highlight different operational peaks:
-
-\begin{itemize}
-    \item Two-wheeled vehicle stops follow a fractured daily curve, rising through the morning, hitting a midday plateau (12:00 to 15:00), and climbing to an evening peak at 19:00 (driven largely by food delivery and courier activity).
-    \item Four-wheeled vehicle stops follow a three-stage traffic cycle, displaying a morning rush hour peak at 8:00 (105,378 stops), a temporary midday dip at 12:00, and a dominant late-afternoon rush hour peak at 16:00 (144,954 stops).
-\end{itemize}
-
-For both vehicle types, the aggregated factor $\texttt{time\_bracket}$ confirms that the afternoon/evening (16–19) and night (20–23) windows account for the majority of all stop events.
-
-\subsection{Motorist Demographic Distributions}
-
-Motorist demographic attributes ($\texttt{age}$, $\texttt{sex}$, and $\texttt{ethnicity}$) reflect distinct driver populations across vehicle categories.
-
-\textit{[Insert figure: Driver Age Distribution across Vehicle Categories]}
-
-Continuous driver age ($\texttt{age}$) demonstrates that two-wheeled vehicle operators are substantially younger than automobile drivers:
-
-\begin{itemize}
-    \item Two-wheeled vehicle drivers concentrate heavily in the 20–45 age range, with a sharp operational peak in the mid-20s (median age around 28 to 32) and a rapid decline after age 50.
-    \item Four-wheeled vehicle drivers exhibit a much broader age distribution, forming a wide plateau between ages 23 and 35, with a higher median age of 35 and an Interquartile Range (IQR) extending from 27 to 47.
-\end{itemize}
-
-Extremely sparse records above age 75 were identified as high-leverage outliers and removed from both datasets. The engineered categorical variable $\texttt{age\_bracket}$ effectively preserves these age structures while isolating missing demographic entries into an explicit "Unknown" factor level.
-
-\textit{[Insert figure: Distribution of Stops by Reported Sex and Ethnicity]}
-
-Sex distributions ($\texttt{sex}$) show that two-wheeled vehicle encounters are almost exclusively male ($96.0\%$ Male, $3.8\%$ Female, and $0.2\%$ Unknown). For four-wheeled vehicles, male drivers still constitute the majority ($80.5\%$), but female drivers represent a substantial portion of stops (395,347 encounters, or $18.3\%$).
-
-Ethnic distributions ($\texttt{ethnicity}$) reveal that both vehicle datasets are dominated by minority drivers, though the top demographic differs by vehicle class:
-
-\begin{itemize}
-    \item Among two-wheeled vehicle drivers, Hispanic motorists represent the plurality of stops (90,250 encounters, or $47.6\%$), followed by Black (39,130 stops, or $20.6\%$), White (18,494 stops, or $9.8\%$), and Asian/Pacific Islander motorists (18,172 stops, or $9.6\%$).
-    \item Among four-wheeled vehicle drivers, Black motorists represent the single largest group (656,109 stops, or $30.4\%$), followed closely by Hispanic motorists (565,531 stops, or $26.2\%$), White motorists (426,594 stops, or $19.8\%$), and Asian/Pacific Islander motorists (270,311 stops, or $12.5\%$).
-\end{itemize}
-
-In both datasets, the "Unknown" ethnicity level accounts for a noticeable portion of records (approx $10\%$ in two-wheelers and $9\%$ in four-wheelers), making its explicit retention essential for unbiased inference.
-
-\section{Bivariate Exploratory Data Analysis}
-
-Having characterized the marginal distributions of individual features, we now analyze bivariate relationships between potential predictors and the target variable $\texttt{arrested}$. Given the predominantly categorical structure of the data, we utilize Cramer's V to measure effect sizes without relying on p-values that become artificially inflated by large sample sizes.
-
-\subsection{Categorical Associations and Effect Sizes}
-
-To evaluate feature overlap and initial target association, we construct pairwise association matrices using Cramer's V across all categorical predictors and discrete representations of time and age.
-
-\textit{[Insert figure: Categorical Association Matrices (Cramer's V) for Both Datasets]}
-
-For two-wheeled vehicles, the strongest individual associations with $\texttt{arrested}$ originate from geographical location ($\texttt{area}$ and $\texttt{boro}$ at V = 0.13), temporal windows ($\texttt{hour}$ and $\texttt{time\_bracket}$ at V = 0.11), and motorist ethnicity ($\texttt{ethnicity}$ at V = 0.10). In contrast, demographic variables such as $\texttt{sex}$ (V = 0.02) and $\texttt{age\_bracket}$ (V = 0.04) demonstrate weak standalone associations with the target.
-
-For four-wheeled vehicles, the hierarchy of target association shifts slightly. Motorist ethnicity ($\texttt{ethnicity}$ at V = 0.10) and temporal windows ($\texttt{hour}$ and $\texttt{time\_bracket}$ at V = 0.09) provide the highest baseline signals, followed by $\texttt{age\_bracket}$ (V = 0.07) and $\texttt{sex}$ (V = 0.05). Spatial predictors ($\texttt{area}$ and $\texttt{boro}$) display lower direct pairwise association (V = 0.05 to 0.06) than in the two-wheeled dataset.
-
-In both datasets, pairwise associations among predictors reveal important structural relationships. In particular, strong associations exist between spatial attributes ($\texttt{area}$/$\texttt{boro}$) and motorist ethnicity (V = 0.17 to 0.19), as well as between ethnicity and driver sex (V = 0.15 to 0.16). Furthermore, linear correlation matrices across numerical attributes ($\texttt{age}$, $\texttt{hour}$, $\texttt{month}$, $\texttt{year}$) yield near-zero Pearson coefficients with $\texttt{arrested}$ (ranging from -0.07 to 0.03). These findings indicate that simple linear or single-variable main-effects models will underfit the data. Capturing patterns of enforcement escalation requires incorporating multi-way interaction terms, particularly between geographical zones and temporal windows ($\texttt{area} \times \texttt{time\_bracket}$).
-
-\subsection{Geospatial Determinants of Escalation Rates}
-
-Cross-tabulating stop outcomes across geographic regions reveals strong spatial disparities in the conditional probability of an arrest given a stop.
-
-\textit{[Insert figure: Arrest Rates by Area and Borough]}
-
-For two-wheeled vehicles, the arrest rate varies by nearly 4x across the five boroughs, ranging from a low of $3.2\%$ in Manhattan to a high of $12.1\%$ in the Bronx (where 3,628 out of 29,874 stops resulted in arrests). Staten Island also exhibits an elevated arrest rate of $8.5\%$, though this figure is based on a small sample of 125 arrests. High-volume boroughs like Brooklyn ($5.1\%$ arrest rate) and Queens ($4.5\%$ arrest rate) align closely with the citywide average. Sub-borough analysis ($\texttt{boro}$) confirms that Brooklyn South achieves an arrest rate of $6.1\%$, whereas Manhattan South records the lowest rate at $3.0\%$.
-
-For four-wheeled vehicles, spatial variations are more compact but remain statistically meaningful due to massive sample sizes. The borough-level arrest rate ranges from $2.5\%$ in Queens to $4.8\%$ in the Bronx (where 18,171 out of 381,239 stops resulted in arrests). However, examining the sub-borough level ($\texttt{boro}$) reveals dramatic intra-borough divergence within Manhattan: stops in Manhattan South yield an arrest rate of only $1.6\%$ (4,036 arrests out of 251,848 stops), whereas stops in Manhattan North jump to an arrest rate of $3.9\%$ (6,561 arrests out of 166,447 stops). This intra-borough split demonstrates that aggregating data to macro-level borough categories can mask localized enforcement hotspots.
-
-\textit{[Insert figure: Spatial Distribution of Arrest Rates in NYC Grid Bins]}
-
-Spatial grid maps displaying localized arrest proportions (filtered for bins with at least 5 stops) confirm the presence of high-concentration arrest clusters in northern Manhattan, the central Bronx, and parts of Brooklyn, where localized conversion rates exceed $15\%$ to $40\%$.
-
-\subsection{Temporal and Diurnal Escalation Trends}
-
-Evaluating arrest rates across temporal dimensions demonstrates how the conditional probability of escalation evolves over annual, seasonal, weekly, and daily cycles.
-
-\textit{[Insert figure: Annual and Monthly Arrest Rate Trends]}
-
-Annual arrest rate trajectories ($\texttt{year}$) reveal contrasting temporal trends between vehicle classes:
-\begin{itemize}
-    \item Two-wheeled vehicle arrest rates rose continuously over the three-year window, climbing from $4.4\%$ in 2023 to $5.6\%$ in 2024 and $6.0\%$ in 2025.
-    \item Four-wheeled vehicle arrest rates increased from $2.8\%$ in 2023 to $3.5\%$ in 2024, after which the rate stabilized at $3.4\%$ in 2025.
-\end{itemize}
-
-Monthly trends ($\texttt{month}$) and seasonal flags ($\texttt{hot\_season}$) further highlight operational divergences. Two-wheeled vehicle arrest rates track environmental warm-weather cycles, rising from $4.4\%$ in December to a peak of $6.5\%$ in July and September. Comparing seasonal blocks confirms that two-wheeler stops during the "Hot Season" (April–October) carry a $5.9\%$ arrest rate versus $4.8\%$ during the "Off Season". Conversely, four-wheeled vehicle arrest rates remain relatively flat across calendar months (hovering between $3.1\%$ and $3.3\%$ for most of the year) with slight spikes in December ($3.7\%$) and January ($4.1\%$). Year-by-year monthly faceting indicates that four-wheeled arrest probability shifts according to administrative priorities rather than weather patterns.
-
-Weekly cycles ($\texttt{weekday}$) show that for both vehicle types, the highest conditional probability of an arrest occurs on Saturday ($6.2\%$ for two-wheelers and $3.8\%$ for four-wheelers), whereas Mondays record lower conversion rates ($5.3\%$ for two-wheelers and $3.0\%$ for four-wheelers). Interestingly, while mid-week days (Wednesday and Thursday) generate the highest total stop volumes, weekend encounters carry a higher per-stop escalation risk.
-
-\textit{[Insert figure: Hourly Arrest Rate Diurnal Curves and Time Brackets]}
-
-Diurnal hourly curves ($\texttt{hour}$) display a striking, universal U-shaped pattern across both vehicle classes:
-\begin{itemize}
-    \item The arrest rate reaches its global minimum during the morning commute around 7:00 AM (dropping to $3.2\%$ for two-wheelers and $0.6\%$ for four-wheelers).
-    \item The arrest rate climbs steadily through the late afternoon and surges during late-night and early-morning hours, reaching an absolute peak at 3:00 AM ($10.9\%$ for two-wheelers and $5.3\%$ for four-wheelers).
-\end{itemize}
-Evaluating the binned variable $\texttt{time\_bracket}$ confirms this monotonic risk progression, with the Late Night (0–3) and Night (20–23) brackets registering the highest arrest proportions across both vehicle categories.
-
-\subsection{Demographic Disparities in Enforcement Outcomes}
-
-Evaluating arrest proportions across motorist demographic attributes reveals pronounced disparities based on reported age, sex, and ethnicity.
-
-\textit{[Insert figure: Arrest Rates by Reported Age, Sex, and Ethnicity]}
-
-Cross-tabulating outcome rates across age categories ($\texttt{age\_bracket}$) demonstrates distinct age-related escalation patterns:
-\begin{itemize}
-    \item For two-wheeled vehicles, the arrest rate decreases monotonically with age. Underage drivers ("Under 18") experience the highest escalation rate at $10.9\%$ (424 arrests out of 3,889 stops), followed by the "Unknown" age group ($7.1\%$) and young adults aged "18–24" ($6.3\%$). Seniors ("65+") exhibit the lowest rate at $3.2\%$.
-    \item For four-wheeled vehicles, the escalation risk concentrates heavily among young adults rather than minors. Drivers in the "25–34" bracket experience the highest arrest rate at $4.57\%$ (28,821 arrests out of 631,234 stops), closely followed by the "18–24" bracket at $4.38\%$ (14,380 arrests). Minors ("Under 18") face a $2.99\%$ arrest rate, while seniors ("65+") record the lowest rate at $0.66\%$.
-\end{itemize}
-
-Disaggregating by driver sex ($\texttt{sex}$) reveals a consistent gap across both vehicle categories. Male drivers face an arrest rate more than twice as high as female drivers. For two-wheelers, male stops result in arrests $5.7\%$ of the time compared to $2.7\%$ for females. For four-wheelers, male stops result in arrests $3.70\%$ of the time (64,333 arrests) compared to $1.51\%$ for females (5,966 arrests).
-
-Finally, evaluating stop outcomes by reported ethnicity ($\texttt{ethnicity}$) uncovers significant demographic disparities:
-
-\begin{itemize}
-    \item For two-wheeled vehicles, Hispanic drivers experience the highest arrest rate at $7.24\%$ (6,533 arrests out of 90,250 stops), closely followed by Black drivers at $6.86\%$ (2,686 arrests out of 39,130 stops). In contrast, White drivers record an arrest rate of $3.23\%$ (597 arrests out of 18,494 stops), while Asian/Pacific Islander drivers record a $1.94\%$ rate.
-    \item For four-wheeled vehicles, Black drivers experience the highest escalation rate at $5.02\%$ (32,954 arrests out of 656,109 stops), followed by Hispanic drivers at $4.66\%$ (26,330 arrests out of 565,531 stops). White drivers record an arrest rate of $1.15\%$ (4,912 arrests out of 426,594 stops), and Asian/Pacific Islander drivers record a $1.34\%$ rate.
-\end{itemize}
-
-In the four-wheeled vehicle dataset, the conditional probability of a stop resulting in an arrest is over four times higher for Black and Hispanic motorists than for White motorists. Because these rates are derived from large samples exceeding hundreds of thousands of observations, these disparities reflect stable structural patterns that form a central focus for our subsequent predictive and inferential modeling.
+This project studies arrest outcomes following NYPD vehicle stops in New York City. We study \textbf{whether the observed stop resulted in an arrest and which characteristics help explain or predict that outcome}. The statistical target is therefore $P(\texttt{arrested}=1 \mid X)$, where $X$ contains the predictor's information.
+
+\paragraph{Data Origin:} The data comes from the \textit{NYPD Vehicle Stop Reports}, published by the City of New York. The raw file used for the project contains 2,488,293 stop records and 19 attributes covering time, location, officer command, vehicle type, motorist demographics and enforcement outcomes.
+
+\paragraph{Data Context and Problems:} The data covers only about three years, it provides no complete description of the reason for the stop, and it contains partially missing demographic information. Coordinates are also incomplete or rounded in a non negligible fraction of observations. 
+
+\paragraph{Data Preparation:} The main objective was to retain information that could help us generalize arrest-related variables, while removing identifiers, overfitting predictors and features that could increase model complexity without adding interpretable signal. Here, we sum up what we did:
+
+\begin{center}
+\begin{tabular}{lll}
+\hline
+\textbf{Block} & \textbf{Main operation} & \textbf{Final representation} \\
+\hline
+Target  & retain arrest only & $\texttt{arrested}\in\{0,1\}$ \\
+Time & parse and decompose & year, month, weekday, hour \\
+Demographics & clean and group sparse values & age, age bracket, sex, ethnicity \\
+Geography & aggregate high cardinality command & area, boro, coordinates for EDA \\
+Vehicle & remove commercial and TLC groups & 2 wheels, 4 wheels \\
+\hline
+\end{tabular}
+\end{center}
+
+In particular, we must mention that missing demographic values were preserved through explicit Unknown levels (when appropriate), because we considered that the complete deletion would alter the empirical population instead of removing noise. Furthermore, the bracketing of commands was done based on a report published by the NYPD, and the categories of vehicles that we retain are either any vehicles with 2 wheels or private vehicles with 4 wheels. These two macro categories originated 2 separate datasets.
+After cleaning, we understood that the data available was very difficult to deal with. Most useful predictors are categorical and the main numerical variables, age and hour, are not naturally represented by a simple linear effect. At that point, we chose to go for parsimonious and interpretable models.
+
+\paragraph{Splitting the Analysis:} The cleaned datasets (from the data preparation) are \textbf{analysed as two separate populations with the same response and the same research focus}. This split is mainly justified by the strong differences in size, arrest association, age composition and temporal/geographical distributions.
+
+\paragraph{Exploratory Data Analysis and Goal:} The EDA is used to identify the structure that should be carried into the models. Its main purpose is to determine which predictors deserve attention, where the two datasets agree or disagree, and which relationships do not show linearity.
+
+\paragraph{Univariate Analysis:} First of all we have huge difference in scale and class prevalence. The two wheeled dataset contains 189,610 stops, with 10,560 arrests, corresponding to approximately $5.6\%$. The four wheeled dataset contains 2,157,445 stops, with 70,600 arrests, approximately $3.3\%$. \textbf{Arrest is, thus, a rare outcome in both populations} and especially rare for four wheeled vehicles. Secondly, the distribution of the predictors also highlight how the two dataset differ. \textbf{Two wheeled stops are concentrated among younger motorists} and exhibit pronounced seasonal variation, with much higher volumes during warmer months and strong growth from 2023 to 2025. \textbf{Four wheeled stops have a broader age distribution and a much more stable annual and seasonal profile}. Geographic distribution of stops is also more even for four wheeled vehicles.
+These differences justify the separate analyses but, at the same time, both datasets share the same difficulty: a rare binary target must be explained using mostly categorical or discrete predictors.
+
+\paragraph{Bivariate Analysis:} We first use Cramer's $V$ to summarize pairwise association among categorical predictors. For two wheeled vehicles, the clearest pairwise associations with arrest are geographical location ($V\approx0.13$ for area and boro), hour or time bracket ($V\approx0.11$) and ethnicity ($V\approx0.10$). Sex ($V\approx0.02$) and age or age bracket ($V\approx0.04$) are weak when considered alone. For four wheeled vehicles, ethnicity remains around $V\approx0.10$, hour around $0.09$, age bracket around $0.07$, sex around $0.05$ and geography around $0.05$ to $0.06$. The matrices also show that \textbf{predictor to predictor associations are generally modest}. The largest recurring structure is between ethnicity and geography, approximately $0.17$ to $0.19$. Pearson correlations among the raw numerical variables are similarly weak. This is useful for diagnostics purposes but it also suggests that simple linear target-predictor relationships do not suffice to explain the target. The bivariate results therefore focus the remainder of the analysis on five axes: $\texttt{boro}$, $\texttt{hour}$, $\texttt{sex}$, $\texttt{ethnicity}$ and $\texttt{age}$ or $\texttt{age\_bracket}$.
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/categ_corr_2w.png}
+\small (a) Two wheeled vehicles
+\end{minipage}
+\hfill
+\begin{minipage}{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{img/categ_corr_4w.png}
+\small (b) Four wheeled vehicles
+\end{minipage}
+\caption{Cram\'er's $V$ association matrices for the two analytical populations.}
+\label{fig:cramer-comparison}
+\end{figure}
+\FloatBarrier
+
+\paragraph{Geography:} The \textbf{Bronx has the highest raw arrest rate in both populations}. For two wheeled stops, borough level rates range from approximately $3.2\%$ in Manhattan to $12.1\%$ in the Bronx. For four wheeled stops, we range from about $2.5\%$ in Queens to $4.8\%$ in the Bronx.
+
+\paragraph{Hour:} It produces the most consistent raw pattern across the two populations. \textbf{Arrest rates are lowest during the morning and increase during late night and early morning hours}. Around 07:00 the raw rate is approximately $3.2\%$ for two wheeled vehicles and $0.6\%$ for four wheeled vehicles, while around 03:00 it rises to about $10.9\%$ and $5.3\%$. The shape is \textbf{clearly non linear} and motivates treating hour as more than a standard numerical predictor.
+
+\paragraph{Sex:} \textbf{Male motorists have higher raw arrest rates in both datasets}. The difference is approximately $5.7\%$ versus $2.7\%$ for two wheeled stops and $3.70\%$ versus $1.51\%$ for four wheeled stops.
+
+\paragraph{Ethnicity:} R\textbf{eported ethnicity shows the strongest demographic contrast}. In the two wheeled population, Hispanic and Black motorists have arrest rates of $7.24\%$ and $6.86\%$, compared with $3.23\%$ for White motorists. In the four wheeled population the corresponding rates are $4.66\%$, $5.02\%$ and $1.15\%$.
+
+\paragraph{Age:} \textbf{Age provides the clearest example of disagreement between the populations}. Two wheeled arrest rates are highest among the youngest groups and do not follow the same ordering observed for cars. In the four wheeled population, the 25--34 and 18--24 groups have the highest rates, while arrest frequency declines strongly at older ages.
 
