@@ -1,17 +1,346 @@
-\chapter{Clarifications, Limitations and Trade-offs}
-Here, we discuss some important aspects of the code and the theory behind it, with the goal of backing up the structural choices we made and understanding what went wrong. In this sense, we mainly face these topics as a "Q and A" format. 
+\chapter{Research Questions, Limitations and Conclusions}
 
+The preceding analyses can now be combined to answer the research questions
+introduced by the project. The objective of this chapter is not to introduce
+additional models, but to synthesize evidence from the EDA and the different
+statistical-learning approaches.
 
-\paragraph{What we wanted to achieve}
+% -----------------------------------------------------------------------------
+\section{RQ1: Are Arrest Outcomes Distributed Uniformly Across Recorded Stops?}
 
-\paragraph{What we found out through the EDA}
+\textbf{Answer: No.} The descriptive analysis provides clear evidence that
+arrest outcomes are heterogeneous across demographic, temporal, and
+geographical characteristics.
 
-\paragraph{What the models tell us}
+Among two-wheeled stops, the observed arrest rate is $12.1\%$ in the Bronx
+but only approximately $3.2\%$ in Manhattan. For four-wheeled stops the
+geographical range is narrower but remains substantial, from approximately
+$4.8\%$ in the Bronx to $2.5\%$ in Queens.
 
-\paragraph{Where we went wrong and what we wish we did}
+Time of day produces an especially consistent pattern. At approximately
+07:00, arrest rates fall to $3.2\%$ for two-wheeled vehicles and $0.6\%$
+for four-wheeled vehicles. By 03:00, they rise to approximately $10.9\%$
+and $5.3\%$, respectively.
 
-\paragraph{Recap to answer our questions}
+Demographic differences are also substantial. For two-wheeled vehicles,
+Hispanic and Black motorists have observed arrest rates of $7.24\%$ and
+$6.86\%$, compared with $3.23\%$ for White motorists. For four-wheeled
+vehicles, the corresponding rates are $4.66\%$, $5.02\%$, and $1.15\%$.
 
+The EDA therefore rejects the hypothesis that arrest outcomes are uniformly
+distributed across the observed characteristics. These are, however,
+\textbf{unadjusted differences}; they do not establish which characteristics
+retain an association after accounting for the others.
 
+% -----------------------------------------------------------------------------
+\section{RQ2: Do Demographic Disparities Persist After Adjustment?}
 
-\paragraph{Conclusion}
+\textbf{Answer: Yes.} Several of the demographic differences identified by the
+EDA remain after conditioning on temporal, geographical, and other demographic
+characteristics.
+
+The clearest evidence comes from reported ethnicity. In the Logistic
+Regression for two-wheeled vehicles,
+
+$$
+OR_{\text{Black}}=1.451,
+\qquad
+OR_{\text{Hispanic}}=1.778,
+$$
+
+relative to the White reference category.
+
+For four-wheeled vehicles the estimated associations are much larger:
+
+$$
+OR_{\text{Black}}=3.425,
+\qquad
+OR_{\text{Hispanic}}=3.258.
+$$
+
+These findings are not dependent on a single model. In the four-wheeled LASSO
+1-SE model, the corresponding penalized odds ratios remain approximately
+
+$$
+3.202
+\quad\text{and}\quad
+3.057,
+$$
+
+while the GAM estimates
+
+$$
+3.349
+\quad\text{and}\quad
+3.185.
+$$
+
+The same consistency is visible for sex. Female observations have conditional
+odds ratios of $0.300$ and $0.408$ in the two Logistic models, and the
+direction and magnitude remain similar under LASSO and GAM.
+
+Therefore, demographic disparities do not disappear after controlling for the
+observed context included in the models. In particular, the Black and Hispanic
+coefficients remain large and resistant to regularization in the four-wheeled
+analysis.
+
+These results demonstrate \textbf{persistent conditional statistical
+disparities}. They do not, by themselves, identify the mechanism responsible
+for those disparities.
+
+% -----------------------------------------------------------------------------
+\section{RQ3: Are the Relationships with Hour and Age Non-Linear?}
+
+\textbf{Answer: Yes.} The GAM provides strong statistical and graphical
+evidence that both relationships are non-linear.
+
+For hour of day,
+
+$$
+\text{edf}_{2W}=7.52,
+\qquad
+\text{edf}_{4W}=7.925,
+$$
+
+with $p<2\times10^{-16}$ in both models. The smooth functions reproduce the
+same broad cycle observed during the EDA: elevated arrest propensity during
+late-night and early-morning hours, a pronounced minimum around 07:00--08:00,
+and a progressive increase during the afternoon and evening.
+
+The consistency of this curve across vehicle types makes time of day one of
+the most stable findings in the entire analysis.
+
+Age is also non-linear,
+
+$$
+\text{edf}_{2W}=4.66,
+\qquad
+\text{edf}_{4W}=4.878,
+$$
+
+again with $p<2\times10^{-16}$.
+
+Unlike hour, however, the age curves differ substantially between vehicle
+types. The four-wheeled smooth reaches its highest value around ages 27--30
+and subsequently declines, particularly after age 50. The two-wheeled curve
+has a more irregular structure, with elevated values among the youngest
+observations and another local increase at later ages.
+
+The hypothesis that age and hour can be represented adequately by simple
+linear effects is therefore rejected.
+
+% -----------------------------------------------------------------------------
+\section{RQ4: Do Two-Wheeled and Four-Wheeled Stops Exhibit the Same Patterns?}
+
+\textbf{Answer: Only partially.}
+
+Some results are remarkably consistent. Both datasets exhibit:
+
+\begin{itemize}
+\item a strong late-night versus morning arrest pattern;
+\item lower conditional odds for female motorists;
+\item positive conditional associations for Black and Hispanic categories
+relative to White;
+\item substantial geographical heterogeneity;
+\item only moderate individual-level predictability.
+\end{itemize}
+
+However, the magnitude and sometimes even the direction of specific
+associations differ considerably.
+
+The ethnicity contrast is substantially stronger among four-wheeled vehicles.
+For example,
+
+$$
+OR_{\text{Black}}:
+1.451\;(2W)
+\quad\text{vs.}\quad
+3.425\;(4W),
+$$
+
+and
+
+$$
+OR_{\text{Hispanic}}:
+1.778\;(2W)
+\quad\text{vs.}\quad
+3.258\;(4W).
+$$
+
+Age provides an even clearer difference. In the Logistic Regression, Under-18
+two-wheeled observations have higher estimated odds than the 25--34 reference
+group,
+
+$$
+OR=1.725,
+$$
+
+whereas the corresponding four-wheeled estimate is
+
+$$
+OR=0.756.
+$$
+
+Similarly, the four-wheeled model exhibits a strong progressive reduction at
+older ages, reaching $OR_{65+}=0.201$, while the corresponding two-wheeled
+65+ coefficient is not statistically distinguishable from the 25--34
+reference group.
+
+The GAM smooths confirm that this is not merely an artifact of the age
+brackets.
+
+Consequently, the data support the decision to maintain separate analyses.
+There appears to be a common temporal component, but the demographic
+structure of arrest outcomes is strongly dependent on the vehicle context.
+
+% -----------------------------------------------------------------------------
+\section{RQ5: How Predictable Is an Arrest from the Available Information?}
+
+\textbf{Answer: Arrest is moderately predictable as a ranking problem, but not
+with high reliability at the individual classification level. Predictability
+is consistently greater for four-wheeled stops.}
+
+Across two-wheeled models, ROC-AUC ranges approximately from
+
+$$
+0.682 \text{ to } 0.690,
+$$
+
+whereas for four-wheeled models it remains around
+
+$$
+0.732 \text{ to } 0.735.
+$$
+
+Thus, all models perform better than random ranking, but none achieves strong
+class separation.
+
+The PR-AUC results must be interpreted relative to the different class
+prevalences. For two-wheeled vehicles, PR-AUC is approximately
+$0.117$--$0.125$ against a no-skill baseline of approximately $0.063$.
+For four-wheeled vehicles it is approximately $0.076$--$0.079$ against a
+much lower baseline of approximately $0.034$.
+odels. Consequently, most observations
+classified as arrests are false positives even though sensitivity is generally
+around $70\%-76\%$.
+
+The models therefore contain genuine information about relative arrest
+propensity, but the observed characteristics are not sufficient to determine
+individual arrest outcomes with high certainty.
+
+The GAM fit reinforces this conclusion from another perspective: only about
+$9.61\%$ and $9.31\%$ of deviance is explained in the two vehicle
+populations. A substantial part of the outcome therefore depends on
+information that is either unobserved or not represented by the available
+predictors.
+
+% -----------------------------------------------------------------------------
+\section{RQ6: Do the Results Demonstrate Systematic or Excessive Enforcement?}
+
+\textbf{Answer: The results provide evidence of persistent systematic
+statistical disparities in post-stop arrest outcomes, but they are not
+sufficient to establish systematic discriminatory or excessive enforcement.}
+
+There is substantial empirical evidence that the observed differences are not
+purely descriptive artifacts. For example, among four-wheeled vehicle stops,
+the raw arrest rate is $5.02\%$ for Black motorists and $4.66\%$ for
+Hispanic motorists compared with $1.15\%$ for White motorists. After
+adjustment, the Logistic Regression still estimates odds ratios of $3.425$
+and $3.258$, respectively. LASSO and GAM produce very similar conditional
+relationships.
+
+Similarly, significant geographical, sex-related, age-related, and temporal
+differences remain after adjustment, and several of these patterns are
+recovered under multiple modelling assumptions.
+
+This constitutes evidence that the disparities are
+\textbf{persistent and structured within the recorded stop data}.
+
+However, three different statements must be distinguished:
+
+$$
+\boxed{
+\text{Observed disparity}
+\neq
+\text{causal demographic effect}
+\neq
+\text{proof of discriminatory enforcement}
+}
+$$
+
+The dataset contains only vehicle stops that have already occurred. It
+therefore allows the analysis of
+
+$$
+P(\text{arrest}\mid\text{recorded stop},X),
+$$
+
+but not the probability that a motorist is stopped in the first place.
+
+Furthermore, the records do not contain complete information about the reason
+for the stop, the legal circumstances leading to the arrest, the behavior
+during the encounter, or other operational factors that may influence the
+decision to arrest. Consequently, important confounding information is not
+available to the models.
+
+The strongest conclusion supported by the available evidence is therefore the
+following:
+
+\begin{quote}
+Among recorded NYPD vehicle stops, arrest outcomes exhibit persistent
+demographic, temporal, and geographical disparities. Several of these
+differences remain large after adjustment for the observed characteristics and
+are reproduced across alternative statistical models, particularly in the
+four-wheeled population. However, the available data are insufficient to
+determine whether these conditional disparities are caused by discriminatory
+or excessive police enforcement.
+\end{quote}
+
+This distinction is central to the interpretation of the project. The analysis
+does not confirm a predetermined claim of police bias, nor does it provide
+evidence that the observed disparities are innocuous. Instead, it identifies
+which disparities are present, quantifies their magnitude, tests their
+robustness across modelling assumptions, and establishes the boundary beyond
+which the available data cannot support stronger causal conclusions.
+
+% =============================================================================
+% FINAL SYNTHESIS
+% =============================================================================
+
+% -----------------------------------------------------------------------------
+\section{Limitations}
+
+TODO
+
+% -----------------------------------------------------------------------------
+\section{Synthesis and Conclusions}
+
+Taken together, the exploratory and modelling analyses produce a coherent
+picture.
+
+The most stable finding is temporal: arrest propensity follows a pronounced
+daily cycle in both vehicle populations, with substantially lower conditional
+odds during morning hours and higher values during the night. The agreement
+between raw arrest rates, Logistic Regression coefficients, LASSO retention,
+Naive Bayes conditional distributions, and GAM smooths makes this the most
+robust cross-dataset pattern.
+
+Demographic variables also contain persistent information, but their effects
+are considerably more context-dependent. Reported ethnicity and sex remain
+associated with arrest after adjustment and regularization, while the magnitude
+of the ethnicity coefficients is substantially greater among four-wheeled
+vehicle stops. Age exhibits an even stronger vehicle-specific structure.
+
+At the same time, predictive performance places an important limit on the
+interpretation. The available predictors produce moderate ranking ability but
+low individual precision, and more flexible modelling does not substantially
+raise this performance ceiling.
+
+The principal contribution of the modelling stage is therefore not the
+identification of a single ``best'' classifier. It is the convergence of
+several modelling approaches toward the same broader conclusion:
+\textbf{post-stop arrest outcomes exhibit structured and persistent
+disparities, but much of the individual outcome remains unexplained by the
+information available in the dataset.}
+
+TODO

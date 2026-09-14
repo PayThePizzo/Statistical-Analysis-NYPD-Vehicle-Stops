@@ -6,9 +6,11 @@ The primary objective of this project is to evaluate whether police behavior dur
 
 As is typical in applied data science, our analytical strategy evolves as we gain deeper familiarity with the underlying data. Rather than restricting our scope to baseline descriptive summaries, our initial goal centers on converting, restructuring, and cleaning raw administrative records into a reliable tabular format. We engineer domain-specific features (including time-of-day brackets, age groupings, and jurisdictional aggregations) to uncover subtle patterns that raw predictors might obscure. Each transformation is systematically verified before proceeding to exploratory analysis and predictive modeling. Ultimately, we aim to construct and evaluate classification models capable of estimating the probability that a vehicle halt escalates into an arrest, quantifying both the predictive performance and the statistical confidence of our inferences.
 
-\section{Data Origin and Context}
+\section{Data Origin and Preparation}
 
-The dataset under study originates from public incident-level documentation published by the New York City Police Department (NYPD), released under the title NYPD Vehicle Stop Reports. The dataset was initially published on February 27, 2024, updated on February 6, 2026, and retrieved for this analysis in mid-March 2026. The raw file contains 2,488,293 individual vehicle stop records across 19 attributes.
+The dataset was published during February 27th 2024, by the NYPD, which describes the data as "Police incident level data documenting vehicular stops". Also, it was updated in February 6th 2026 and downloaded less than 8000 times at the time of download (Mid March 2026).
+
+The raw file contains 2,488,293 individual vehicle stop records across 19 attributes.
 
 Prior domain literature and public reporting (such as descriptive summaries provided by civil liberties organizations) primarily emphasize univariate figures and broad citywide percentages. However, those summaries rarely address multivariable interactions or predictive escalation modeling. Our initial inspection reveals a rich, high-volume dataset that provides substantial statistical power. At the same time, the raw data presents noticeable structural inconsistencies, high categorical cardinality, and missing coordinate values that necessitate careful preprocessing before formal modeling can begin.
 
