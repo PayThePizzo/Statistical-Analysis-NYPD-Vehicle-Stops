@@ -62,3 +62,7 @@ TODO.*
 *.xlsx
 *.pptx
 .positai
+
+report/*.aux
+report/*.log
+report/*.out
