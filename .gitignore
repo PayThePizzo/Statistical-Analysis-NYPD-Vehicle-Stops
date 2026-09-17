@@ -39,9 +39,6 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-# pkgdown site
-docs/
-
 # translation temp files
 po/*~
 
@@ -57,7 +54,6 @@ TODO.*
 *.png
 *.jpg
 *.jpeg
-*.pdf
 *.docx
 *.xlsx
 *.pptx
